@@ -1,0 +1,13 @@
+
+*.nes
+*.fm3
+*.fm2
+*.fmv
+*.3ct
+*.bk2
+bin/Debug/TriCNES.exe
+bin/Debug/TriCNES.exe.config
+bin/Debug/TriCNES.pdb
+bin/Release/TriCNES.exe
+bin/Release/TriCNES.exe.config
+bin/Release/TriCNES.pdb

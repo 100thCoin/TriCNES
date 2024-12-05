@@ -1,0 +1,12 @@
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\bin\Release\TriCNES.exe.config
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\bin\Release\TriCNES.exe
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\bin\Release\TriCNES.pdb
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Release\TriCNES.csproj.AssemblyReference.cache
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Release\TriCNES.Properties.Resources.resources
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Release\TriCNES.csproj.GenerateResource.cache
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Release\TriCNES.csproj.CoreCompileInputs.cache
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Release\TriCNES.exe
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Release\TriCNES.pdb
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Release\TriCNES.TriCNESGUI.resources
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Release\TriCNES.TASProperties.resources
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Release\TriCNES.TASProperties3ct.resources
