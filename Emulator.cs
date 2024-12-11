@@ -407,6 +407,71 @@ namespace TriCNES
 
         }
 
+        // when pressing the reset button, this function runs
+        public void Reset()
+        {
+            // The A, X, and Y registers are unchanged through reset.
+            // most flags go unchanged as well, but the I flag is set to 1
+            flag_Interrupt = true;
+            // Triangle phase gets reset, though I'm not yet emulating audio.
+            APU_DMC_Output &= 1;
+            // All the bits of $4015 are cleared
+            APU_Status_DMCInterrupt = false;
+            APU_Status_FrameInterrupt = false;
+            APU_Status_DelayedDMC = false;
+            APU_Status_DMC = false;
+            APU_Status_Noise = false;
+            APU_Status_Triangle = false;
+            APU_Status_Pulse2 = false;
+            APU_Status_Pulse1 = false;
+            APU_DMC_BytesRemaining = 0;
+            APU_LengthCounter_Noise = 0;
+            APU_LengthCounter_Triangle = 0;
+            APU_LengthCounter_Pulse2 = 0;
+            APU_LengthCounter_Pulse1 = 0;
+            APU_Framecounter = 0; // reset the frame counter
+
+            // PPU registers
+            PPU_Update2000Delay = 0;
+            PPU_Ctrl = 0; // this value is only used for debugging.
+            PPUControl_NMIEnabled = false;
+            PPUControlIncrementMode32 = false;
+            PPU_Spritex16 = false;
+            PPU_PatternSelect_Sprites = false;
+            PPU_PatternSelect_Background = false;
+            PPU_TempVRAMAddress = 0;
+
+            PPU_Update2001Delay = 0;
+            PPU_Mask_Greyscale = false;
+            PPU_Mask_EmphasizeRed = false;
+            PPU_Mask_EmphasizeGreen = false;
+            PPU_Mask_EmphasizeBlue = false;
+            PPU_Mask_8PxShowBackground = false;
+            PPU_Mask_8PxShowSprites = false;
+            PPU_Mask_ShowBackground = false;
+            PPU_Mask_ShowSprites = false;
+
+            PPU_Update2005Delay = 0;
+            PPU_FineXScroll = 0;
+
+            //$2006 is unchanged
+
+            PPU_Data_StateMachine = 7;
+            PPU_VRAMAddressBuffer = 0;
+            PPU_OddFrame = false;
+
+            PPU_ScanCycle = 0;
+            PPU_Scanline = 0;
+
+            DoDMCDMA = false;
+            DoOAMDMA = false;
+            operationCycle = 0;
+            operationComplete = false;
+            DoReset = true;
+
+            // in theory, the CPU/PPU clock would be given random values. Let's just assume no changes.
+        }
+
         public bool CPU_Read; // DMC DMA Has some specific behavior depending on if the CPU is currently reading or writing. DMA Halting fails / DMA $2007 bug.
 
 
