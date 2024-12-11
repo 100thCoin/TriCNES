@@ -271,5 +271,10 @@ namespace TriCNES
                 TASPropertiesForm3ct.Location = Location;
             }
         }
+
+        private void resetToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            EMU.Reset();
+        }
     }
 }

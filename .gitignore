@@ -13,3 +13,7 @@ bin/Release/TriCNES.exe.config
 bin/Release/TriCNES.pdb
 .vs/TriCNES/FileContentIndex/a1f39354-40ca-44d4-a1f4-22570f4e355b.vsidx
 .vs/TriCNES/FileContentIndex/4bef6b04-ae46-46c1-a5d2-a4ddde2871fe.vsidx
+*.vsidx
+*.vsidx
+*.cache
+/obj

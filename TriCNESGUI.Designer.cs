@@ -36,6 +36,7 @@
             this.loadTASToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.load3ctToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pb_Screen = new System.Windows.Forms.PictureBox();
+            this.resetToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pb_Screen)).BeginInit();
             this.SuspendLayout();
@@ -54,7 +55,8 @@
             // consoleToolStripMenuItem
             // 
             this.consoleToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.loadROMToolStripMenuItem});
+            this.loadROMToolStripMenuItem,
+            this.resetToolStripMenuItem});
             this.consoleToolStripMenuItem.Name = "consoleToolStripMenuItem";
             this.consoleToolStripMenuItem.Size = new System.Drawing.Size(62, 20);
             this.consoleToolStripMenuItem.Text = "Console";
@@ -62,7 +64,7 @@
             // loadROMToolStripMenuItem
             // 
             this.loadROMToolStripMenuItem.Name = "loadROMToolStripMenuItem";
-            this.loadROMToolStripMenuItem.Size = new System.Drawing.Size(130, 22);
+            this.loadROMToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.loadROMToolStripMenuItem.Text = "Load ROM";
             this.loadROMToolStripMenuItem.Click += new System.EventHandler(this.loadROMToolStripMenuItem_Click);
             // 
@@ -78,14 +80,14 @@
             // loadTASToolStripMenuItem
             // 
             this.loadTASToolStripMenuItem.Name = "loadTASToolStripMenuItem";
-            this.loadTASToolStripMenuItem.Size = new System.Drawing.Size(144, 22);
+            this.loadTASToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.loadTASToolStripMenuItem.Text = "Load TAS";
             this.loadTASToolStripMenuItem.Click += new System.EventHandler(this.loadTASToolStripMenuItem_Click);
             // 
             // load3ctToolStripMenuItem
             // 
             this.load3ctToolStripMenuItem.Name = "load3ctToolStripMenuItem";
-            this.load3ctToolStripMenuItem.Size = new System.Drawing.Size(144, 22);
+            this.load3ctToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.load3ctToolStripMenuItem.Text = "Load .3ct TAS";
             this.load3ctToolStripMenuItem.Click += new System.EventHandler(this.load3ctToolStripMenuItem_Click);
             // 
@@ -97,6 +99,13 @@
             this.pb_Screen.Size = new System.Drawing.Size(256, 240);
             this.pb_Screen.TabIndex = 1;
             this.pb_Screen.TabStop = false;
+            // 
+            // resetToolStripMenuItem
+            // 
+            this.resetToolStripMenuItem.Name = "resetToolStripMenuItem";
+            this.resetToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.resetToolStripMenuItem.Text = "Reset";
+            this.resetToolStripMenuItem.Click += new System.EventHandler(this.resetToolStripMenuItem_Click);
             // 
             // TriCNESGUI
             // 
@@ -133,6 +142,7 @@
         private System.Windows.Forms.ToolStripMenuItem loadROMToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem loadTASToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem load3ctToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem resetToolStripMenuItem;
     }
 }
 
