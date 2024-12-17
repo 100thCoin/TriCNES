@@ -147,7 +147,7 @@ namespace TriCNES
 
     }
 
-    class Emulator
+    public class Emulator
     {
         
         public Cartridge Cart;  // The idea behind this emulator is that this value could be changed at any time if you so desire.
@@ -8654,10 +8654,10 @@ namespace TriCNES
                                         Cart.Mapper_4_CHR_1KC = Input;
                                         return;
                                     case 6: //PRG ($8000 - $9FFF) ?+ 0x4000
-                                        Cart.Mapper_4_Bank8C = (byte)(Input & 0x3F);
+                                        Cart.Mapper_4_Bank8C = (byte)(Input & (Cart.PRG_Size*2-1));
                                         return;
                                     case 7: //PRG ($A000 - $BFFF)
-                                        Cart.Mapper_4_BankA = (byte)(Input & 0x3F);
+                                        Cart.Mapper_4_BankA = (byte)(Input & (Cart.PRG_Size*2-1));
                                         return;
                                 }
                                 return;

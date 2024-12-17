@@ -32,6 +32,11 @@ namespace TriCNES
             return (byte)cb_CpuClock.SelectedIndex;
         }
 
+        public bool FromRESET()
+        {
+            return rb_FromRES.Checked;
+        }
+
         public Cartridge[] CartridgeArray;
 
         public void Init()
@@ -41,6 +46,8 @@ namespace TriCNES
             cb_ClockAlignment.Update();
             cb_CpuClock.SelectedIndex = 0;
             cb_CpuClock.Update();
+            rb_FromPOW.Checked = true;
+            rb_FromPOW.Update();
         }
 
 
@@ -77,7 +84,14 @@ namespace TriCNES
                 l = SR.ReadLine();
                 if(File.Exists(Dir+l))
                 {
-                    CartridgeArray[i] = new Cartridge(Dir + l);
+                    if (MainGUI.EMU != null && MainGUI.EMU.Cart.Name == (Dir + l))
+                    {
+                        CartridgeArray[i] = MainGUI.EMU.Cart; // If running a TAS from RESET, we want to use the currently loaded cartridge
+                    }
+                    else
+                    {
+                        CartridgeArray[i] = new Cartridge(Dir + l);
+                    }
                 }
                 else
                 {
@@ -108,5 +122,6 @@ namespace TriCNES
 
             b_RunTAS.Enabled = true;
         }
+
     }
 }

@@ -17,3 +17,5 @@ bin/Release/TriCNES.pdb
 *.vsidx
 *.cache
 /obj
+*.vsidx
+*.vsidx

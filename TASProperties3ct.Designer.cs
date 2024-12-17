@@ -39,6 +39,10 @@
             this.tb_FilePath = new System.Windows.Forms.TextBox();
             this.b_RunTAS = new System.Windows.Forms.Button();
             this.b_LoadCartridges = new System.Windows.Forms.Button();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.rb_FromPOW = new System.Windows.Forms.RadioButton();
+            this.rb_FromRES = new System.Windows.Forms.RadioButton();
+            this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
             // cb_CpuClock
@@ -135,7 +139,7 @@
             // 
             this.b_RunTAS.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
             this.b_RunTAS.Enabled = false;
-            this.b_RunTAS.Location = new System.Drawing.Point(25, 176);
+            this.b_RunTAS.Location = new System.Drawing.Point(25, 212);
             this.b_RunTAS.Name = "b_RunTAS";
             this.b_RunTAS.Size = new System.Drawing.Size(300, 40);
             this.b_RunTAS.TabIndex = 14;
@@ -146,7 +150,7 @@
             // b_LoadCartridges
             // 
             this.b_LoadCartridges.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
-            this.b_LoadCartridges.Location = new System.Drawing.Point(25, 118);
+            this.b_LoadCartridges.Location = new System.Drawing.Point(25, 154);
             this.b_LoadCartridges.Name = "b_LoadCartridges";
             this.b_LoadCartridges.Size = new System.Drawing.Size(300, 40);
             this.b_LoadCartridges.TabIndex = 25;
@@ -154,11 +158,43 @@
             this.b_LoadCartridges.UseVisualStyleBackColor = true;
             this.b_LoadCartridges.Click += new System.EventHandler(this.b_LoadCartridges_Click);
             // 
+            // panel1
+            // 
+            this.panel1.Controls.Add(this.rb_FromPOW);
+            this.panel1.Controls.Add(this.rb_FromRES);
+            this.panel1.Location = new System.Drawing.Point(25, 98);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(100, 49);
+            this.panel1.TabIndex = 26;
+            // 
+            // rb_FromPOW
+            // 
+            this.rb_FromPOW.AutoSize = true;
+            this.rb_FromPOW.Location = new System.Drawing.Point(5, 3);
+            this.rb_FromPOW.Name = "rb_FromPOW";
+            this.rb_FromPOW.Size = new System.Drawing.Size(92, 17);
+            this.rb_FromPOW.TabIndex = 3;
+            this.rb_FromPOW.TabStop = true;
+            this.rb_FromPOW.Text = "From POWER";
+            this.rb_FromPOW.UseVisualStyleBackColor = true;
+            // 
+            // rb_FromRES
+            // 
+            this.rb_FromRES.AutoSize = true;
+            this.rb_FromRES.Location = new System.Drawing.Point(5, 26);
+            this.rb_FromRES.Name = "rb_FromRES";
+            this.rb_FromRES.Size = new System.Drawing.Size(87, 17);
+            this.rb_FromRES.TabIndex = 4;
+            this.rb_FromRES.TabStop = true;
+            this.rb_FromRES.Text = "From RESET";
+            this.rb_FromRES.UseVisualStyleBackColor = true;
+            // 
             // TASProperties3ct
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(350, 228);
+            this.ClientSize = new System.Drawing.Size(350, 264);
+            this.Controls.Add(this.panel1);
             this.Controls.Add(this.b_LoadCartridges);
             this.Controls.Add(this.cb_CpuClock);
             this.Controls.Add(this.label1);
@@ -173,6 +209,8 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "TASProperties3ct";
             this.Text = "3CT TAS Properties";
+            this.panel1.ResumeLayout(false);
+            this.panel1.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -190,5 +228,8 @@
         private System.Windows.Forms.TextBox tb_FilePath;
         private System.Windows.Forms.Button b_RunTAS;
         private System.Windows.Forms.Button b_LoadCartridges;
+        private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.RadioButton rb_FromPOW;
+        private System.Windows.Forms.RadioButton rb_FromRES;
     }
 }

@@ -25,7 +25,7 @@ namespace TriCNES
             InitializeComponent();
         }
 
-        Emulator EMU;
+        public Emulator EMU;
         Thread EmuClock;
         string CurrentROMFilePath;
         TASProperties TASPropertiesForm;
@@ -240,7 +240,19 @@ namespace TriCNES
                     catch (System.Threading.ThreadAbortException) { }
                 }
             }
-            EMU = new Emulator();
+            if (TASPropertiesForm3ct.FromRESET())
+            {
+                if(EMU == null)
+                {
+                    MessageBox.Show("The emulator needs to be powered on before running from RESET.");
+                    return;
+                }
+                EMU.Reset();
+            }
+            else
+            {
+                EMU = new Emulator();
+            }
             EmuClock = new Thread(ClockEmulator3CT);
             EmuClock.IsBackground = true;
             EmuClock.Start();
@@ -275,6 +287,18 @@ namespace TriCNES
         private void resetToolStripMenuItem_Click(object sender, EventArgs e)
         {
             EMU.Reset();
+        }
+
+        private void powerCycleToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Emulator Emu2 = new Emulator();
+            Emu2.Cart = EMU.Cart;
+            EMU = Emu2;
+        }
+
+        private void screenshotToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Clipboard.SetImage(EMU.Screen.Bitmap);
         }
     }
 }
