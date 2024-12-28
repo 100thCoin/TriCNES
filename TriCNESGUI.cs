@@ -300,5 +300,7 @@ namespace TriCNES
         {
             Clipboard.SetImage(EMU.Screen.Bitmap);
         }
+
+
     }
 }

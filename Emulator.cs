@@ -198,6 +198,7 @@ namespace TriCNES
         public byte specialBus = 0;  // The Special Bus is used in certain instructions. //TODO: What's the actual use for this bus??
         public byte pd = 0;         // PreDecode register. This holds values between CPU cycles that are used in later cycles within an instruction.
 
+
         public byte operationCycle = 0; // This tracks what cycle of a given instruction is being emulated. Cycle 0 fetches the opcode, and all cycles after that have specific logic depending on which cycle needs emulated next.
         public bool operationComplete = false; // When an instruction is complete, I use this to reset operationCycle.
 
@@ -2180,6 +2181,10 @@ namespace TriCNES
                     if ((PPU_ReadWriteAddress & 0x3F1F) >= 0x3F00) // if v points to palette ram:
                     {
                         PaletteRAMAddress = (byte)(PPU_ReadWriteAddress & 0x1F); // The palette RAM address is simply wherever the v register is. (bitwise and with $1F due to palette RAM mirroring)
+                        if ((PaletteRAMAddress & 3) == 0)
+                        {
+                            PaletteRAMAddress &= 0x0F; // the transparent colors for sprites and backgrounds are shared.
+                        }
                     }
                     else
                     {
@@ -2194,13 +2199,335 @@ namespace TriCNES
                     PPU_VRegisterChangedOutOfVBlank = false;
                     PPU_PaletteCorruptionRenderingDisabledOutOfVBlank = false;
                     // PPU palette corruption!
-                    // To be honest, I have no idea what's going on here. This will be worked out later.
+
+                    CorruptPalettes(Color, Palette);
+                    // This corruption also results in a single discolored pixel, and this occurs on all alignments.
+                    // I'm not entirely sure how this works, and I think it's the *next* pixel that gets corrupt? More research needed.
+
                 }
 
-                DotColor = PaletteRAM[0x00 | PaletteRAMAddress]; // Get the color by reading from Palette RAM
+                DotColor = (byte)((PaletteRAM[0x00 | PaletteRAMAddress]) & 0x3F); // Get the color by reading from Palette RAM
 
                 // though this is actually drawn to the screen 2 ppu cycles from now.
             }
+        }
+
+        void CorruptPalettes(byte Color, byte Palette)
+        {
+            // Depending on the index into a color palette being used to select a color being drawn when rendering was disabled during a nametable fetch on a visible pixel with the PPU V Register (bitwise AND with $3FFF) being >= $3C00...
+            // Palettes get "corrupted" with a specific pattern.
+            // This pattern is determined by:
+            // The lowest nybble of the PPU's V register,
+            // The color index into the palette,
+            // and if this is using a sprite palette. (TODO: emulate this part)
+
+            // All of this was determined by observations with a custom test cart.
+            // It is entirely possible that the logic defined in this functions is incorrect, or possibly there are more factors at play.
+            // As far as I can tell though, this is "good enough" emulation of palette corruption.
+
+            if ((CPUClock & 3) != 2)
+            {
+                // this ONLY occurs on alignment 2.
+                return;
+            }
+
+
+            byte[] CorruptedPalette = new byte[PaletteRAM.Length];
+            for (int i = 0; i < CorruptedPalette.Length; i++)
+            {
+                CorruptedPalette[i] = PaletteRAM[i];
+            }
+
+            switch (Color)
+            {
+                case 0:
+                    // simply take the low nybble from the V register. that's the color to corrupt.
+                    CorruptedPalette[PPU_ReadWriteAddress & 0xF] = (byte)((PaletteRAM[0] & PaletteRAM[PPU_ReadWriteAddress & 0xC]) | (PaletteRAM[0] & PaletteRAM[PPU_ReadWriteAddress & 0xF]) | (PaletteRAM[PPU_ReadWriteAddress & 0xC] & PaletteRAM[PPU_ReadWriteAddress & 0xF]));
+                    // TODO: Nybble 7 can corrupt color F. It's inconsistent though, so I'll need to circle back to this.
+
+                    break;
+                case 1:
+
+                    // To be honest, I'm not sure what's going on, so forgive the lack of comments.
+                    // There's almost a pattern, but again- unsure on why this is how it behaves.
+                    // and also it's likely this isn't entirely accurate, either due to mistyping something, or not enough research.
+
+                    switch (PPU_ReadWriteAddress & 0xF)
+                    {
+                        case 0:
+                            CorruptedPalette[0x0] = (byte)((PaletteRAM[0x1] & PaletteRAM[0xD]) | PaletteRAM[0x0]);
+                            CorruptedPalette[0x4] = PaletteRAM[0x5];
+                            CorruptedPalette[0x8] = PaletteRAM[0x9];
+                            CorruptedPalette[0xC] = PaletteRAM[0xD];
+                            break;
+                        case 1:
+                            break;
+                        case 2:
+                            CorruptedPalette[0x2] = (byte)((PaletteRAM[0x2] | PaletteRAM[0xD]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x3] = (byte)((PaletteRAM[0x1] | PaletteRAM[0x2]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x6] = (byte)((PaletteRAM[0x6] | PaletteRAM[0x5]) & PaletteRAM[0x7]);
+                            CorruptedPalette[0xA] = (byte)((PaletteRAM[0xA] | PaletteRAM[0x9]) & PaletteRAM[0xB]);
+                            CorruptedPalette[0xE] = PaletteRAM[0xD];
+                            CorruptedPalette[0xF] = PaletteRAM[0xD];
+                            break;
+                        case 3:
+                            CorruptedPalette[0x3] &= (byte)(PaletteRAM[0x1] | PaletteRAM[0xD]);
+                            CorruptedPalette[0xF] = PaletteRAM[0xD];
+                            break;
+                        case 4:
+                            CorruptedPalette[0x0] = PaletteRAM[0x1];
+                            CorruptedPalette[0x4] = (byte)((PaletteRAM[0x5] & PaletteRAM[0xD]) | PaletteRAM[0x4]);
+                            CorruptedPalette[0x8] = PaletteRAM[0x9];
+                            CorruptedPalette[0xC] = PaletteRAM[0xD];
+                            break;
+                        case 5:
+                            break;
+                        case 6:
+                            CorruptedPalette[0x2] = (byte)((PaletteRAM[0x2] | PaletteRAM[0x1]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x6] = (byte)((PaletteRAM[0x6] | PaletteRAM[0x7]) & PaletteRAM[0xD]);
+                            CorruptedPalette[0x7] = (byte)((PaletteRAM[0x7] | PaletteRAM[0x6]) & PaletteRAM[0x5]);
+                            CorruptedPalette[0xA] = (byte)((PaletteRAM[0xA] | PaletteRAM[0x9]) & PaletteRAM[0xB]);
+                            CorruptedPalette[0xE] = PaletteRAM[0xD];
+                            CorruptedPalette[0xF] = PaletteRAM[0xD];
+                            break;
+                        case 7:
+                            CorruptedPalette[0x7] &= (byte)(PaletteRAM[0x5] | PaletteRAM[0xD]);
+                            CorruptedPalette[0xF] = PaletteRAM[0xD];
+                            break;
+                        case 8:
+                            CorruptedPalette[0x0] = PaletteRAM[0x1];
+                            CorruptedPalette[0x4] = PaletteRAM[0x5];
+                            CorruptedPalette[0x8] = (byte)((PaletteRAM[0x9] & PaletteRAM[0xD]) | PaletteRAM[0x8]);
+                            CorruptedPalette[0xC] = PaletteRAM[0xD];
+                            break;
+                        case 9:
+                            break;
+                        case 0xA:
+                            CorruptedPalette[0x2] = (byte)((PaletteRAM[0x2] | PaletteRAM[0x1]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x6] = (byte)((PaletteRAM[0x6] | PaletteRAM[0xD]) & PaletteRAM[0x7]);
+                            CorruptedPalette[0xA] = (byte)((PaletteRAM[0xB] | PaletteRAM[0xD]) & PaletteRAM[0xA]);
+                            CorruptedPalette[0xB] = (byte)((PaletteRAM[0x9] | PaletteRAM[0xA]) & PaletteRAM[0xB]);
+                            CorruptedPalette[0xE] = PaletteRAM[0xD];
+                            CorruptedPalette[0xF] = PaletteRAM[0xD];
+                            break;
+                        case 0xB:
+                            CorruptedPalette[0xB] &= (byte)(PaletteRAM[0x9] | PaletteRAM[0xD]);
+                            CorruptedPalette[0xF] = PaletteRAM[0xD];
+                            break;
+                        case 0xC:
+                            CorruptedPalette[0x0] = PaletteRAM[0x1];
+                            CorruptedPalette[0x4] = PaletteRAM[0x5];
+                            CorruptedPalette[0x8] = PaletteRAM[0x9];
+                            CorruptedPalette[0xC] = PaletteRAM[0xD];
+                            break;
+                        case 0xD:
+                            break;
+                        case 0xE:
+                            CorruptedPalette[0x2] = (byte)((PaletteRAM[0x2] | PaletteRAM[0x1]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x6] = (byte)((PaletteRAM[0x6] | PaletteRAM[0xD]) & PaletteRAM[0x7]);
+                            CorruptedPalette[0xA] = (byte)((PaletteRAM[0xA] | PaletteRAM[0x9]) & PaletteRAM[0xB]);
+                            CorruptedPalette[0xE] = PaletteRAM[0xD];
+                            CorruptedPalette[0xF] = PaletteRAM[0xD];
+                            break;
+                        case 0xF:
+                            CorruptedPalette[0xF] = PaletteRAM[0xD];
+                            break;
+                    }
+
+
+                    // In some tests with case A, bit 3 ($08) of color 3 can remove bit 2 ($04) from the value of color 0 for the purposes of the bitwise AND. It's inconsistent though.
+
+
+                    break;
+                case 2:
+
+                    // To be honest, I'm not sure what's going on, so forgive the lack of comments.
+                    // There's almost a pattern, but again- unsure on why this is how it behaves.
+                    // and also it's likely this isn't entirely accurate, either due to mistyping something, or not enough research.
+
+                    switch (PPU_ReadWriteAddress & 0xF)
+                    {
+                        case 0:
+                            CorruptedPalette[0x0] = (byte)(PaletteRAM[0x0] | (PaletteRAM[0x2] & PaletteRAM[0xE]));
+                            CorruptedPalette[0x4] = PaletteRAM[0x6];
+                            CorruptedPalette[0x8] = PaletteRAM[0xA];
+                            CorruptedPalette[0xC] = PaletteRAM[0xE];
+                            break;
+                        case 1:
+                            CorruptedPalette[0x1] = (byte)((PaletteRAM[0x2] | PaletteRAM[0x1] | PaletteRAM[0xE]) & (PaletteRAM[0x3] | PaletteRAM[0xE]));
+                            CorruptedPalette[0x3] = (byte)((PaletteRAM[0x2] | PaletteRAM[0xE] | 0x3C) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x5] = (byte)((PaletteRAM[0x6] | PaletteRAM[0x7]) & PaletteRAM[0x5]);
+                            CorruptedPalette[0x9] = (byte)((PaletteRAM[0xA] | PaletteRAM[0xB]) & PaletteRAM[0x9]);
+                            CorruptedPalette[0xD] = PaletteRAM[0xE];
+                            CorruptedPalette[0xF] = PaletteRAM[0xE];
+                            break;
+                        case 2:
+                            break;
+                        case 3:
+                            CorruptedPalette[0x3] &= (byte)(PaletteRAM[0x2] | PaletteRAM[0xE]);
+                            CorruptedPalette[0xF] = PaletteRAM[0xE];
+                            break;
+                        case 4:
+                            CorruptedPalette[0x0] = PaletteRAM[0x2];
+                            CorruptedPalette[0x4] = (byte)(PaletteRAM[0x4] | (PaletteRAM[0x6] & PaletteRAM[0xE]));
+                            CorruptedPalette[0x8] = PaletteRAM[0xA];
+                            CorruptedPalette[0xC] = PaletteRAM[0xE];
+                            break;
+                        case 5:
+                            CorruptedPalette[0x1] = (byte)((PaletteRAM[0x2] | PaletteRAM[0x1]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x5] = (byte)((PaletteRAM[0xE] | PaletteRAM[0x6]) & PaletteRAM[0x5]);
+                            CorruptedPalette[0x7] = (byte)((PaletteRAM[0xE] | PaletteRAM[0x6]) & PaletteRAM[0x7]);
+                            CorruptedPalette[0xD] = PaletteRAM[0xE];
+                            CorruptedPalette[0xF] = PaletteRAM[0xE];
+                            break;
+                        case 6:
+                            break;
+                        case 7:
+                            CorruptedPalette[0x7] &= (byte)(PaletteRAM[0x6] | PaletteRAM[0xE]);
+                            //CorruptedPalette[0xF] = PaletteRAM[0xE];
+                            break;
+                        case 8:
+                            CorruptedPalette[0x0] = PaletteRAM[0x2];
+                            CorruptedPalette[0x4] = PaletteRAM[0x6];
+                            CorruptedPalette[0x8] = (byte)(PaletteRAM[0x8] | (PaletteRAM[0xA] & PaletteRAM[0xE]));
+                            CorruptedPalette[0xC] = PaletteRAM[0xE];
+                            break;
+                        case 9:
+                            CorruptedPalette[0x1] = (byte)((PaletteRAM[0x2] | PaletteRAM[0x1]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x5] = (byte)((PaletteRAM[0x6] | PaletteRAM[0x5]) & PaletteRAM[0x7]);
+                            CorruptedPalette[0x9] = (byte)((PaletteRAM[0xE] | PaletteRAM[0xA] | 0x01) & PaletteRAM[0x9]);
+                            CorruptedPalette[0xB] = (byte)((PaletteRAM[0xE] | PaletteRAM[0xA] | 0x31) & PaletteRAM[0xB]);
+                            CorruptedPalette[0xD] = PaletteRAM[0xE];
+                            CorruptedPalette[0xF] = PaletteRAM[0xE];
+                            break;
+                        case 0xA:
+                            break;
+                        case 0xB:
+                            CorruptedPalette[0xB] &= (byte)(PaletteRAM[0xA] | PaletteRAM[0xE]);
+                            CorruptedPalette[0xF] = PaletteRAM[0xE];
+                            break;
+                        case 0xC:
+                            CorruptedPalette[0x0] = PaletteRAM[0x2];
+                            CorruptedPalette[0x4] = PaletteRAM[0x6];
+                            CorruptedPalette[0x8] = PaletteRAM[0xA];
+                            CorruptedPalette[0xC] = PaletteRAM[0xE];
+                            break;
+                        case 0xD:
+                            CorruptedPalette[0x1] = (byte)((PaletteRAM[0x2] | PaletteRAM[0x1]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x5] = (byte)((PaletteRAM[0x6] | PaletteRAM[0x5]) & PaletteRAM[0x7]);
+                            CorruptedPalette[0x9] = (byte)((PaletteRAM[0xA] | PaletteRAM[0x9]) & PaletteRAM[0xB]);
+                            CorruptedPalette[0xD] = PaletteRAM[0xE];
+                            CorruptedPalette[0xF] = PaletteRAM[0xE];
+                            break;
+                        case 0xE:
+                            break;
+                        case 0xF:
+                            CorruptedPalette[0xF] = PaletteRAM[0xE];
+                            break;
+                    }
+
+
+                    break;
+                case 3:
+
+                    // To be honest, I'm not sure what's going on, so forgive the lack of comments.
+                    // There's almost a pattern, but again- unsure on why this is how it behaves.
+                    // and also it's likely this isn't entirely accurate, either due to mistyping something, or not enough research.
+
+                    switch (PPU_ReadWriteAddress & 0xF)
+                    {
+                        case 0:
+                            CorruptedPalette[0x0] = (byte)((PaletteRAM[0x3] | (PaletteRAM[0xF] & PaletteRAM[0x0])));
+                            CorruptedPalette[0x4] &= PaletteRAM[0x7];
+                            CorruptedPalette[0x8] &= (byte)(PaletteRAM[0x9] | PaletteRAM[0xA] | PaletteRAM[0xB] | PaletteRAM[0xF] | 0x22); // magic number... Probably a temperature thing? I've seen 02, 22, 2C, or 2E
+                            CorruptedPalette[0xC] = PaletteRAM[0xF];
+                            break;
+                        case 1:
+                            CorruptedPalette[0x1] = (byte)((PaletteRAM[0x1] | PaletteRAM[0xF]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x5] = PaletteRAM[0x7];
+                            CorruptedPalette[0x9] = PaletteRAM[0xB];
+                            CorruptedPalette[0xD] = PaletteRAM[0xF];
+                            break;
+                        case 2:
+                            CorruptedPalette[0x2] = (byte)((PaletteRAM[0x3] | PaletteRAM[0xF]) & PaletteRAM[0x3]);
+                            CorruptedPalette[0x6] = PaletteRAM[0x7];
+                            CorruptedPalette[0xA] = PaletteRAM[0xB];
+                            CorruptedPalette[0xE] = PaletteRAM[0xF];
+                            break;
+                        case 3:
+                            break;
+                        case 4:
+                            CorruptedPalette[0x0] &= (byte)(((PaletteRAM[0xF] ^ 0xFF)) | PaletteRAM[0x1] | PaletteRAM[0x2] | PaletteRAM[0x3] | 0x7); // magic number... I've only seen it as 07 though.
+                            CorruptedPalette[0x4] &= (byte)(PaletteRAM[0x7] | PaletteRAM[0xF]);
+                            CorruptedPalette[0x8] &= (byte)(PaletteRAM[0xB] | PaletteRAM[0xF] | (PaletteRAM[0xC] ^ 0xFF));
+                            CorruptedPalette[0xC] = (byte)((PaletteRAM[0x7] & PaletteRAM[0xF]) | PaletteRAM[0xC]);
+                            break;
+                        case 5:
+                            CorruptedPalette[0x1] = PaletteRAM[0x3];
+                            CorruptedPalette[0x5] = (byte)((PaletteRAM[0x5] | PaletteRAM[0xF]) & PaletteRAM[0x7]);
+                            CorruptedPalette[0x9] = PaletteRAM[0xB];
+                            CorruptedPalette[0xD] = PaletteRAM[0xF];
+                            break;
+                        case 6:
+                            CorruptedPalette[0x2] = PaletteRAM[0x3];
+                            CorruptedPalette[0x6] = (byte)((PaletteRAM[0x6] | PaletteRAM[0xF]) & PaletteRAM[0x7]);
+                            CorruptedPalette[0xA] = PaletteRAM[0xB];
+                            CorruptedPalette[0xE] = PaletteRAM[0xF];
+                            break;
+                        case 7:
+                            break;
+                        case 8:
+                            CorruptedPalette[0x0] &= (byte)(((PaletteRAM[0xF] ^ 0xFF)) | PaletteRAM[0x1] | PaletteRAM[0x2] | PaletteRAM[0x3] | 0x23); // magic number... I've only seen it as 23 though.
+                            CorruptedPalette[0x4] = (byte)(PaletteRAM[0x7]);
+                            CorruptedPalette[0x8] &= (byte)(PaletteRAM[0xB] | PaletteRAM[0xF] | (PaletteRAM[0xC] ^ 0xFF));
+                            CorruptedPalette[0xC] = (byte)((PaletteRAM[0xB] & PaletteRAM[0xF]) | PaletteRAM[0xC]);
+                            break;
+                        case 9:
+                            CorruptedPalette[0x1] = PaletteRAM[0x3];
+                            CorruptedPalette[0x5] = PaletteRAM[0x7];
+                            CorruptedPalette[0x9] = (byte)((PaletteRAM[0x9] | PaletteRAM[0xF]) & PaletteRAM[0xB]);
+                            CorruptedPalette[0xD] = PaletteRAM[0xF];
+                            break;
+                        case 0xA:
+                            CorruptedPalette[0x2] = PaletteRAM[0x3];
+                            CorruptedPalette[0x6] = PaletteRAM[0x7];
+                            CorruptedPalette[0xA] = (byte)((PaletteRAM[0xA] | PaletteRAM[0xF]) & PaletteRAM[0xB]);
+                            CorruptedPalette[0xE] = PaletteRAM[0xF];
+                            break;
+                        case 0xB:
+                            break;
+                        case 0xC:
+                            CorruptedPalette[0x0] &= (byte)(((PaletteRAM[0xF] ^ 0xFF)) | PaletteRAM[0x1] | PaletteRAM[0x2] | PaletteRAM[0x3] | 0x37); // magic number... I've only seen it as 23 though.
+                            CorruptedPalette[0x4] = PaletteRAM[0x7];
+                            CorruptedPalette[0x8] &= (byte)(PaletteRAM[0xB] | 0x2F); // Magic number. I've seen 2F and 2E
+                            CorruptedPalette[0xC] = PaletteRAM[0xF];
+                            break;
+                        case 0xD:
+                            CorruptedPalette[0x1] = PaletteRAM[0x3];
+                            CorruptedPalette[0x5] = PaletteRAM[0x7];
+                            CorruptedPalette[0x9] = PaletteRAM[0xB];
+                            CorruptedPalette[0xD] = PaletteRAM[0xF];
+                            break;
+                        case 0xE:
+                            CorruptedPalette[0x2] = PaletteRAM[0x3];
+                            CorruptedPalette[0x6] = PaletteRAM[0x7];
+                            CorruptedPalette[0xA] = PaletteRAM[0xB];
+                            CorruptedPalette[0xE] = PaletteRAM[0xF];
+                            break;
+                        case 0xF:
+                            break;
+                    }
+
+                    break;
+
+
+            }
+            for (int i = 0; i < CorruptedPalette.Length; i++)
+            {
+                PaletteRAM[i] = CorruptedPalette[i];
+            }
+
+
         }
 
 
@@ -2473,7 +2800,9 @@ namespace TriCNES
                 Address = PPUAddressWithMirroring(Address);
                 if (Address >= 0x3F00)
                 {
-                    return PaletteRAM[Address & 0x1F];
+                    // read from palette RAM.
+                    // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
+                    return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
                 }
                 return PPU[Address];
             }
@@ -2586,6 +2915,7 @@ namespace TriCNES
         bool OAMDMA_Halt = false;
         bool DMCDMA_Halt = false;
         byte OAM_InternalBus;   // a data bus that's used for the OAM DMA
+        ushort OAMAddressBus;   // the address bus of the OAM DMA
 
         // The DMAs (Direct Memory Accesses) Have "get" and "put" cycles.
         // they can also be "halted" in which case, it will always read instead of write.
@@ -2601,16 +2931,18 @@ namespace TriCNES
 
         void OAMDMA_Get()
         {
+            OAMAddressBus = (ushort)(DMAPage << 8 | DMAAddress);
+
 
             OAMDMA_Aligned = true;
             // the fetch happens regardless of halt
+            OAM_InternalBus = Fetch(OAMAddressBus);
+
             if ((addressBus & 0xFFE0) == 0x4000)
             {
-                OAM_InternalBus = Fetch((ushort)((addressBus & 0xEFE0) | (DMAAddress & 0x1F))); //This still updates the databus
-            }
-            else
-            {
-                OAM_InternalBus = Fetch((ushort)(DMAPage << 8 | DMAAddress)); // regular read.   This still updates the databus
+                // Bus conflict with APU Registers
+                OAMAddressBus = (ushort)((addressBus & 0xEFE0) | (DMAAddress & 0x1F));
+                OAM_InternalBus = Fetch(OAMAddressBus);
             }
         }
         void OAMDMA_Halted()
@@ -2643,6 +2975,13 @@ namespace TriCNES
         {
             // now reload the DMC buffer.
             APU_DMC_Buffer = Fetch(APU_DMC_SampleAddress);
+
+            if ((addressBus & 0xFFE0) == 0x4000)
+            {
+                // Bus conflict with APU Registers
+                OAM_InternalBus = Fetch((ushort)((addressBus & 0xEFE0) | (APU_DMC_SampleAddress & 0x1F)));
+            }
+
             APU_DMC_AddressCounter++;
             if (APU_DMC_BytesRemaining > 0)
             {
@@ -2675,6 +3014,7 @@ namespace TriCNES
         void DMCDMA_Halted()
         {
             Fetch(addressBus);
+
             if ((addressBus & 0xE007) == 0x2007)  // this needs to include mirrors
             {
                 if (PPU_Data_StateMachine == 0 || PPU_Data_StateMachine == 3 || PPU_Data_StateMachine == 6)
@@ -4919,14 +5259,14 @@ namespace TriCNES
                             case 2: // read from address
                                 addressBus = (ushort)(0x100 | (stackPointer));
                                 Fetch(addressBus); // dummy read
+                                stackPointer++;
                                 break;
                             case 3: // read from address
                                 PollInterrupts();
-                                addressBus = (ushort)(0x100 | (stackPointer + 1));
+                                addressBus = (ushort)(0x100 | (stackPointer));
                                 A = Fetch(addressBus);
                                 flag_Zero = A == 0;
                                 flag_Negative = A >= 0x80;
-                                stackPointer = (byte)addressBus;
                                 operationComplete = true;
                                 break;
                         }
@@ -7609,9 +7949,13 @@ namespace TriCNES
                         if (PPU_Scanline < 241 || PPU_Scanline == 261)
                         {
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = true; // used in the next cycle of sprite evaluation
-                            if ((PPU_ReadWriteAddress & 0x3FFF) > 0x3C00) // palette ocrruption only appears to occur when disabling rendering if the VRAM address is currently greater than 3C00
+                            if ((PPU_ScanCycle & 7) < 2 && PPU_ScanCycle <= 250)
                             {
-                                PPU_PaletteCorruptionRenderingDisabledOutOfVBlank = true; // used in the color calculation for the next dot being drawn
+                                // Palette corruption only occurs if rendering was disabled during the first 2 dots of a nametable fetch
+                                if ((PPU_ReadWriteAddress & 0x3FFF) >= 0x3C00) // palette corruption only appears to occur when disabling rendering if the VRAM address is currently greater than 3C00
+                                {
+                                    PPU_PaletteCorruptionRenderingDisabledOutOfVBlank = true; // used in the color calculation for the next dot being drawn
+                                }
                             }
                         }
                     }
@@ -8075,8 +8419,9 @@ namespace TriCNES
             {
                 //addressBus
                 if ((addressBus & 0xFFE0) == 0x4000) // In most cases this will be true, but for DMA's if the 6502 Address bus isn't here, the registers are not accessible
-                {
-                    if (Address == 0x4015)
+                { 
+                    byte Reg = (byte)(Address & 0x1F);
+                    if (Reg == 0x15)
                     {
                         if (DebugObserve)
                         {
@@ -8100,15 +8445,15 @@ namespace TriCNES
 
                         return InternalBus; // reading from $4015 can not affect the databus
                     }
-                    else if (Address == 0x4016 || Address == 0x4017)
+                    else if (Reg == 0x16 || Reg == 0x17)
                     {
                         // controller ports
                         // grab 1 bit from the controller's shift register.
                         // also add the upper 3 bits of the databus.
-                        dataBus = (byte)((((Address == 0x4016) ? (ControllerShiftRegister1 & 0x80) : (ControllerShiftRegister2 & 0x80)) == 0 ? 0 : 1) | (dataBus & 0xE0));
+                        dataBus = (byte)((((Reg == 0x16) ? (ControllerShiftRegister1 & 0x80) : (ControllerShiftRegister2 & 0x80)) == 0 ? 0 : 1) | (dataBus & 0xE0));
                         if (!DebugObserve)
                         {
-                            if (Address == 0x4016)
+                            if (Reg == 0x16)
                             {
                                 // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
                                 Controller1ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle

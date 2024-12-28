@@ -19,3 +19,4 @@ bin/Release/TriCNES.pdb
 /obj
 *.vsidx
 *.vsidx
+*.tasproj
