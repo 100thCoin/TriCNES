@@ -522,6 +522,7 @@ namespace TriCNES
         public bool PPU_Data_StateMachine_UpdateVRAMAddressEarly;   // During read-modify-write instructions to $2007, certain CPU/PPU alignments will update the VRAM address earlier than expected.
         public bool PPU_Data_StateMachine_UpdateVRAMBufferLate;     // During read-modify-write instructions to $2007, certain CPU/PPU alignments will update the VRAM buffer later than expected.
         public bool PPU_Data_StateMachine_NormalWriteBehavior;      // If this write instruction is not interrupting the state machine.
+        public bool PPU_Data_StateMachine_InterruptedReadToWrite;   // If a write happens on cycle 3 of the state machine.
 
         public void _CoreFrameAdvance()
         {
@@ -1313,6 +1314,11 @@ namespace TriCNES
                                 // Store the expected value at the *recently modified* Read/Write address.
                                 StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
                             }
+                        }
+                        else if (PPU_Data_StateMachine_InterruptedReadToWrite)
+                        {
+                            PPU_Data_StateMachine_InterruptedReadToWrite = false;
+                            StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
                         }
                     }
                     PPU_Data_SateMachine_Read = PPU_Data_SateMachine_Read_Delayed;
@@ -8051,23 +8057,13 @@ namespace TriCNES
                     {
                         // during Read-Modify-Write instructions to $2007, there's alignment specific side effects.
                         PPU_VRAM_MysteryAddress = (ushort)(Address & 0xFF00 | In);
-
-                        switch (PPUClock & 3)
+                        if (!PPU_Data_SateMachine_Read)
                         {
-                            case 0:
-                                if (!PPU_Data_SateMachine_Read)
-                                {
-                                    PPU_Data_StateMachine_PerformMysteryWrite = true;
-                                }
-                                break;
-                            case 1:
-                            case 2:
-                            case 3:
-                                if (!PPU_Data_SateMachine_Read)
-                                {
-                                    PPU_Data_StateMachine_PerformMysteryWrite = true;
-                                }
-                                break;
+                            PPU_Data_StateMachine_PerformMysteryWrite = true;
+                        }
+                        else
+                        {
+                            PPU_Data_StateMachine_InterruptedReadToWrite = true;
                         }
                     }
                     else
