@@ -33,12 +33,12 @@
             this.consoleToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadROMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.resetToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.powerCycleToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.screenshotToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tASToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadTASToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.load3ctToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pb_Screen = new System.Windows.Forms.PictureBox();
-            this.powerCycleToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.screenshotToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pb_Screen)).BeginInit();
             this.SuspendLayout();
@@ -68,16 +68,30 @@
             // loadROMToolStripMenuItem
             // 
             this.loadROMToolStripMenuItem.Name = "loadROMToolStripMenuItem";
-            this.loadROMToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.loadROMToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
             this.loadROMToolStripMenuItem.Text = "Load ROM";
             this.loadROMToolStripMenuItem.Click += new System.EventHandler(this.loadROMToolStripMenuItem_Click);
             // 
             // resetToolStripMenuItem
             // 
             this.resetToolStripMenuItem.Name = "resetToolStripMenuItem";
-            this.resetToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.resetToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
             this.resetToolStripMenuItem.Text = "Reset";
             this.resetToolStripMenuItem.Click += new System.EventHandler(this.resetToolStripMenuItem_Click);
+            // 
+            // powerCycleToolStripMenuItem
+            // 
+            this.powerCycleToolStripMenuItem.Name = "powerCycleToolStripMenuItem";
+            this.powerCycleToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
+            this.powerCycleToolStripMenuItem.Text = "Power Cycle";
+            this.powerCycleToolStripMenuItem.Click += new System.EventHandler(this.powerCycleToolStripMenuItem_Click);
+            // 
+            // screenshotToolStripMenuItem
+            // 
+            this.screenshotToolStripMenuItem.Name = "screenshotToolStripMenuItem";
+            this.screenshotToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
+            this.screenshotToolStripMenuItem.Text = "Screenshot";
+            this.screenshotToolStripMenuItem.Click += new System.EventHandler(this.screenshotToolStripMenuItem_Click);
             // 
             // tASToolStripMenuItem
             // 
@@ -110,25 +124,14 @@
             this.pb_Screen.Size = new System.Drawing.Size(256, 240);
             this.pb_Screen.TabIndex = 1;
             this.pb_Screen.TabStop = false;
-            // 
-            // powerCycleToolStripMenuItem
-            // 
-            this.powerCycleToolStripMenuItem.Name = "powerCycleToolStripMenuItem";
-            this.powerCycleToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.powerCycleToolStripMenuItem.Text = "Power Cycle";
-            this.powerCycleToolStripMenuItem.Click += new System.EventHandler(this.powerCycleToolStripMenuItem_Click);
-            // 
-            // screenshotToolStripMenuItem
-            // 
-            this.screenshotToolStripMenuItem.Name = "screenshotToolStripMenuItem";
-            this.screenshotToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.screenshotToolStripMenuItem.Text = "Screenshot";
-            this.screenshotToolStripMenuItem.Click += new System.EventHandler(this.screenshotToolStripMenuItem_Click);
+            this.pb_Screen.AllowDrop = true;
             // 
             // TriCNESGUI
             // 
+            this.AllowDrop = true;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.AutoValidate = System.Windows.Forms.AutoValidate.EnableAllowFocusChange;
             this.ClientSize = new System.Drawing.Size(256, 267);
             this.Controls.Add(this.pb_Screen);
             this.Controls.Add(this.menuStrip1);

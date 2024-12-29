@@ -23,6 +23,9 @@ namespace TriCNES
         public TriCNESGUI()
         {
             InitializeComponent();
+            pb_Screen.DragEnter += new DragEventHandler(pb_Screen_DragEnter);
+            pb_Screen.DragDrop += new DragEventHandler(pb_Screen_DragDrop);
+
         }
 
         public Emulator EMU;
@@ -301,6 +304,25 @@ namespace TriCNES
             Clipboard.SetImage(EMU.Screen.Bitmap);
         }
 
+        private void pb_Screen_DragEnter(object sender, DragEventArgs e)
+        {
+            var filenames = (string[])e.Data.GetData(DataFormats.FileDrop, false);
+            if (Path.GetExtension(filenames[0]) == ".nes") e.Effect = DragDropEffects.All;
+            else e.Effect = DragDropEffects.None;
+        }
 
+        private void pb_Screen_DragDrop(object sender, DragEventArgs e)
+        {
+            var filenames = (string[])e.Data.GetData(DataFormats.FileDrop, false);
+            string filename = filenames[0];
+            CurrentROMFilePath = filename;
+            EMU = new Emulator();
+            Cartridge Cart = new Cartridge(CurrentROMFilePath);
+            EMU.Cart = Cart;
+            EmuClock = new Thread(ClockEmulator);
+            EmuClock.IsBackground = true;
+            EmuClock.Start();
+            // Do stuff
+        }
     }
 }
