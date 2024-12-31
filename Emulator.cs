@@ -457,7 +457,7 @@ namespace TriCNES
 
             //$2006 is unchanged
 
-            PPU_Data_StateMachine = 7;
+            PPU_Data_StateMachine = 9;
             PPU_VRAMAddressBuffer = 0;
             PPU_OddFrame = false;
 
@@ -523,6 +523,9 @@ namespace TriCNES
         public bool PPU_Data_StateMachine_UpdateVRAMBufferLate;     // During read-modify-write instructions to $2007, certain CPU/PPU alignments will update the VRAM buffer later than expected.
         public bool PPU_Data_StateMachine_NormalWriteBehavior;      // If this write instruction is not interrupting the state machine.
         public bool PPU_Data_StateMachine_InterruptedReadToWrite;   // If a write happens on cycle 3 of the state machine.
+
+        public byte MMC3_M2Filter;  // The MMC3 chip only clocks the IRQ timer if A12 has been low for at *least* 3 falling edges of M2.
+        public bool ResetM2Filter;  // Due to how I implemented the M2 filter, I need to reset it to zero at a specific moment, or else I can miss an IRQ clock.
 
         public void _CoreFrameAdvance()
         {
@@ -590,6 +593,21 @@ namespace TriCNES
 
 
                 PPUClock = 4; // there is 1 PPU cycle for every 12 master clock cycles
+            }
+            if (CPUClock == 5)
+            {
+                IRQLine = IRQ_LevelDetector;
+                if ((PPU_AddressBus & 0b0001000000000000) == 0)
+                {
+                    if (MMC3_M2Filter < 3)
+                    {
+                        MMC3_M2Filter++;
+                    }
+                }
+                else
+                {
+                    ResetM2Filter = true; // the filter gets reset in the function that clokc the MMC3 IRQ
+                }
             }
 
 
@@ -1109,6 +1127,7 @@ namespace TriCNES
         public bool NMI_PreviousPinsSignal; // I'm using this to detect the rising edge of $2000.7 and $2002.7
         public bool IRQ_LevelDetector; // If set, it's time to run an IRQ whenever this is detected
         public bool NMILine; // Set to true if $2000.7 and $2002.7 are both set. This is cehcked during the second half od a CPU cycle.
+        public bool IRQLine; // Set during phi2 to true if the IRQ level detector is low.
 
 
         void _EmulatePPU()
@@ -1177,7 +1196,7 @@ namespace TriCNES
                 }
             }
 
-            if (PPU_Data_StateMachine < 7)
+            if (PPU_Data_StateMachine < 9)
             {
                 // This info was not determined by using visualNES or visual2c02, and is entirely "speculation" based on behavior I was able to detect on my console through read-modify-write instructions to address $2007.
 
@@ -1187,6 +1206,11 @@ namespace TriCNES
                 // that behavior is handled here.
 
                 // NOTE: This behavior matches my console, though different revisions have shown different behaviors.
+
+                if(PPU_Scanline == 24)
+                {
+
+                }
 
                 if (PPU_Data_StateMachine == 1) // 1 ppu cycle after the read occurs
                 {
@@ -1272,8 +1296,6 @@ namespace TriCNES
                             PPU_VRAMAddressBuffer = FetchPPU((ushort)(PPU_AddressBus & 0x3FFF));
                         }
                     }
-
-
                     // We're getting deep into alignment specific state machine shenanigans.
                     // If the state machine was interrupted with a read cycle, and the CPU/PPU is not in alignment 0:
                     if (PPU_Data_StateMachine_UpdateVRAMAddressEarly)
@@ -1315,17 +1337,24 @@ namespace TriCNES
                                 StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
                             }
                         }
-                        else if (PPU_Data_StateMachine_InterruptedReadToWrite)
-                        {
-                            PPU_Data_StateMachine_InterruptedReadToWrite = false;
-                            StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
-                        }
                     }
                     PPU_Data_SateMachine_Read = PPU_Data_SateMachine_Read_Delayed;
                     PPU_Data_StateMachine_PerformMysteryWrite = false;
                 }
                 // And that's it for the PPU $2007 State Machine.
-                PPU_Data_StateMachine++;    // this stops counting up at 7.
+                PPU_Data_StateMachine++;    // this stops counting up at 8.
+            }
+            if (PPU_Data_StateMachine == 8)
+            {
+                if (PPU_Data_StateMachine_InterruptedReadToWrite)
+                {
+                    StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
+                    PPU_Data_StateMachine_InterruptedReadToWrite = false;
+                    PPU_ReadWriteAddress += PPUControlIncrementMode32 ? (ushort)32 : (ushort)1; // add either 1 or 32 depending on PPU_CRTL
+                    PPU_ReadWriteAddress &= 0x3FFF; // and truncate to just 15 bits
+                    PPU_AddressBus = PPU_ReadWriteAddress;
+
+                }
             }
 
             // Updating the scroll registers during screen rendering
@@ -1550,7 +1579,7 @@ namespace TriCNES
             if (Cart.MemoryMapper == 4)// MMC3 stuff.
             {
                 // if bit 12 of the ppu address bus (A12) changes:
-                if (((PPU_ADDR_Prev & 0b0001000000000000) == 0) && ((PPU_AddressBus & 0b0001000000000000) != 0))
+                if (((PPU_ADDR_Prev & 0b0001000000000000) == 0) && ((PPU_AddressBus & 0b0001000000000000) != 0) && MMC3_M2Filter == 3)
                 {
                     if (Cart.Mapper_4_ReloadIRQCounter)
                     {
@@ -1590,6 +1619,11 @@ namespace TriCNES
 
                     }
                 }
+                if (ResetM2Filter)
+                {
+                    ResetM2Filter = false;
+                    MMC3_M2Filter = 0;
+                }
             }
         }
 
@@ -1598,6 +1632,10 @@ namespace TriCNES
         {
             // basically 8 entries of OAM are getting replaced (this is considered a single "row" of OAM) 
             // PPU_OAMCorruptionIndex is the row that gets corrupted.
+            if(PPU_OAMCorruptionIndex == 0x20)
+            {
+                PPU_OAMCorruptionIndex = 0;
+            }
             int i = 0;
             while (i < 8) // 8 entries in a row
             {
@@ -3065,7 +3103,7 @@ namespace TriCNES
             {
                 DoNMI = true;
             }
-            DoIRQ = IRQ_LevelDetector;
+            DoIRQ = IRQLine;
         }
 
         public void _6502()
@@ -3314,7 +3352,8 @@ namespace TriCNES
 
                                 DoNMI = false;
                                 DoIRQ = false;
-
+                                IRQLine = false;
+                                IRQ_LevelDetector = false;
 
 
                                 SuppressInterrupt = true;
@@ -8074,7 +8113,7 @@ namespace TriCNES
 
                     if (PPU_Data_StateMachine != 3) // as long as this isn't 1 CPU cycle after the previous access to $2007...
                     {
-                        if (PPU_Data_StateMachine == 7) // If this is not interrupting the state machine. (This is just a standard write to the $2007. No back-to-back cycles reading/writing)
+                        if (PPU_Data_StateMachine == 9) // If this is not interrupting the state machine. (This is just a standard write to the $2007. No back-to-back cycles reading/writing)
                         {
                             PPU_Data_StateMachine = 3; // then the ppu VRAM read/write address needs to be updated *next* cycle.
                         }
@@ -8374,7 +8413,7 @@ namespace TriCNES
                             }
 
                             // if the PPU state machine is not currently in progress...
-                            if (PPU_Data_StateMachine == 7)
+                            if (PPU_Data_StateMachine == 9)
                             {
                                 PPU_Data_StateMachine = 0; // start it at 0
                                 if (PPUClock == 1 || PPUClock == 0)
@@ -8627,7 +8666,7 @@ namespace TriCNES
                     if (Address >= 0x8000)
                     {
                         ushort tempo = (ushort)(Address & 0x7FFF);
-                        dataBus = Cart.PRGROM[0x8000 * (Cart.Mapper_7_BankSelect & 0x07) + tempo];
+                        dataBus = Cart.PRGROM[(0x8000 * (Cart.Mapper_7_BankSelect & 0x07) + tempo)&(Cart.PRGROM.Length-1)];
                     }
                     // AOROM doesn't have any PRG RAM
                     return;
