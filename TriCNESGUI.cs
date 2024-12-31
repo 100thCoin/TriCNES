@@ -307,7 +307,7 @@ namespace TriCNES
         private void pb_Screen_DragEnter(object sender, DragEventArgs e)
         {
             var filenames = (string[])e.Data.GetData(DataFormats.FileDrop, false);
-            if (Path.GetExtension(filenames[0]) == ".nes") e.Effect = DragDropEffects.All;
+            if (Path.GetExtension(filenames[0]) == ".nes" || Path.GetExtension(filenames[0]) == ".NES") e.Effect = DragDropEffects.All;
             else e.Effect = DragDropEffects.None;
         }
 
