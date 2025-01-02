@@ -44,6 +44,7 @@
             this.l_FamtasiaWarning = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
+            this.cb_fceuxFrame0 = new System.Windows.Forms.CheckBox();
             this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -172,7 +173,7 @@
             // 
             this.l_FamtasiaWarning.AutoSize = true;
             this.l_FamtasiaWarning.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.l_FamtasiaWarning.Location = new System.Drawing.Point(12, 94);
+            this.l_FamtasiaWarning.Location = new System.Drawing.Point(12, 73);
             this.l_FamtasiaWarning.Name = "l_FamtasiaWarning";
             this.l_FamtasiaWarning.Size = new System.Drawing.Size(325, 26);
             this.l_FamtasiaWarning.TabIndex = 9;
@@ -197,11 +198,27 @@
             this.label1.TabIndex = 12;
             this.label1.Text = "CPU / Master clock alignment";
             // 
+            // cb_fceuxFrame0
+            // 
+            this.cb_fceuxFrame0.AutoSize = true;
+            this.cb_fceuxFrame0.Checked = true;
+            this.cb_fceuxFrame0.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.cb_fceuxFrame0.Location = new System.Drawing.Point(24, 124);
+            this.cb_fceuxFrame0.Name = "cb_fceuxFrame0";
+            this.cb_fceuxFrame0.Size = new System.Drawing.Size(175, 17);
+            this.cb_fceuxFrame0.TabIndex = 14;
+            this.cb_fceuxFrame0.Text = "Use FCEUX\'s Frame 0 behavior";
+            this.TASPropTooltips.SetToolTip(this.cb_fceuxFrame0, "FCEUX inaccurately emulates the first frame from the beginning of VBlank rather t" +
+        "han the end.\r\nUnchecking this box can potentially lead to a desync, though it wi" +
+        "ll be more accurate.");
+            this.cb_fceuxFrame0.UseVisualStyleBackColor = true;
+            // 
             // TASProperties
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(350, 307);
+            this.Controls.Add(this.cb_fceuxFrame0);
             this.Controls.Add(this.cb_CpuClock);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.label3);
@@ -241,5 +258,6 @@
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.ComboBox cb_CpuClock;
+        private System.Windows.Forms.CheckBox cb_fceuxFrame0;
     }
 }

@@ -29,6 +29,11 @@ namespace TriCNES
             return rb_ClockFiltering.Checked;
         }
 
+        public bool UseFCEUXFrame0Timing() // this only applies to TASes using the .fm2 or .fm3 file format.
+        {
+            return cb_fceuxFrame0.Checked;
+        }
+
         public byte GetPPUClockPhase()
         {
             return (byte)cb_ClockAlignment.SelectedIndex;
@@ -57,6 +62,7 @@ namespace TriCNES
             cb_ClockAlignment.Update();
             cb_CpuClock.SelectedIndex = 0;
             cb_CpuClock.Update();
+            cb_fceuxFrame0.Enabled = false;
             switch (extension)
             {
                 case ".bk2":
@@ -125,6 +131,7 @@ namespace TriCNES
                     break;
                 case ".fm2":
                     {
+                        cb_fceuxFrame0.Enabled = true;
                         // change the alignment to use FCEUX's
                         cb_CpuClock.SelectedIndex = 0;
                         cb_CpuClock.Update();
