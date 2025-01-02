@@ -566,8 +566,10 @@ namespace TriCNES
             // APU
 
 
+
             if (CPUClock == 0)
             {
+
                 _6502(); // This is where I run the CPU
                 DMCDMA_Failed = false; // If the DMC DMA failed, reset this value.
                 totalCycles++;         // for debugging mostly
@@ -1797,11 +1799,22 @@ namespace TriCNES
                                 else
                                 {
                                     PPU_OAMEvaluationObjectInRange = false;
-                                    PPUOAMAddress += 4; // +4
-                                    PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
                                     if (SecondaryOAMFull)
                                     {
-                                        PPUOAMAddress++; // A real hardware bug.
+                                        if ((PPUOAMAddress & 0x3) == 3)
+                                        {
+                                            PPUOAMAddress++; // A real hardware bug.
+                                        }
+                                        else
+                                        {
+                                            PPUOAMAddress += 4; // +4
+                                            PPUOAMAddress++; // A real hardware bug.
+                                        }
+                                    }
+                                    else
+                                    {
+                                        PPUOAMAddress += 4; // +4
+                                        PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
                                     }
                                     if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && !PPU_OAMEvaluationCorruptionOddCycle) // if we just disabled rendering mid OAM evaluation, the address is incremented yet again.
                                     {
