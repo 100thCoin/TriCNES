@@ -9149,12 +9149,12 @@ namespace TriCNES
             if (operationCycle == 1)
             {
                 // fetch address low
-                addressBus = (ushort)((addressBus & 0xFF00) | (Fetch(programCounter)));
+                pd = Fetch(programCounter);
             }
             else
             {
                 // fetch address high
-                addressBus = (ushort)((addressBus & 0xFF) | (Fetch(programCounter) << 8));
+                addressBus = (ushort)(pd | (Fetch(programCounter) << 8));
             }
             programCounter++;
         }
@@ -9181,10 +9181,10 @@ namespace TriCNES
                     pointerBus = (byte)(pointerBus + X);
                     break;
                 case 3: // fetch address low
-                    addressBus = (ushort)((addressBus & 0xFF00) | (Fetch((byte)(pointerBus))));
+                    pd = Fetch((byte)(pointerBus));
                     break;
                 case 4: // fetch address high
-                    addressBus = (ushort)((addressBus & 0xFF) | (Fetch((byte)(pointerBus + 1)) << 8));
+                    addressBus = (ushort)(pd | (Fetch((byte)(pointerBus + 1)) << 8));
                     break;
             }
         }
@@ -9204,10 +9204,10 @@ namespace TriCNES
                         programCounter++;
                         break;
                     case 2: // fetch address low
-                        addressBus = (ushort)((addressBus & 0xFF00) | (Fetch((byte)(pointerBus))));
+                        pd = Fetch((byte)(pointerBus));
                         break;
                     case 3: // fetch address high, add Y to low byte
-                        addressBus = (ushort)((((addressBus) & 0xFF) | (Fetch((byte)(pointerBus + 1)) << 8)));
+                        addressBus = (ushort)(pd | (Fetch((byte)(pointerBus + 1)) << 8));
                         temporaryAddress = addressBus;
                         H = (byte)(addressBus >> 8);
                         if (((temporaryAddress + Y) & 0xFF00) == (temporaryAddress & 0xFF00))
@@ -9233,10 +9233,10 @@ namespace TriCNES
                         programCounter++;
                         break;
                     case 2: // fetch address low
-                        addressBus = (ushort)((addressBus & 0xFF00) | (Fetch((byte)(pointerBus))));
+                        pd = Fetch((byte)(pointerBus));
                         break;
                     case 3: // fetch address high, add Y to low byte
-                        addressBus = (ushort)((((addressBus) & 0xFF) | (Fetch((byte)(pointerBus + 1)) << 8)));
+                        addressBus = (ushort)(pd | (Fetch((byte)(pointerBus + 1)) << 8));
                         temporaryAddress = addressBus;
                         addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + Y) & 0xFF));
                         break;
@@ -9298,12 +9298,12 @@ namespace TriCNES
                 switch (operationCycle)
                 {
                     case 1: // fetch address low
-                        addressBus = (ushort)((addressBus & 0xFF00) | (Fetch((programCounter))));
+                        pd = Fetch(programCounter);
                         programCounter++;
 
                         break;
                     case 2: // fetch address high, add Y to low byte
-                        addressBus = (ushort)((((addressBus) & 0xFF) | (Fetch((programCounter)) << 8)));
+                        addressBus = (ushort)(pd | Fetch(programCounter) << 8);
                         temporaryAddress = addressBus;
                         H = (byte)(addressBus >> 8);
 
@@ -9343,12 +9343,12 @@ namespace TriCNES
                 switch (operationCycle)
                 {
                     case 1: // fetch address low
-                        addressBus = (ushort)((addressBus & 0xFF00) | (Fetch((programCounter))));
+                        pd = Fetch(programCounter);
                         programCounter++;
 
                         break;
                     case 2: // fetch address high, add Y to low byte
-                        addressBus = (ushort)((((addressBus) & 0xFF) | (Fetch((programCounter)) << 8)));
+                        addressBus = (ushort)(pd | Fetch(programCounter) << 8);
                         temporaryAddress = addressBus;
                         addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + X) & 0xFF));
                         programCounter++;
@@ -9380,12 +9380,12 @@ namespace TriCNES
                 switch (operationCycle)
                 {
                     case 1: // fetch address low
-                        addressBus = (ushort)((addressBus & 0xFF00) | (Fetch((programCounter))));
+                        pd = Fetch(programCounter);
                         programCounter++;
 
                         break;
                     case 2: // fetch address high, add Y to low byte
-                        addressBus = (ushort)((((addressBus) & 0xFF) | (Fetch((programCounter)) << 8)));
+                        addressBus = (ushort)(pd | Fetch(programCounter) << 8);
                         temporaryAddress = addressBus;
                         H = (byte)(addressBus >> 8);
 
@@ -9425,12 +9425,12 @@ namespace TriCNES
                 switch (operationCycle)
                 {
                     case 1: // fetch address low
-                        addressBus = (ushort)((addressBus & 0xFF00) | (Fetch((programCounter))));
+                        pd = Fetch(programCounter);
                         programCounter++;
 
                         break;
                     case 2: // fetch address high, add Y to low byte
-                        addressBus = (ushort)((((addressBus) & 0xFF) | (Fetch((programCounter)) << 8)));
+                        addressBus = (ushort)(pd | Fetch(programCounter) << 8);
                         temporaryAddress = addressBus;
                         addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + Y) & 0xFF));
                         programCounter++;

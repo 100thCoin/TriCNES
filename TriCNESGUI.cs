@@ -39,8 +39,10 @@ namespace TriCNES
             LockObject = pb_Screen;
             lock (LockObject)
             {
+                int fc = 0;
                 while (true)
                 {
+                    fc++;
                     EMU._CoreFrameAdvance();
                     if (pb_Screen.InvokeRequired)
                     {
@@ -48,6 +50,7 @@ namespace TriCNES
                         delegate ()
                         {
                             pb_Screen.Image = EMU.Screen.Bitmap;
+                            pb_Screen.Image.Save(@"C:\Users\100th_Coin\Pictures\SMB3_Video\__IntercycleCartoons\TestRoms\PalCorruption\_Frame_" + fc.ToString() + ".png");
                         }));
                     }
                     else
