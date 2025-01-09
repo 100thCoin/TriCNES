@@ -3,11 +3,11 @@
   "WorkspaceRootPath": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|c:\\users\\100th_coin\\documents\\visualstudioprojects\\tricnes\\emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|c:\\users\\100th_coin\\documents\\visualstudioprojects\\tricnes\\tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
@@ -133,8 +133,7 @@
               "RelativeToolTip": "TriCNESGUI.cs",
               "ViewState": "AQIAALoAAAAAAAAAAAAwwNoAAAAyAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-11-26T17:43:37.777Z",
-              "EditorCaption": ""
+              "WhenOpened": "2024-11-26T17:43:37.777Z"
             },
             {
               "$type": "Document",
@@ -214,9 +213,9 @@
               "Title": "Emulator.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs",
               "RelativeDocumentMoniker": "Emulator.cs",
-              "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs*",
-              "RelativeToolTip": "Emulator.cs*",
-              "ViewState": "AQIAAAMGAAAAAAAAAAAIwB8GAAAsAAAA",
+              "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs",
+              "RelativeToolTip": "Emulator.cs",
+              "ViewState": "AQIAACAMAAAAAAAAAAAowDEMAABNAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-11-26T18:32:33.096Z",
               "EditorCaption": ""

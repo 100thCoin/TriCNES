@@ -486,7 +486,6 @@ namespace TriCNES
         public bool FirstCycleOfOAMDMA; // The first cycle caa behave differently.
         public bool DoDMCDMA; // If set, the Delta Modulation Channel's Direct Memory Access will occur.
         public byte DMCDMADelay; // There's actually a slight delay between the audio chip preparing the DMA, and the CPU actually running it.
-        public bool DMCDMA_Failed; // If the DMA tries to begin on a write cycle, it "fails" and waits for the next read cycle.
 
         public bool SuppressInterrupt; // If the IRQ happens on the wrong cycle of a DMA, it gets suppressed, and never runs.
         public bool InterruptHijackedByIRQ; // If a BRK or NMI occurs, and an IRQ happens in the middle of it, it's possible for the instruction to be "hijacked" and move the PC to the wrong address.
@@ -571,7 +570,6 @@ namespace TriCNES
             {
 
                 _6502(); // This is where I run the CPU
-                DMCDMA_Failed = false; // If the DMC DMA failed, reset this value.
                 totalCycles++;         // for debugging mostly
                 if (operationComplete) // If this instruction is complete
                 {
@@ -847,7 +845,6 @@ namespace TriCNES
                             APU_SetImplicitAbortDMC4015 = false;
                             APU_DMC_Shifter = APU_DMC_Buffer;
                             APU_Silent = false;
-                            DMCDMA_Failed = !CPU_Read;
                         }
                         else
                         {
@@ -867,7 +864,6 @@ namespace TriCNES
                         DoDMCDMA = true;
                         DMCDMA_Halt = true;
                         APU_DMC_Shifter = APU_DMC_Buffer;
-                        DMCDMA_Failed = !CPU_Read;
                         APU_Silent = false;
                     }
                 }
@@ -2284,7 +2280,8 @@ namespace TriCNES
 
             if ((CPUClock & 3) != 2)
             {
-                // this ONLY occurs on alignment 2.
+                // this behavior occurs on other alignments, but seems consistent on alignment 2, and very hit or miss on other alignments.
+                // Currently, I'm only emulating this on alignment 2, but I'll probably change this in the future.
                 return;
             }
 
@@ -3121,7 +3118,7 @@ namespace TriCNES
 
         public void _6502()
         {
-            if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && !DMCDMA_Failed) || DoOAMDMA) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
+            if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || DoOAMDMA) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
             {
                 APU_ImplicitAbortDMC4015 = false; // If this DMA cycle is only running because the edge case where this aborts, clear this flag.
 
