@@ -1346,11 +1346,14 @@ namespace TriCNES
             {
                 if (PPU_Data_StateMachine_InterruptedReadToWrite)
                 {
-                    StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
-                    PPU_Data_StateMachine_InterruptedReadToWrite = false;
-                    PPU_ReadWriteAddress += PPUControlIncrementMode32 ? (ushort)32 : (ushort)1; // add either 1 or 32 depending on PPU_CRTL
-                    PPU_ReadWriteAddress &= 0x3FFF; // and truncate to just 15 bits
-                    PPU_AddressBus = PPU_ReadWriteAddress;
+                    if ((CPUClock & 3) != 0) // This write only occurs on phases 1, 2, and 3
+                    {
+                        StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
+                        PPU_Data_StateMachine_InterruptedReadToWrite = false;
+                        PPU_ReadWriteAddress += PPUControlIncrementMode32 ? (ushort)32 : (ushort)1; // add either 1 or 32 depending on PPU_CRTL
+                        PPU_ReadWriteAddress &= 0x3FFF; // and truncate to just 15 bits
+                        PPU_AddressBus = PPU_ReadWriteAddress;
+                    }
 
                 }
             }
@@ -1524,8 +1527,21 @@ namespace TriCNES
                         }
                     }
 
+                    
+
                     PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
                     PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
+                }
+            }
+            if(PPU_Update2001EmphasisBitsDelay > 0)
+            {
+                PPU_Update2001EmphasisBitsDelay--;
+                if(PPU_Update2001EmphasisBitsDelay == 0)
+                {
+                    PPU_Mask_Greyscale = (PPU_Update2001Value & 0x01) != 0;
+                    PPU_Mask_EmphasizeRed = (PPU_Update2001Value & 0x20) != 0;
+                    PPU_Mask_EmphasizeGreen = (PPU_Update2001Value & 0x40) != 0;
+                    PPU_Mask_EmphasizeBlue = (PPU_Update2001Value & 0x80) != 0;
                 }
             }
 
@@ -7925,6 +7941,7 @@ namespace TriCNES
         byte PPU_Update2005Delay;   // The number of PPU cycles to wait between writing to $2004 and the ppu from updating
         byte PPU_Update2005Value;   // The value written to $2005, for use when the delay has ended.
         byte PPU_Update2001Delay;   // The number of PPU cycles to wait between writing to $2001 and the ppu from updating
+        byte PPU_Update2001EmphasisBitsDelay;   // The number of PPU cycles to wait between writing to $2001 and the ppu from updating the emphasis bits and greyscale
         byte PPU_Update2001Value;   // The value written to $2001, for use when the delay has ended.
         byte PPU_Update2000Delay;   // The number of PPU cycles to wait between writing to $2000 and the ppu from updating
         byte PPU_Update2000Value;   // The value written to $2000, for use when the delay has ended.
@@ -7982,13 +7999,13 @@ namespace TriCNES
                     switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
                     {
                         case 0:
-                            PPU_Update2001Delay = 2; break;
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; break;
                         case 1:
-                            PPU_Update2001Delay = 2; break;
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 1; break;
                         case 2:
-                            PPU_Update2001Delay = 3; break;
+                            PPU_Update2001Delay = 3; PPU_Update2001EmphasisBitsDelay = 1; break;
                         case 3:
-                            PPU_Update2001Delay = 2; break;
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; break;
                     }
                     bool temp_rendering = PPU_Mask_ShowBackground || PPU_Mask_ShowSprites;
                     bool temp_renderingFromInput = ((In & 0x08) != 0) || ((In & 0x10) != 0);
@@ -8016,7 +8033,7 @@ namespace TriCNES
                     }
 
                     // this part happens immediately though?
-                    PPU_Mask_Greyscale = (In & 0x01) != 0;
+                    PPU_Mask_Greyscale = ((dataBus | In) & 0x01) != 0;
                     PPU_Mask_EmphasizeRed = (In & 0x20) != 0;
                     PPU_Mask_EmphasizeGreen = (In & 0x40) != 0;
                     PPU_Mask_EmphasizeBlue = (In & 0x80) != 0;
