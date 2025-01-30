@@ -103,7 +103,7 @@ namespace TriCNES
         public byte Mapper_3_CHRBank; // any write to ROM
 
         // Mapper 4, MMC3
-        public byte Mapper_4_8000;      // The value written to $8000 (or any eve naddress between $8000 and $9FFE)
+        public byte Mapper_4_8000;      // The value written to $8000 (or any even address between $8000 and $9FFE)
         public byte Mapper_4_BankA;     // The PRG bank between $A000 and $BFFF
         public byte Mapper_4_Bank8C;    // The PRG bank that could either be at $8000 throuhg 9FFF, or $C000 through $DFFF
         public byte Mapper_4_CHR_2K0;
@@ -1795,6 +1795,14 @@ namespace TriCNES
                                     {
                                         PPUOAMAddress++; // +1
                                         SecondaryOAMAddress++; // increment this for the next write to secondary OAM
+                                        if (!SecondaryOAMFull) // if secondary OAM is not full
+                                        {
+                                            SecondaryOAMAddress &= 0x1F; // keep the secondary OAM address in-bounds
+                                            if (SecondaryOAMAddress == 0) // If we've overflowed the secondary OAM address
+                                            {
+                                                SecondaryOAMFull = true; // secondary OAM is now full.
+                                            }
+                                        }
                                         // Sprite zero hits actually have nothing to do with reading the object at OAM index 0. Rather, if an object is within range of the scanline on dot 66.
                                         // typically, the object processed on dot 66 is OAM[0], though it's possible using precisely timed writes to $2003 to have PPUOAMAddress start processing here from a different value.
                                         if (PPU_ScanCycle == 66)
@@ -1838,6 +1846,14 @@ namespace TriCNES
                                         {
                                             SecondaryOAMAddress &= 0xFC;
                                             SecondaryOAMAddress += 4;
+                                        }
+                                        if (!SecondaryOAMFull) // if secondary OAM is not full
+                                        {
+                                            SecondaryOAMAddress &= 0x1F; // keep the secondary OAM address in-bounds
+                                            if (SecondaryOAMAddress == 0) // If we've overflowed the secondary OAM address
+                                            {
+                                                SecondaryOAMFull = true; // secondary OAM is now full.
+                                            }
                                         }
                                         PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
                                     }
@@ -8033,10 +8049,10 @@ namespace TriCNES
                     }
 
                     // this part happens immediately though?
-                    PPU_Mask_Greyscale = ((dataBus | In) & 0x01) != 0;
+                    PPU_Mask_Greyscale = ((dataBus) & 0x01) != 0;
                     PPU_Mask_EmphasizeRed = (In & 0x20) != 0;
                     PPU_Mask_EmphasizeGreen = (In & 0x40) != 0;
-                    PPU_Mask_EmphasizeBlue = (In & 0x80) != 0;
+                    PPU_Mask_EmphasizeBlue = (dataBus & 0x80) != 0;
 
                     PPU_Update2001Value = In;
                     PPUBus = In;

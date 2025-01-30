@@ -39,10 +39,8 @@ namespace TriCNES
             LockObject = pb_Screen;
             lock (LockObject)
             {
-                int fc = 0;
                 while (true)
                 {
-                    fc++;
                     EMU._CoreFrameAdvance();
                     if (pb_Screen.InvokeRequired)
                     {
@@ -50,7 +48,6 @@ namespace TriCNES
                         delegate ()
                         {
                             pb_Screen.Image = EMU.Screen.Bitmap;
-                            pb_Screen.Image.Save(@"C:\Users\100th_Coin\Pictures\SMB3_Video\__IntercycleCartoons\TestRoms\PalCorruption\_Frame_" + fc.ToString() + ".png");
                         }));
                     }
                     else
@@ -72,7 +69,7 @@ namespace TriCNES
             {
                 int i = 1; // what cycle is being executed next?
                 int j = 0; // what step of the .3ct TAS is this?
-                while(j < CyclesToSwapOn.Length)
+                while (j < CyclesToSwapOn.Length)
                 {
                     if(i == CyclesToSwapOn[j]) // if there's a cart swap on this cycle
                     {
@@ -86,7 +83,19 @@ namespace TriCNES
                 while (true)
                 {
                     EMU._CoreFrameAdvance();
-                    pb_Screen.Image = EMU.Screen.Bitmap;
+                    if (pb_Screen.InvokeRequired)
+                    {
+                        pb_Screen.Invoke(new MethodInvoker(
+                        delegate ()
+                        {
+                            pb_Screen.Image = EMU.Screen.Bitmap;
+                        }));
+                    }
+                    else
+                    {
+                        pb_Screen.Image = EMU.Screen.Bitmap;
+                    }
+
                 }
             }
         }

@@ -3,50 +3,50 @@
   "WorkspaceRootPath": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
-      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|c:\\users\\100th_coin\\documents\\visualstudioprojects\\tricnes\\6502documentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:6502documentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\299d06fb72f02b9bfaaba9d67b259fcccbd37c226fa72cfea562fd5d30238302\\Image.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tasproperties.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
-      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tasproperties.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tasproperties.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tasproperties.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tasproperties3ct.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tasproperties3ct.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tasproperties3ct.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tasproperties3ct.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tasproperties3ct.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tasproperties3ct.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\9b1c4965f4a257075b18f048692a7c960f5a36a7330c234f5602855e9e3c0170\\Application.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tasproperties3ct.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tasproperties3ct.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tasproperties.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tasproperties.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tasproperties.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tasproperties.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|c:\\users\\100th_coin\\documents\\visualstudioprojects\\tricnes\\tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tricnesgui.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tricnesgui.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\9b1c4965f4a257075b18f048692a7c960f5a36a7330c234f5602855e9e3c0170\\Application.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\299d06fb72f02b9bfaaba9d67b259fcccbd37c226fa72cfea562fd5d30238302\\Image.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\6502documentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:6502documentation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\0023a6af74033180253ab1511869aa7b7176eeaca0947ed401680e8721053094\\Control.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
@@ -59,7 +59,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 13,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Bookmark",
@@ -67,7 +67,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 11,
               "Title": "6502Documentation.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\6502Documentation.cs",
               "RelativeDocumentMoniker": "6502Documentation.cs",
@@ -75,8 +75,7 @@
               "RelativeToolTip": "6502Documentation.cs",
               "ViewState": "AQIAAE0BAAAAAAAAAAAowAAAAAAAAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-01-13T21:13:24.212Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-01-13T21:13:24.212Z"
             },
             {
               "$type": "Document",
@@ -84,16 +83,16 @@
               "Title": "Application.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\9b1c4965f4a257075b18f048692a7c960f5a36a7330c234f5602855e9e3c0170\\Application.cs",
               "RelativeDocumentMoniker": "..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\9b1c4965f4a257075b18f048692a7c960f5a36a7330c234f5602855e9e3c0170\\Application.cs",
-              "ToolTip": "C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\9b1c4965f4a257075b18f048692a7c960f5a36a7330c234f5602855e9e3c0170\\Application.cs [Read Only]",
-              "RelativeToolTip": "..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\9b1c4965f4a257075b18f048692a7c960f5a36a7330c234f5602855e9e3c0170\\Application.cs [Read Only]",
+              "ToolTip": "C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\9b1c4965f4a257075b18f048692a7c960f5a36a7330c234f5602855e9e3c0170\\Application.cs",
+              "RelativeToolTip": "..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\9b1c4965f4a257075b18f048692a7c960f5a36a7330c234f5602855e9e3c0170\\Application.cs",
               "ViewState": "AQIAADsBAAAAAAAAAAAhwEsBAAAHAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-01-02T20:28:47.347Z",
-              "EditorCaption": " [Read Only]"
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 0,
               "Title": "TASProperties3ct.Designer.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties3ct.Designer.cs",
               "RelativeDocumentMoniker": "TASProperties3ct.Designer.cs",
@@ -101,22 +100,24 @@
               "RelativeToolTip": "TASProperties3ct.Designer.cs",
               "ViewState": "AQIAAJsAAAAAAAAAAADwv7MAAAAAAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-12-04T18:36:05.409Z"
+              "WhenOpened": "2024-12-04T18:36:05.409Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 1,
               "Title": "TASProperties3ct.cs [Design]",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties3ct.cs",
               "RelativeDocumentMoniker": "TASProperties3ct.cs",
               "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties3ct.cs [Design]",
               "RelativeToolTip": "TASProperties3ct.cs [Design]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-12-04T18:36:06.475Z"
+              "WhenOpened": "2024-12-04T18:36:06.475Z",
+              "EditorCaption": " [Design]"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 4,
               "Title": "TASProperties.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties.cs",
               "RelativeDocumentMoniker": "TASProperties.cs",
@@ -124,7 +125,8 @@
               "RelativeToolTip": "TASProperties.cs",
               "ViewState": "AQIAAMAAAAAAAAAAAAAmwB8AAAAoAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-12-02T19:24:39.491Z"
+              "WhenOpened": "2024-12-02T19:24:39.491Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -135,48 +137,51 @@
               "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties.cs [Design]",
               "RelativeToolTip": "TASProperties.cs [Design]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-12-02T19:24:36.989Z"
+              "WhenOpened": "2024-12-02T19:24:36.989Z",
+              "EditorCaption": " [Design]"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 6,
               "Title": "TriCNESGUI.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TriCNESGUI.cs",
               "RelativeDocumentMoniker": "TriCNESGUI.cs",
               "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TriCNESGUI.cs",
               "RelativeToolTip": "TriCNESGUI.cs",
-              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAAAAAAHAAAA",
+              "ViewState": "AQIAABQAAAAAAAAAAAAQwDQAAAAYAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-11-26T17:43:37.777Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 10,
               "Title": "Image.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\299d06fb72f02b9bfaaba9d67b259fcccbd37c226fa72cfea562fd5d30238302\\Image.cs",
               "RelativeDocumentMoniker": "..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\299d06fb72f02b9bfaaba9d67b259fcccbd37c226fa72cfea562fd5d30238302\\Image.cs",
               "ToolTip": "C:\\Users\\100th_Coin\\AppData\\Local\\Temp\\.vsdbgsrc\\299d06fb72f02b9bfaaba9d67b259fcccbd37c226fa72cfea562fd5d30238302\\Image.cs",
               "RelativeToolTip": "..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\299d06fb72f02b9bfaaba9d67b259fcccbd37c226fa72cfea562fd5d30238302\\Image.cs",
-              "ViewState": "AQIAADIAAAAAAAAAAAAqwEcAAAAZAAAA",
+              "ViewState": "AQIAADMAAAAAAAAAAAAQwEcAAAADAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-12-04T18:55:26.697Z"
+              "WhenOpened": "2024-12-04T18:55:26.697Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 3,
               "Title": "TASProperties3ct.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties3ct.cs",
               "RelativeDocumentMoniker": "TASProperties3ct.cs",
               "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties3ct.cs",
               "RelativeToolTip": "TASProperties3ct.cs",
-              "ViewState": "AQIAAD4AAAAAAAAAAAAYwFQAAAAmAAAA",
+              "ViewState": "AQIAACoAAAAAAAAAAAAMwE4AAABpAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-12-11T19:10:18.308Z"
+              "WhenOpened": "2024-12-11T19:10:18.308Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 8,
               "Title": "TriCNESGUI.Designer.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TriCNESGUI.Designer.cs",
               "RelativeDocumentMoniker": "TriCNESGUI.Designer.cs",
@@ -202,7 +207,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 7,
               "Title": "TriCNESGUI.cs [Design]",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TriCNESGUI.cs",
               "RelativeDocumentMoniker": "TriCNESGUI.cs",
@@ -214,13 +219,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "Emulator.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs",
               "RelativeDocumentMoniker": "Emulator.cs",
               "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs",
               "RelativeToolTip": "Emulator.cs",
-              "ViewState": "AQIAAP4HAAAAAAAAAAAQwB4IAAAIAAAA",
+              "ViewState": "AQIAAEYAAAAAAAAAAAAqwGkAAABTAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-11-26T18:32:33.096Z",
               "EditorCaption": ""
