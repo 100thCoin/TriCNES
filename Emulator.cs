@@ -169,7 +169,7 @@ namespace TriCNES
         public bool OAMAddressOverflowedDuringSpriteEvaluation = false; // If the OAM address overflows during sprite evaluation, there's a few bugs that can occur.
 
         public byte[] RAM = new byte[0x800];    // There are 0x800 bytes of RAM
-        public byte[] PPU = new byte[0x4000];   // There are 0x4000 bytes of VRAM
+        public byte[] PPU = new byte[0x800];   // There are 0x800 bytes of VRAM
         public byte[] PaletteRAM = new byte[0x20]; // there are 0x20 bytes of palette RAM
 
         public ushort programCounter = 0;   // The PC. What address is currently being executed?
@@ -284,7 +284,7 @@ namespace TriCNES
             A = 0;  // The A, X, and Y registers are all initialized with 0 when the console boots up.
             X = 0;
             Y = 0;
-            PPU = new byte[0x4000];
+            PPU = new byte[0x800];
             OAM = new byte[0x100];
             SecondaryOAM = new byte[32];
 
@@ -301,8 +301,8 @@ namespace TriCNES
             }
 
             // set up PPU RAM Pattern
-            i = 0x2000;
-            while (i < 0x4000)
+            i = 0;
+            while (i < 0x800)
             {
                 int j = i & 0x2;
                 bool swap = (i & 0x1F) >= 0x10;
@@ -597,6 +597,7 @@ namespace TriCNES
             if (CPUClock == 5)
             {
                 IRQLine = IRQ_LevelDetector;
+                IRQ_LevelDetector |= APU_Status_FrameInterrupt; // if the APU frame counter flag is never cleared, you will get another IRQ when the I flag is cleared.
                 if ((PPU_AddressBus & 0b0001000000000000) == 0)
                 {
                     if (MMC3_M2Filter < 3)
@@ -2890,6 +2891,7 @@ namespace TriCNES
                     // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
                     return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
                 }
+                Address &= 0x7FF;
                 return PPU[Address];
             }
         }
@@ -8291,7 +8293,7 @@ namespace TriCNES
             }
             else // if this is not pointing to CHR RAM or palettes
             {
-                PPU[Address & 0x3FFF] = In;
+                PPU[Address & 0x7FF] = In;
 
             }
         }
