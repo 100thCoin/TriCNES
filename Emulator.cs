@@ -1120,6 +1120,7 @@ namespace TriCNES
         public byte DotColor; // The pixel output is delayed by 2 dots.
         public byte PrevDotColor; // This is the value from last cycle.
         public byte PrevPrevDotColor; // And this is from 2 cycles ago.
+        public byte PrevPrevPrevDotColor; // And this is from 2 cycles ago.
         public byte PaletteRAMAddress;
 
         public bool NMI_PinsSignal; // I'm using this to detect the rising edge of $2000.7 and $2002.7
@@ -1548,8 +1549,9 @@ namespace TriCNES
 
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
             {
-                PrevPrevDotColor = PrevDotColor; // Drawing a color to the screen has a 2 ppu cycle delay between deciding the color, and drawing it.
-                PrevDotColor = DotColor; // These varaibles here just record the color, and swap them through these varaibles so it can be used 2 cycles after it was chosen.
+                PrevPrevPrevDotColor = PrevPrevDotColor; // Drawing a color to the screen has a 3(?) ppu cycle delay between deciding the color, and drawing it.
+                PrevPrevDotColor = PrevDotColor; 
+                PrevDotColor = DotColor; // These varaibles here just record the color, and swap them through these varaibles so it can be used 3 cycles after it was chosen.
 
                 if ((PPU_ScanCycle > 0 && PPU_ScanCycle <= 256) || (PPU_ScanCycle > 320 && PPU_ScanCycle <= 336)) // if this is a visible pixel, or preparing the start of next scanline
                 {
@@ -1564,10 +1566,10 @@ namespace TriCNES
                     }
 
                 }
-                if (PPU_ScanCycle > 2 && PPU_ScanCycle <= 258 && PPU_Scanline < 241) // the process of drawing a dot to the screen actually has a 2 ppu cycle delay, which the emphasis bits happen after
+                if (PPU_ScanCycle > 3 && PPU_ScanCycle <= 259 && PPU_Scanline < 241) // the process of drawing a dot to the screen actually has a 2 ppu cycle delay, which the emphasis bits happen after
                 {
                     // in other words, the geryscale/emphasis bits can affect the color that was decided 2 ppu cycles ago.
-                    chosenColor = PrevPrevDotColor;
+                    chosenColor = PrevPrevPrevDotColor;
                     if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
                     {
                         chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
@@ -1577,8 +1579,8 @@ namespace TriCNES
                     if (PPU_Mask_EmphasizeGreen) { chosenColor |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
                     if (PPU_Mask_EmphasizeBlue) { chosenColor |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
 
-                    Screen.SetPixel(PPU_ScanCycle - 3, PPU_Scanline, NesPalInts[chosenColor]); // this sets the pixel on screen to the chosen color.
-                    ScreenPixelColors[PPU_ScanCycle - 3, PPU_Scanline] = chosenColor; // this array was for the attempt at emulating ntsc artifacts. I never got around to it though.
+                    Screen.SetPixel(PPU_ScanCycle - 4, PPU_Scanline, NesPalInts[chosenColor]); // this sets the pixel on screen to the chosen color.
+                    ScreenPixelColors[PPU_ScanCycle - 4, PPU_Scanline] = chosenColor; // this array was for the attempt at emulating ntsc artifacts. I never got around to it though.
                 }
 
 
@@ -8019,9 +8021,9 @@ namespace TriCNES
                         case 0:
                             PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; break;
                         case 1:
-                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 1; break;
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 1; break; // it's actually 2, but different behavior than case 0 and 3.
                         case 2:
-                            PPU_Update2001Delay = 3; PPU_Update2001EmphasisBitsDelay = 1; break;
+                            PPU_Update2001Delay = 3; PPU_Update2001EmphasisBitsDelay = 1; break; // it's actually 2, but different behavior than case 0 and 3.
                         case 3:
                             PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; break;
                     }
@@ -8051,10 +8053,17 @@ namespace TriCNES
                     }
 
                     // this part happens immediately though?
-                    PPU_Mask_Greyscale = ((dataBus) & 0x01) != 0;
+                    if (PPU_Update2001EmphasisBitsDelay == 2)
+                    {
+                        PPU_Mask_Greyscale = (dataBus & 0x01) != 0;
+                        PPU_Mask_EmphasizeBlue = (dataBus & 0x80) != 0;
+                    }
+                    else
+                    {
+                        PPU_Update2001EmphasisBitsDelay++; // it's always 2.
+                    }
                     PPU_Mask_EmphasizeRed = (In & 0x20) != 0;
                     PPU_Mask_EmphasizeGreen = (In & 0x40) != 0;
-                    PPU_Mask_EmphasizeBlue = (dataBus & 0x80) != 0;
 
                     PPU_Update2001Value = In;
                     PPUBus = In;
