@@ -1,8 +1,6 @@
 # TriCNES
 
-What is TriCNES?
-
-The Three C's in Tri-C-NES, stand for Coin's Contrabulous Cartswapulator. It's a NES emulator designed for swapping NES cartridges between CPU cycles in order to try emulating a theoretical arbitrary code exploit for the Nintendo Entertainment System.
+TriCNES, or "Coin's Contrabulous Cartswapulator", is a NES emulator designed for swapping NES cartridges between CPU cycles in order to try emulating a theoretical arbitrary code exploit for the Nintendo Entertainment System.
 
 This NES emulator was built from the ground up starting from a blank .net winforms project
 
