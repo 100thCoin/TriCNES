@@ -828,11 +828,11 @@ namespace TriCNES
                             APU_DMC_Output -= 2;
                         }
                     }
-                    APU_DMC_Shifter >>= 1;
-                    APU_DMC_ShifterBitsRemaining--;
-                    if (APU_DMC_ShifterBitsRemaining == 0)
+                    APU_DMC_Shifter >>= 1; // shift the btis in teh shift register
+                    APU_DMC_ShifterBitsRemaining--; // and decrement the "bits remaining" counter.
+                    if (APU_DMC_ShifterBitsRemaining == 0) // If there are no bits left,
                     {
-                        APU_DMC_ShifterBitsRemaining = 8;
+                        APU_DMC_ShifterBitsRemaining = 8; // it's time for a DMC DMA!
 
                         if (APU_DMC_BytesRemaining > 0 || APU_SetImplicitAbortDMC4015)
                         {
@@ -842,10 +842,10 @@ namespace TriCNES
                                 DoDMCDMA = true;
                                 DMCDMA_Halt = true;
                             }
-                            APU_ImplicitAbortDMC4015 = APU_SetImplicitAbortDMC4015;
+                            APU_ImplicitAbortDMC4015 = APU_SetImplicitAbortDMC4015; // check for weird DMA abord behavior
                             APU_SetImplicitAbortDMC4015 = false;
-                            APU_DMC_Shifter = APU_DMC_Buffer;
-                            APU_Silent = false;
+                            APU_DMC_Shifter = APU_DMC_Buffer; // and set up the shifter with the new values.
+                            APU_Silent = false; // The APU is not silent.
                         }
                         else
                         {
@@ -859,7 +859,7 @@ namespace TriCNES
                 // DMC load from 4015
                 if (DMCDMADelay > 0)
                 {
-                    DMCDMADelay--;
+                    DMCDMADelay--; // there's as mall delay beetween the write occuring and the DMA beginning
                     if (DMCDMADelay == 0 && !DoDMCDMA) // if the DMA is already happening because of the timer
                     {
                         DoDMCDMA = true;
@@ -1207,10 +1207,7 @@ namespace TriCNES
 
                 // NOTE: This behavior matches my console, though different revisions have shown different behaviors.
 
-                if(PPU_Scanline == 24)
-                {
-
-                }
+                // TODO: Something is going wrong with the timing of STA $2007, X (where X = 0). Gotta figure that out, and probably re-do this entire function. I have no idea how inaccurate this is. 
 
                 if (PPU_Data_StateMachine == 1) // 1 ppu cycle after the read occurs
                 {
@@ -1580,16 +1577,12 @@ namespace TriCNES
                     if (PPU_Mask_EmphasizeBlue) { chosenColor |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
 
                     Screen.SetPixel(PPU_ScanCycle - 4, PPU_Scanline, NesPalInts[chosenColor]); // this sets the pixel on screen to the chosen color.
-                    ScreenPixelColors[PPU_ScanCycle - 4, PPU_Scanline] = chosenColor; // this array was for the attempt at emulating ntsc artifacts. I never got around to it though.
                 }
 
 
             }
 
-            NTSCPhase++; // I was trying to emulate NTSC artifacts, but never got around to it
         } // and that's all for the PPU cycle!
-
-        public int NTSCPhase = 0;
 
         void PPU_MapperSpecificFunctions()
         {
@@ -1720,12 +1713,6 @@ namespace TriCNES
 
                 if (PPU_Mask_ShowBackground_Instant || PPU_Mask_ShowSprites_Instant || PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant) // if rendering is enabled, or was *just* disabled mid evaluation
                 {
-
-                    if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant)
-                    {
-
-
-                    }
 
                     if ((PPU_ScanCycle & 1) == 1)
                     { //odd cycles
@@ -2620,113 +2607,7 @@ namespace TriCNES
         }
 
 
-        int[,] ScreenPixelColors = new int[256, 240];
-        float[] NTSC_Signals = new float[256 * 8];
 
-        bool NTSC_InColorPhase(int col, int phase)
-        {
-            return (col + phase) % 12 < 6;
-        }
-
-        public void NTSC_Artifacts(int phase)
-        {
-            // this will just be the ppu cycle at the start of the frame
-
-            float _phase = (((phase * 8) % 12) + 3.9f);
-
-            int line = 0;
-            while (line < 240)
-            {
-
-                int i = 0;
-                while (i < 256)
-                {
-
-
-                    int p = 0;
-                    while (p < 8)
-                    {
-                        // calculate NTSC signal
-
-                        // numbers taken from nesdev wiki
-                        float[] levels = {
-                            0.228f, 0.312f, 0.552f, 0.880f, // Signal low
-                            0.616f, 0.840f, 1.100f, 1.100f, // Signal high
-                            0.192f, 0.256f, 0.448f, 0.712f, // Signal low, attenuated
-                            0.500f, 0.676f, 0.896f, 0.896f  // Signal high, attenuated
-                        };
-                        int C = ScreenPixelColors[i, line];
-                        int Col = C & 0xF;
-                        int Level = (C >> 4) & 3;
-                        int Emphasis = (C >> 6);
-
-                        int Attenuation = (((Emphasis & 1) != 0) && NTSC_InColorPhase(0xC, phase)) || (((Emphasis & 2) != 0) && NTSC_InColorPhase(0x4, phase)) || (((Emphasis & 4) != 0) && NTSC_InColorPhase(0x8, phase)) ? 0 : 8;
-
-                        float low = levels[Level + Attenuation];
-                        float high = levels[4 + Level + Attenuation];
-                        if (Col == 0) { low = high; }
-                        if (Col > 12) { high = low; }
-                        float signal = NTSC_InColorPhase(Col, phase) ? high : low;
-
-                        float black = 0.312f, white = 1.100f;
-                        signal = (signal - black) / (white - black);
-                        if (signal < 0) { signal = 0; }
-                        else if (signal > 1) { signal = 1; }
-                        NTSC_Signals[i * 8 + p] = signal;
-
-                        phase++;
-                        p++;
-                    }
-
-                    //phase += 85;
-
-                    i++;
-                }
-
-                // now we have 8 NTSC signals for every pixel in a scanline
-
-                int x = 0;
-                while (x < 256)
-                {
-                    int center = x * 8;
-                    int begin = center - 6;
-                    if (begin < 0) { begin = 0; }
-                    int end = center + 6; if (end > 256 * 8) { end = 256 * 8; }
-                    float y = 0;
-                    float u = 0;
-                    float v = 0;
-                    int p = begin;
-                    float hueOff = -4;
-                    while (p < end)
-                    {
-                        float lev = NTSC_Signals[p] / 12f;
-                        y = y + lev;
-                        u = u + lev * (float)Math.Sin(Math.PI * (phase + p + hueOff) / 6f) * 2f;
-                        v = v + lev * (float)Math.Cos(Math.PI * (phase + p + hueOff) / 6f) * 2f;
-
-                        p++;
-                    }
-
-                    float R = y + v * 1.139883f;
-                    float G = y - u * 0.394642f - v * 0.580622f;
-                    float B = y + u * 2.032062f;
-
-                    if (R < 0) { R = 0; }
-                    else if (R > 1) { R = 1; }
-                    if (G < 0) { G = 0; }
-                    else if (G > 1) { G = 1; }
-                    if (B < 0) { B = 0; }
-                    else if (B > 1) { B = 1; }
-
-                    Screen.SetPixel(x, line, Color.FromArgb(255, (int)(R * 255), (int)(G * 255), (int)(B * 255)));
-                    x++;
-                }
-
-
-
-                line++;
-            }
-        }
 
 
         byte PPU_RenderTemp; // a variable used in the following function to store information between ppu cycles.
@@ -3159,7 +3040,7 @@ namespace TriCNES
                 APU_ImplicitAbortDMC4015 = false; // If this DMA cycle is only running because the edge case where this aborts, clear this flag.
 
 
-                if (DoOAMDMA && FirstCycleOfOAMDMA) // interupt suppression. if this is the first cycle of the OAM DMA...
+                if (DoOAMDMA && FirstCycleOfOAMDMA) // interupt suppression. (There's probably a better way to implement this) if this is the first cycle of the OAM DMA...
                 {
                     if (!((DoNMI) || (DoIRQ && !flag_InterruptWithDelay))) // and we are NOT running an NMI or IRQ
                     {
@@ -3303,7 +3184,7 @@ namespace TriCNES
                 // depending on the value of the opcode, different behavior will take place.
                 // this is how instructions work.
 
-                // All sintructions are labeled. If it's an undocumented opcode, I also write "***" next to it.
+                // All intructions are labeled. If it's an undocumented opcode, I also write "***" next to it.
 
                 switch (opCode)
                 {
