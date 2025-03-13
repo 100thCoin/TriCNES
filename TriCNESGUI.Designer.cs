@@ -1,4 +1,7 @@
-﻿namespace TriCNES
+﻿using System.Threading;
+using System.Windows.Forms;
+
+namespace TriCNES
 {
     partial class TriCNESGUI
     {

@@ -16,7 +16,7 @@ namespace TriCNES
     public partial class TriCNESGUI : Form
     {
         // This is the the main window for a user to interact with this emulator.
-        // The logic for the emulator is contained entirely in 1 C# file, for easy use importing it into other projects.
+        // The logic for the emulator is contained entirely in a single C# file, for easy use importing it into other projects.
         // this form here is intended to be used an an example.
         // The intended use for this emulator is to run your own code specifically to collect data, but do with it as you please.
         // Cheers! ~ Chris "100th_Coin" Siebert
@@ -25,12 +25,12 @@ namespace TriCNES
             InitializeComponent();
             pb_Screen.DragEnter += new DragEventHandler(pb_Screen_DragEnter);
             pb_Screen.DragDrop += new DragEventHandler(pb_Screen_DragDrop);
-
+            FormClosing += new FormClosingEventHandler(TriCNESGUI_Closing);
         }
 
         public Emulator EMU;
         Thread EmuClock;
-        string CurrentROMFilePath;
+        string filePath;
         TASProperties TASPropertiesForm;
         TASProperties3ct TASPropertiesForm3ct;
         private object LockObject = new object();
@@ -124,9 +124,9 @@ namespace TriCNES
                         EmuClock.Abort();
                     }
                 }
-                CurrentROMFilePath = ofd.FileName;
+                filePath = ofd.FileName;
                 EMU = new Emulator();
-                Cartridge Cart = new Cartridge(CurrentROMFilePath);
+                Cartridge Cart = new Cartridge(filePath);
                 EMU.Cart = Cart;
                 EmuClock = new Thread(ClockEmulator);
                 EmuClock.IsBackground = true;
@@ -180,8 +180,14 @@ namespace TriCNES
                 }
             }
 
+            if (filePath == "" || filePath == null)
+            {
+                MessageBox.Show("You need to select a ROM before running a TAS.");
+                return;
+            }
+
             EMU = new Emulator();
-            Cartridge Cart = new Cartridge(CurrentROMFilePath);
+            Cartridge Cart = new Cartridge(filePath);
             EMU.Cart = Cart;
             EMU.TAS_ReadingTAS = true;
             EMU.TAS_InputLog = TASPropertiesForm.TasInputLog;
@@ -335,14 +341,31 @@ namespace TriCNES
         {
             var filenames = (string[])e.Data.GetData(DataFormats.FileDrop, false);
             string filename = filenames[0];
-            CurrentROMFilePath = filename;
+            filePath = filename;
             EMU = new Emulator();
-            Cartridge Cart = new Cartridge(CurrentROMFilePath);
+            Cartridge Cart = new Cartridge(filePath);
             EMU.Cart = Cart;
             EmuClock = new Thread(ClockEmulator);
             EmuClock.IsBackground = true;
             EmuClock.Start();
             // Do stuff
         }
+        private void TriCNESGUI_Closing(Object sender, FormClosingEventArgs e)
+        {
+            if (EmuClock != null)
+            {
+                EmuClock.Abort();
+            }
+            if (TASPropertiesForm != null)
+            {
+                TASPropertiesForm.Dispose();
+            }
+            if (TASPropertiesForm3ct != null)
+            {
+                TASPropertiesForm3ct.Dispose();
+            }
+            Application.Exit();
+        }
+
     }
 }
