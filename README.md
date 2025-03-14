@@ -20,7 +20,7 @@ This emulator only supports the following mapper chips:
 
 # Supported TAS file types
 
-Due to varying emulator accuracy, this emulator is not guarunteed to sync all TAS files. Despite this, it supports loading inputs from the following formats:
+Due to varying emulator accuracy, this emulator is not guaranteed to sync all TAS files. Despite this, it supports loading inputs from the following formats:
 * .bk2 (Bizhawk)
 * .tasproj (Bizhawk's TAStudio)
 * .fm2 (FCEUX)
