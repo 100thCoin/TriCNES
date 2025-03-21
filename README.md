@@ -20,7 +20,7 @@ This emulator only supports the following mapper chips:
 
 # Supported TAS file types
 
-Due to varying emulator accuracy, this emulator is not guarunteed to sync all TAS files. Despite this, it supports loading inputs from the following formats:
+Due to varying emulator accuracy, this emulator is not guaranteed to sync all TAS files. Despite this, it supports loading inputs from the following formats:
 * .bk2 (Bizhawk)
 * .tasproj (Bizhawk's TAStudio)
 * .fm2 (FCEUX)
@@ -58,3 +58,10 @@ Super Mario Bros. 3 (U) (V1.1) [!].nes
 </pre>
 
 In this example, there are 5 cartridges. Before cycle 6, the emulator will swap to `Super Mario Bros. [!].nes`, as that is index 0 into the cartridge array. Before cycle 7, the emulator will swap to index 1, `Dash Galaxy in the Alien Asylum (U) [!].nes`, and so on.
+
+# Screenshots
+![Screenshot](https://github.com/user-attachments/assets/56a25c5d-5c2f-493f-85bd-90bb192b1322)
+
+![Screenshot2](https://github.com/user-attachments/assets/5e6771fe-0696-4e27-9fdc-b16fd1b407ef)
+
+![Screenshot3](https://github.com/user-attachments/assets/1689f379-7eb8-445e-9632-81c3a3de2301)
