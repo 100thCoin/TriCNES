@@ -404,9 +404,12 @@ namespace TriCNES
             APU_DMC_ShifterBitsRemaining = 8;
             APU_ChannelTimer_DMC = APU_DMCRateLUT[0];
             DoReset = true; // This is used to force the first instruction at power on to be the RESET instruction.
+            PPU_RESET = true;
 
 
         }
+
+        public bool PPU_RESET;
 
         // when pressing the reset button, this function runs
         public void Reset()
@@ -469,7 +472,7 @@ namespace TriCNES
             operationCycle = 0;
             operationComplete = false;
             DoReset = true;
-
+            PPU_RESET = true;
             // in theory, the CPU/PPU clock would be given random values. Let's just assume no changes.
         }
 
@@ -1421,7 +1424,7 @@ namespace TriCNES
                         PPUStatus_VBlank_Delayed = true; // There are a few extra ppu cycles after PPUStatus_VBlank is cleared in which writing to $2000 during Vblank in order to trigger an NMI can still occur.
                         PPU_PendingVBlank = false; // clear this flag
                                                    // if PPUControl_NMIEnabled is set to true, then the NMI edge detector will detect this at the end of the CPU cycle!
-
+                        PPU_RESET = false;
                     }
                     // else, address $2002 was read on this ppu cycle. no VBlank flag.
 
@@ -7866,6 +7869,10 @@ namespace TriCNES
                 case 0x2000:
                     // writing here updates a large amount of PPU flags
                     PPUBus = In;
+                    if(PPU_RESET)
+                    {
+                        return;
+                    }
 
                     // NOTE: This uses the contents of the databus (instead of "In") for a single ppu cycle. (alignment dependent)
                     // this will be fixed on the next PPU cycle. no worries :)
@@ -7896,7 +7903,11 @@ namespace TriCNES
                 case 0x2001:
                     // writing here updates a large amount of PPU flags
                     // Is the background being drawn? Are sprites being drawn? Greyscale / color emphasis?
-
+                    PPUBus = In;
+                    if (PPU_RESET)
+                    {
+                        return;
+                    }
                     switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
                     {
                         case 0:
@@ -7947,7 +7958,6 @@ namespace TriCNES
                     PPU_Mask_EmphasizeGreen = (In & 0x40) != 0;
 
                     PPU_Update2001Value = In;
-                    PPUBus = In;
 
                     break;
 
@@ -7975,6 +7985,10 @@ namespace TriCNES
                 case 0x2005:
                     // writing here updates the X and Y scroll
                     PPUBus = In;
+                    if (PPU_RESET)
+                    {
+                        return;
+                    }
                     switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
                     {
                         case 0: PPU_Update2005Delay = 1; break;
@@ -7999,6 +8013,10 @@ namespace TriCNES
                 case 0x2006:
                     // writing here updates the PPU's read/write address.
                     PPUBus = In;
+                    if (PPU_RESET)
+                    {
+                        return;
+                    }
 
                     if (!PPUAddrLatch)
                     {
