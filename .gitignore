@@ -20,3 +20,5 @@ bin/Release/TriCNES.pdb
 *.vsidx
 *.vsidx
 *.tasproj
+/bin/Release/roms
+/bin
