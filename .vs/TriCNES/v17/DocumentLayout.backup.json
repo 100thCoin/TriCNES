@@ -56,35 +56,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 12,
+          "SelectedChildIndex": 9,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{b1e99781-ab81-11d0-b683-00aa00a3ee26}"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "6502Documentation.cs",
-              "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\6502Documentation.cs",
-              "RelativeDocumentMoniker": "6502Documentation.cs",
-              "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\6502Documentation.cs",
-              "RelativeToolTip": "6502Documentation.cs",
-              "ViewState": "AgIAAOwBAAAAAAAAAAAYwP8BAAAcAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-01-13T21:13:24.212Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 11,
-              "Title": "TASProperties3ct.Designer.cs",
-              "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties3ct.Designer.cs",
-              "RelativeDocumentMoniker": "TASProperties3ct.Designer.cs",
-              "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties3ct.Designer.cs",
-              "RelativeToolTip": "TASProperties3ct.Designer.cs",
-              "ViewState": "AgIAAJsAAAAAAAAAAADwv7MAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-12-04T18:36:05.409Z"
             },
             {
               "$type": "Document",
@@ -182,6 +158,43 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Emulator.cs",
+              "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs",
+              "RelativeDocumentMoniker": "Emulator.cs",
+              "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs",
+              "RelativeToolTip": "Emulator.cs",
+              "ViewState": "AgIAAKsGAAAAAAAAAAAAwPUGAAAcAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-11-26T18:32:33.096Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "TASProperties3ct.Designer.cs",
+              "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties3ct.Designer.cs",
+              "RelativeDocumentMoniker": "TASProperties3ct.Designer.cs",
+              "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TASProperties3ct.Designer.cs",
+              "RelativeToolTip": "TASProperties3ct.Designer.cs",
+              "ViewState": "AgIAAJsAAAAAAAAAAADwv7MAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-12-04T18:36:05.409Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "6502Documentation.cs",
+              "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\6502Documentation.cs",
+              "RelativeDocumentMoniker": "6502Documentation.cs",
+              "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\6502Documentation.cs",
+              "RelativeToolTip": "6502Documentation.cs",
+              "ViewState": "AgIAAOwBAAAAAAAAAAAYwP8BAAAcAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-01-13T21:13:24.212Z"
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 2,
               "Title": "TriCNESGUI.cs [Design]",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TriCNESGUI.cs",
@@ -190,19 +203,6 @@
               "RelativeToolTip": "TriCNESGUI.cs [Design]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-11-25T21:50:39.788Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "Emulator.cs",
-              "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs",
-              "RelativeDocumentMoniker": "Emulator.cs",
-              "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs",
-              "RelativeToolTip": "Emulator.cs",
-              "ViewState": "AgIAANQLAAAAAAAAAAAhwOULAAAMAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-11-26T18:32:33.096Z",
-              "EditorCaption": ""
             }
           ]
         }

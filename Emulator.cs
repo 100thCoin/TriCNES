@@ -2218,7 +2218,7 @@ namespace TriCNES
                             if ((PPU_Mask_8PxShowSprites || PPU_ScanCycle > 8) && PPU_ScanCycle < 256) // and if this isn't on pixel 256, or in the first 8 pixels being masked away fron the nametable, if that setting is enabled...
                             {
                                 PPUStatus_SpriteZeroHit = true; // we did it! sprite zero hit achieved.
-                                PPU_CanDetectSpriteZeroHit = false; // another sprite zero hti cannot occur until the end of next vblank.
+                                PPU_CanDetectSpriteZeroHit = false; // another sprite zero hit cannot occur until the end of next vblank.
                                 if (Logging) // and for some debug logging...
                                 {
                                     string S = DebugLog.ToString(); // let's add text to the current line letting me know a sprite zero hit occured, and on which dot
@@ -8007,12 +8007,19 @@ namespace TriCNES
                 case 0x2004:
                     // writing here updates the OAM byte at the current OAM address
                     PPUBus = In;
-                    if ((PPUOAMAddress & 3) == 2)
+                    if (PPU_Scanline >= 240 && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
                     {
-                        In &= 0xE7;
+                        if ((PPUOAMAddress & 3) == 2)
+                        {
+                            In &= 0xE7;
+                        }
+                        OAM[PPUOAMAddress] = In;
+                        PPUOAMAddress++;
                     }
-                    OAM[PPUOAMAddress] = In;
-                    PPUOAMAddress++;
+                    else
+                    {
+                        PPUOAMAddress += 4;
+                    }
                     break;
 
                 case 0x2005:
