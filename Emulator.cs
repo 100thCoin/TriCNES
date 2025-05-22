@@ -8007,7 +8007,7 @@ namespace TriCNES
                 case 0x2004:
                     // writing here updates the OAM byte at the current OAM address
                     PPUBus = In;
-                    if (PPU_Scanline >= 240 && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
+                    if ((PPU_Scanline >= 240 && PPU_Scanline < 261) && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
                     {
                         if ((PPUOAMAddress & 3) == 2)
                         {
