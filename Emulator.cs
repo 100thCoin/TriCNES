@@ -2907,18 +2907,11 @@ namespace TriCNES
         void OAMDMA_Get()
         {
             OAMAddressBus = (ushort)(DMAPage << 8 | DMAAddress);
-
-
             OAMDMA_Aligned = true;
             // the fetch happens regardless of halt
             OAM_InternalBus = Fetch(OAMAddressBus);
 
-            if ((addressBus & 0xFFE0) == 0x4000)
-            {
-                // Bus conflict with APU Registers
-                OAMAddressBus = (ushort)((addressBus & 0xEFE0) | (DMAAddress & 0x1F));
-                OAM_InternalBus = Fetch(OAMAddressBus);
-            }
+
         }
         void OAMDMA_Halted()
         {
@@ -3039,6 +3032,10 @@ namespace TriCNES
 
         public void _6502()
         {
+            if(programCounter == 0x4001)
+            {
+
+            }
 
             if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || DoOAMDMA) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
             {
@@ -8443,66 +8440,60 @@ namespace TriCNES
                 MapperFetch(Address, Cart.MemoryMapper);
                 return dataBus;
             }
-            else if (Address >= 0x4000 && Address <= 0x401F)
+            else if (addressBus >= 0x4000 && addressBus <= 0x401F) // Use the 6502 address bus here. If an OAM DMA using page $40, this won't actually read the values unless the PC is in the $4000 - $401F range.
             {
-                //addressBus
-                if ((addressBus & 0xFFE0) == 0x4000) // In most cases this will be true, but for DMA's if the 6502 Address bus isn't here, the registers are not accessible
-                { 
-                    byte Reg = (byte)(Address & 0x1F);
-                    if (Reg == 0x15)
+                //addressBus 
+                byte Reg = (byte)(Address & 0x1F);
+                if (Reg == 0x15)
+                {
+                    if (DebugObserve)
                     {
-                        if (DebugObserve)
-                        {
-                            dataBus = 0x40; // if this is DebugObserve, the databus's previous value is restored after this function. Fear not!
-                        }
-                        byte InternalBus = dataBus;
+                        dataBus = 0x40; // if this is DebugObserve, the databus's previous value is restored after this function. Fear not!
+                    }
+                    byte InternalBus = dataBus;
 
-                        InternalBus &= 0x20;
-                        InternalBus |= (byte)(APU_Status_DMCInterrupt ? 0x80 : 0);
-                        InternalBus |= (byte)(APU_Status_FrameInterrupt ? 0x40 : 0);
-                        InternalBus |= (byte)((APU_DMC_BytesRemaining != 0) ? 0x10 : 0);
-                        InternalBus |= (byte)((APU_LengthCounter_Noise != 0) ? 0x08 : 0);
-                        InternalBus |= (byte)((APU_LengthCounter_Triangle != 0) ? 0x04 : 0);
-                        InternalBus |= (byte)((APU_LengthCounter_Pulse2 != 0) ? 0x02 : 0);
-                        InternalBus |= (byte)((APU_LengthCounter_Pulse1 != 0) ? 0x01 : 0);
-                        if (!DebugObserve)
-                        {
-                            APU_Status_FrameInterrupt = false;
-                            IRQ_LevelDetector = false;
-                        }
+                    InternalBus &= 0x20;
+                    InternalBus |= (byte)(APU_Status_DMCInterrupt ? 0x80 : 0);
+                    InternalBus |= (byte)(APU_Status_FrameInterrupt ? 0x40 : 0);
+                    InternalBus |= (byte)((APU_DMC_BytesRemaining != 0) ? 0x10 : 0);
+                    InternalBus |= (byte)((APU_LengthCounter_Noise != 0) ? 0x08 : 0);
+                    InternalBus |= (byte)((APU_LengthCounter_Triangle != 0) ? 0x04 : 0);
+                    InternalBus |= (byte)((APU_LengthCounter_Pulse2 != 0) ? 0x02 : 0);
+                    InternalBus |= (byte)((APU_LengthCounter_Pulse1 != 0) ? 0x01 : 0);
+                    if (!DebugObserve)
+                    {
+                        APU_Status_FrameInterrupt = false;
+                        IRQ_LevelDetector = false;
+                    }
 
-                        return InternalBus; // reading from $4015 can not affect the databus
-                    }
-                    else if (Reg == 0x16 || Reg == 0x17)
-                    {
-                        // controller ports
-                        // grab 1 bit from the controller's shift register.
-                        // also add the upper 3 bits of the databus.
-                        dataBus = (byte)((((Reg == 0x16) ? (ControllerShiftRegister1 & 0x80) : (ControllerShiftRegister2 & 0x80)) == 0 ? 0 : 1) | (dataBus & 0xE0));
-                        if (!DebugObserve)
-                        {
-                            if (Reg == 0x16)
-                            {
-                                // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
-                                Controller1ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle
-                            }
-                            else
-                            {
-                                // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
-                                Controller2ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle
-                            }
-                        }
-                        APU_ControllerPortsStrobed = false; // This allows data to rapidly be streamed in through the A button if the controllers are read while strobed.
-                        return dataBus;
-                    }
-                    else
-                    {
-                        return dataBus;
-                    }
+                    return InternalBus; // reading from $4015 can not affect the databus
                 }
-                return dataBus;
-
-
+                else if (Reg == 0x16 || Reg == 0x17)
+                {
+                    // controller ports
+                    // grab 1 bit from the controller's shift register.
+                    // also add the upper 3 bits of the databus.
+                    dataBus = (byte)((((Reg == 0x16) ? (ControllerShiftRegister1 & 0x80) : (ControllerShiftRegister2 & 0x80)) == 0 ? 0 : 1) | (dataBus & 0xE0));
+                    if (!DebugObserve)
+                    {
+                        if (Reg == 0x16)
+                        {
+                            // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
+                            Controller1ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle
+                        }
+                        else
+                        {
+                            // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
+                            Controller2ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle
+                        }
+                    }
+                    APU_ControllerPortsStrobed = false; // This allows data to rapidly be streamed in through the A button if the controllers are read while strobed.
+                    return dataBus;
+                }
+                else
+                {
+                    return dataBus;
+                }     
             }
             else
             {
