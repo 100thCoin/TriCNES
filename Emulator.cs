@@ -1684,10 +1684,10 @@ namespace TriCNES
                 // this step is clearing secondary OAM, and writing FF to each byte in the array.
                 if ((PPU_ScanCycle & 1) == 1)
                 { //odd cycles
-                    PPU_SpriteEvaluationTemp = 0xFF; // load FF
+                    PPU_SpriteEvaluationTemp = ReadOAM(); // During these cycles, OAM is hard-coded to read $FF.
                     if (PPU_ScanCycle == 1)
                     {
-                        SecondaryOAMAddress = 0; // if this is dot 1, reset teh secondary OAM address
+                        SecondaryOAMAddress = 0; // if this is dot 1, reset the secondary OAM address
                         SecondaryOAMFull = false;// also reset the flag that checks of secondary OAM is full.
                         // in preperation for the next section, let's clear these flags too
                         SpriteEvaluationTick = 0;
@@ -8328,7 +8328,7 @@ namespace TriCNES
                         dataBus = PPUBus; break;
                     case 0x2004:
                         // Read from OAM
-                        dataBus = OAM[PPUOAMAddress];
+                        dataBus = ReadOAM();
                         if ((PPUOAMAddress & 3) == 2)
                         {
                             dataBus &= 0xE3; // the attributes always return 0 for bits 2, 3, and 4
@@ -8719,6 +8719,19 @@ namespace TriCNES
 
             }
 
+        }
+
+        byte ReadOAM()
+        {
+            if((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline < 240)
+            {
+                if(PPU_ScanCycle >= 1 && PPU_ScanCycle <= 64)
+                {
+                    return 0xFF;
+                }
+                return OAM[PPUOAMAddress];
+            }
+            return OAM[PPUOAMAddress];
         }
 
         bool PPU_PendingVBlank;
