@@ -205,9 +205,6 @@ namespace TriCNES
 
         public ushort temporaryAddress; // I use this to temporarily modify the value of the address bus for some if statements. This is mostly for checking if the low byte under/over flows.
 
-        bool flag_InterruptWithDelay; // The interrupt suppression flag has a 1 instruction delay. This is the version of the flag with the delay.
-
-
         // This function runs when instantiating this Emulator object.
         static Color[] SetupPalette()
         {
@@ -289,20 +286,8 @@ namespace TriCNES
             OAM = new byte[0x100];
             SecondaryOAM = new byte[32];
 
-            // Set up RAM Pattern
+            // set up RAM and PPU RAM Pattern
             int i = 0;
-            while (i < 0x800)
-            {
-                int j = i & 0xF;
-                if (j >= 0x4 && j < 0xC)
-                {
-                    RAM[i] = 0xFF;
-                }
-                i++;
-            }
-
-            // set up PPU RAM Pattern
-            i = 0;
             while (i < 0x800)
             {
                 int j = i & 0x2;
@@ -310,10 +295,12 @@ namespace TriCNES
                 if (j < 0x2 == !swap)
                 {
                     PPU[i] = 0xF0;
+                    RAM[i] = 0xF0;
                 }
                 else
                 {
                     PPU[i] = 0x0F;
+                    RAM[i] = 0x0F;
                 }
                 i++;
             }
@@ -358,38 +345,38 @@ namespace TriCNES
             else // Except my actual console has a different palette than Blargg, so I use this palette instead.
             {
                 // use the palette that my NES uses
-                PaletteRAM[0x00] = 0x0F;
-                PaletteRAM[0x01] = 0x2D;
-                PaletteRAM[0x02] = 0x0F;
-                PaletteRAM[0x03] = 0x10;
-                PaletteRAM[0x04] = 0x0F;
-                PaletteRAM[0x05] = 0x2D;
-                PaletteRAM[0x06] = 0x0F;
-                PaletteRAM[0x07] = 0x20;
-                PaletteRAM[0x08] = 0x0F;
-                PaletteRAM[0x09] = 0x2D;
-                PaletteRAM[0x0A] = 0x0F;
-                PaletteRAM[0x0B] = 0x27;
-                PaletteRAM[0x0C] = 0x0F;
-                PaletteRAM[0x0D] = 0x2D;
-                PaletteRAM[0x0E] = 0x0F;
-                PaletteRAM[0x0F] = 0x1A;
-                PaletteRAM[0x10] = 0x0F;
-                PaletteRAM[0x11] = 0x06;
-                PaletteRAM[0x12] = 0x06;
-                PaletteRAM[0x13] = 0x06;
-                PaletteRAM[0x14] = 0x0F;
-                PaletteRAM[0x15] = 0x06;
-                PaletteRAM[0x16] = 0x06;
-                PaletteRAM[0x17] = 0x06;
-                PaletteRAM[0x18] = 0x0F;
-                PaletteRAM[0x19] = 0x06;
-                PaletteRAM[0x1A] = 0x06;
-                PaletteRAM[0x1B] = 0x06;
-                PaletteRAM[0x1C] = 0x0F;
-                PaletteRAM[0x1D] = 0x06;
-                PaletteRAM[0x1E] = 0x06;
-                PaletteRAM[0x1F] = 0x06;
+                PaletteRAM[0x00] = 0x00;
+                PaletteRAM[0x01] = 0x00;
+                PaletteRAM[0x02] = 0x28;
+                PaletteRAM[0x03] = 0x00;
+                PaletteRAM[0x04] = 0x00;
+                PaletteRAM[0x05] = 0x08;
+                PaletteRAM[0x06] = 0x00;
+                PaletteRAM[0x07] = 0x00;
+                PaletteRAM[0x08] = 0x00;
+                PaletteRAM[0x09] = 0x01;
+                PaletteRAM[0x0A] = 0x01;
+                PaletteRAM[0x0B] = 0x20;
+                PaletteRAM[0x0C] = 0x00;
+                PaletteRAM[0x0D] = 0x08;
+                PaletteRAM[0x0E] = 0x00;
+                PaletteRAM[0x0F] = 0x02;
+                PaletteRAM[0x10] = 0x00;
+                PaletteRAM[0x11] = 0x00;
+                PaletteRAM[0x12] = 0x00;
+                PaletteRAM[0x13] = 0x00;
+                PaletteRAM[0x14] = 0x00;
+                PaletteRAM[0x15] = 0x02;
+                PaletteRAM[0x16] = 0x21;
+                PaletteRAM[0x17] = 0x00;
+                PaletteRAM[0x18] = 0x00;
+                PaletteRAM[0x19] = 0x00;
+                PaletteRAM[0x1A] = 0x00;
+                PaletteRAM[0x1B] = 0x00;
+                PaletteRAM[0x1C] = 0x00;
+                PaletteRAM[0x1D] = 0x10;
+                PaletteRAM[0x1E] = 0x00;
+                PaletteRAM[0x1F] = 0x00;
             }
 
             programCounter = 0xFFFF; // Technically, this value is nondeterministic. It also doesn't matter where it is, as it will be initialized in the RESET instruction.
@@ -611,7 +598,7 @@ namespace TriCNES
                 }
                 else
                 {
-                    ResetM2Filter = true; // the filter gets reset in the function that clokc the MMC3 IRQ
+                    ResetM2Filter = true; // the filter gets reset in the function that clocks the MMC3 IRQ
                 }
             }
 
@@ -832,7 +819,7 @@ namespace TriCNES
                             APU_DMC_Output -= 2;
                         }
                     }
-                    APU_DMC_Shifter >>= 1; // shift the btis in teh shift register
+                    APU_DMC_Shifter >>= 1; // shift the bits in the shift register
                     APU_DMC_ShifterBitsRemaining--; // and decrement the "bits remaining" counter.
                     if (APU_DMC_ShifterBitsRemaining == 0) // If there are no bits left,
                     {
@@ -1457,7 +1444,7 @@ namespace TriCNES
                 PPUStatus_SpriteOverflow = false;
                 PPU_CanDetectSpriteZeroHit = true;
             }
-            else if (PPU_Scanline == 261 && PPU_ScanCycle == 4)
+            else if (PPU_Scanline == 261 && PPU_ScanCycle == 10)
             {
                 // And then a few cycles later, the CPU notices that this flag was cleared.
                 PPUStatus_VBlank_Delayed = false;
@@ -2910,8 +2897,6 @@ namespace TriCNES
             OAMDMA_Aligned = true;
             // the fetch happens regardless of halt
             OAM_InternalBus = Fetch(OAMAddressBus);
-
-
         }
         void OAMDMA_Halted()
         {
@@ -2943,12 +2928,6 @@ namespace TriCNES
         {
             // now reload the DMC buffer.
             APU_DMC_Buffer = Fetch(APU_DMC_SampleAddress);
-
-            if ((addressBus & 0xFFE0) == 0x4000)
-            {
-                // Bus conflict with APU Registers
-                OAM_InternalBus = Fetch((ushort)((addressBus & 0xEFE0) | (APU_DMC_SampleAddress & 0x1F)));
-            }
 
             APU_DMC_AddressCounter++;
             if (APU_DMC_BytesRemaining > 0)
@@ -2982,39 +2961,10 @@ namespace TriCNES
         void DMCDMA_Halted()
         {
             Fetch(addressBus);
-
-            if ((addressBus & 0xE007) == 0x2007)  // this needs to include mirrors
-            {
-                if (PPU_Data_StateMachine == 0 || PPU_Data_StateMachine == 3 || PPU_Data_StateMachine == 6)
-                {
-                    PPU_Data_StateMachine++; // The DMC DMA doesn't seem to have any alignment specific back-to-back $2007 fetch quirks.
-                }
-                if (PPU_Data_StateMachine == 4)
-                {
-                    PPU_Data_StateMachine_UpdateVRAMBufferLate = true;
-                }
-            }
         }
         void DMCDMA_Put()
         {
             Fetch(addressBus);
-            if ((addressBus & 0xE007) == 0x2007)  // this needs to include mirrors
-            {
-                if (PPU_Data_StateMachine == 0)
-                {
-                    PPU_Data_StateMachine++; // The DMC DMA doesn't seem to have any alignment specific back-to-back $2007 fetch quirks.
-                }
-                if (PPU_Data_StateMachine == 4)
-                {
-                    PPU_Data_StateMachine_UpdateVRAMBufferLate = true;
-                }
-                else
-                {
-                    PPU_Data_StateMachine_UpdateVRAMAddressEarly = true;
-                }
-            }
-
-
         }
 
         // Typically in the last CPU cycle of an instruction, the console will check if the NMI edge detector or IRQ level detector is set. In which case, it's time to run an interrupt.
@@ -3027,16 +2977,11 @@ namespace TriCNES
             {
                 DoNMI = true;
             }
-            DoIRQ = IRQLine;
+            DoIRQ = IRQLine && !flag_Interrupt;
         }
 
         public void _6502()
         {
-            if(programCounter == 0x4001)
-            {
-
-            }
-
             if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || DoOAMDMA) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
             {
                 APU_ImplicitAbortDMC4015 = false; // If this DMA cycle is only running because the edge case where this aborts, clear this flag.
@@ -3054,7 +2999,7 @@ namespace TriCNES
 
                 if (DoOAMDMA && FirstCycleOfOAMDMA) // interupt suppression. (There's probably a better way to implement this) if this is the first cycle of the OAM DMA...
                 {
-                    if (!((DoNMI) || (DoIRQ && !flag_InterruptWithDelay))) // and we are NOT running an NMI or IRQ
+                    if (!(DoNMI || DoIRQ)) // and we are NOT running an NMI or IRQ
                     {
                         SuppressInterrupt = true; // Suppress one if it starts before the next instruction
                     }
@@ -3157,7 +3102,7 @@ namespace TriCNES
                     {
                         opCode = 0; // replace the opcode with 0. (A BRK, which has modified behavior for NMIs)
                     }
-                    else if (DoIRQ && !flag_InterruptWithDelay) // If an IRQ is occuring,
+                    else if (DoIRQ) // If an IRQ is occuring,
                     {
                         opCode = 0; // replace the opcode with 0. (A BRK, which has modified behavior for IRQs)
                     }
@@ -3179,11 +3124,10 @@ namespace TriCNES
                 {
                     Debug(); // This is where the tracelogger occurs.
                 }
-                if ((!DoNMI && !(DoIRQ && !flag_InterruptWithDelay) && !DoReset) || SuppressInterrupt) // If we aren't running any interrupts...
+                if ((!DoNMI && !DoIRQ && !DoReset) || SuppressInterrupt) // If we aren't running any interrupts...
                 {
                     programCounter++; // the PC is incremented to the next address
                     addressBus = programCounter;
-                    flag_InterruptWithDelay = flag_Interrupt; // Also set the flag_InterruptWithDelay, since there's a 1 instruction delay on this flag.
                 }
 
                 operationCycle++; // increment this for use in the following CPU cycle.
@@ -3269,7 +3213,7 @@ namespace TriCNES
                                 {
                                     programCounter = (ushort)((programCounter & 0xFF00) | (Fetch(0xFFFE)));
                                 }
-                                InterruptHijackedByIRQ = (DoIRQ && !flag_InterruptWithDelay);
+                                InterruptHijackedByIRQ = DoIRQ;
 
                                 break;
                             case 6:
@@ -3292,17 +3236,13 @@ namespace TriCNES
                                 DoNMI = false;
                                 DoIRQ = false;
                                 IRQLine = false;
-                                IRQ_LevelDetector = false;
-
 
                                 SuppressInterrupt = true;
 
                                 DoBRK = false;
-                                if (!flag_InterruptWithDelay)
-                                {
-                                    flag_Interrupt = true;
-                                    flag_InterruptWithDelay = true;
-                                }
+
+                                flag_Interrupt = true;
+
 
 
                                 break;
@@ -3319,9 +3259,9 @@ namespace TriCNES
                                 GetAddressIndOffX();
                                 break;
                             case 5: // read from address
+                                PollInterrupts();
                                 Op_ORA(Fetch(addressBus));
                                 operationComplete = true;
-                                PollInterrupts();
                                 break;
                         }
                         break;
@@ -4488,7 +4428,6 @@ namespace TriCNES
                                 flag_Overflow = (status & 0x40) != 0;
                                 flag_Negative = (status & 0x80) != 0;
 
-                                flag_InterruptWithDelay = flag_Interrupt;
                                 addressBus = (ushort)((byte)(addressBus + 1) | 0x100);
                                 break;
                             case 4:
@@ -7907,7 +7846,7 @@ namespace TriCNES
                     // NOTE: This uses the contents of the databus (instead of "In") for a single ppu cycle. (alignment dependent)
                     // this will be fixed on the next PPU cycle. no worries :)
                     // In other words, this can cause a visual bug if this write occurs on the wrong ppu cycle. (dot 257 of a visible scanline)
-                    PPUControl_NMIEnabled = (dataBus & 0x80) != 0;
+                    PPUControl_NMIEnabled = (In & 0x80) != 0;
                     PPUControlIncrementMode32 = (dataBus & 0x4) != 0;
                     PPU_Spritex16 = (dataBus & 0x20) != 0;           // these bits don't seem to be affected by open bus
                     PPU_PatternSelect_Sprites = (In & 0x8) != 0;     // these bits don't seem to be affected by open bus
@@ -9723,7 +9662,7 @@ namespace TriCNES
                 {
                     instruction = "NMI";
                 }
-                else if (DoIRQ && !flag_InterruptWithDelay)
+                else if (DoIRQ)
                 {
                     instruction = "IRQ";
                 }
@@ -9736,7 +9675,7 @@ namespace TriCNES
                 case "i": //implied
                     break;
                 case "d": //zp
-                    instruction += ">$" + Observe((ushort)(programCounter + 1)).ToString("X2"); Target = Observe((ushort)(programCounter + 1)); break;
+                    instruction += "<$" + Observe((ushort)(programCounter + 1)).ToString("X2"); Target = Observe((ushort)(programCounter + 1)); break;
                 case "a": //abs
                     instruction += "$" + Observe((ushort)(programCounter + 2)).ToString("X2") + Observe((ushort)(programCounter + 1)).ToString("X2"); Target = (ushort)((Observe((ushort)(programCounter + 2)) << 8) | Observe((ushort)(programCounter + 1))); break;
                 case "r": //relative
@@ -9748,9 +9687,9 @@ namespace TriCNES
                 case "(a)": //(ind)
                     instruction += "($" + Observe((ushort)(programCounter + 2)).ToString("X2") + Observe((ushort)(programCounter + 1)).ToString("X2") + ") -> $" + (Observe((ushort)(Observe((ushort)(programCounter + 1)) + Observe((ushort)(programCounter + 2)) * 0x100)) + Observe((ushort)((Observe((ushort)(programCounter + 1)) + Observe((ushort)(programCounter + 2)) * 0x100) + 1)) * 0x100).ToString("X4"); Target = (ushort)(Observe((ushort)(Observe((ushort)(programCounter + 1)) + Observe((ushort)(programCounter + 2)) * 0x100)) + Observe((ushort)((Observe((ushort)(programCounter + 1)) + Observe((ushort)(programCounter + 2)) * 0x100) + 1)) * 0x100); break;
                 case "d,x": //zp, x
-                    instruction += ">$" + Observe((ushort)(programCounter + 1)).ToString("X2") + ", X -> $" + (Observe((ushort)(programCounter + 1)) + X).ToString("X2"); Target = (ushort)(Observe((ushort)(programCounter + 1)) + X); break;
+                    instruction += "<$" + Observe((ushort)(programCounter + 1)).ToString("X2") + ", X -> $" + (Observe((ushort)(programCounter + 1)) + X).ToString("X2"); Target = (ushort)(Observe((ushort)(programCounter + 1)) + X); break;
                 case "d,y": //zp, y
-                    instruction += ">$" + Observe((ushort)(programCounter + 1)).ToString("X2") + ", Y -> $" + (Observe((ushort)(programCounter + 1)) + Y).ToString("X2"); Target = (ushort)(Observe((ushort)(programCounter + 1)) + Y); break;
+                    instruction += "<$" + Observe((ushort)(programCounter + 1)).ToString("X2") + ", Y -> $" + (Observe((ushort)(programCounter + 1)) + Y).ToString("X2"); Target = (ushort)(Observe((ushort)(programCounter + 1)) + Y); break;
                 case "a,x": //abs, x
                     instruction += "$" + Observe((ushort)(programCounter + 2)).ToString("X2") + Observe((ushort)(programCounter + 1)).ToString("X2") + ", X -> $" + ((ushort)(Observe((ushort)(programCounter + 1)) + Observe((ushort)(programCounter + 2)) * 0x100 + X)).ToString("X4"); Target = (ushort)(Observe((ushort)(programCounter + 1)) + Observe((ushort)(programCounter + 2)) * 0x100 + X); break;
                 case "a,y": //abs, Y
