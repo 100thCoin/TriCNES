@@ -8734,6 +8734,7 @@ namespace TriCNES
                         if (!APU_DMC_EnableIRQ)
                         {
                             APU_Status_DMCInterrupt = false;
+                            IRQ_LevelDetector = false;
                         }
                         break;
 
@@ -8787,7 +8788,7 @@ namespace TriCNES
                         if (!APU_Status_Pulse2) { APU_LengthCounter_Pulse2 = 0; }
                         if (!APU_Status_Pulse1) { APU_LengthCounter_Pulse1 = 0; }
                         APU_Status_DMCInterrupt = false;
-
+                        IRQ_LevelDetector = false;
 
                         if (!APU_Status_DelayedDMC && ((APU_ChannelTimer_DMC == 2 && !APU_EvenCycle) || (APU_ChannelTimer_DMC == APU_DMC_Rate && APU_EvenCycle))) // this will be the APU cycle that fires a DMC DMA
                         {
