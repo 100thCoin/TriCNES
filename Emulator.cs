@@ -1241,18 +1241,13 @@ namespace TriCNES
 
                         // This only occurs if there's 2 consecutive CPU cycles that access $2007
 
-                        // The mystery writes cannot write to palettes (treat $3Fxx as a mirror, and write to $2Fxx)
+                        // The mystery writes cannot write to palettes. Instead, write the modified value read from palette RAM to the following address.
                         if (PPU_VRAM_MysteryAddress >= 0x3F00)
                         {
-                            // and for some unholy reason, if the high byte of the read/write address is pointing to the color palettes and this is phase 0, nothing happens???
-                            // I'm honestly stumped on why this doesn't happen in phase 0 under these very specific circumstances. (but the mystery write does occur if not pointing to palettes!)
-                            // TODO: write more tests about this case. Is it actually writing somewhere and I just can't find it? Maybe it goes to CHR RAM, ha!
-                            if ((CPUClock & 3) != 0)
-                            {
-                                StorePPUData((ushort)(PPU_VRAM_MysteryAddress & 0x2FFF), (byte)PPU_VRAM_MysteryAddress);
-                                StorePPUData((ushort)(PPU_ReadWriteAddress & 0x2FFF), (byte)PPU_ReadWriteAddress);
-                                PPU_AddressBus = PPU_ReadWriteAddress;
-                            }
+                            
+                            StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_VRAM_MysteryAddress);
+                            PPU_AddressBus = PPU_ReadWriteAddress;
+                            
                         }
                         else
                         {
