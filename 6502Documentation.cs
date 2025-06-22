@@ -465,7 +465,7 @@ namespace TriCNES
             new Op(0x3E,"ROL","a,x"     ,3,nFlag | zFlag | cFlag | memChanges           ,CycleDocs[19],InstructionDocs[14]),
             new Op(0x3F,"RLA","a,x"     ,3,nFlag | zFlag | cFlag | aChanges | memChanges,CycleDocs[19],InstructionDocs[12]),
 
-            new Op(0x40,"RTI","i"       ,2,0xFF | stackPChanges | pcChanges             ,CycleDocs[1] ,InstructionDocs[18]),
+            new Op(0x40,"RTI","i"       ,1,0xFF | stackPChanges | pcChanges             ,CycleDocs[1] ,InstructionDocs[18]),
             new Op(0x41,"EOR","(d,x)"   ,2,nFlag | zFlag | aChanges                     ,CycleDocs[22],InstructionDocs[19]),
             new Op(0x42,"HLT","i"       ,1,0                                            ,CycleDocs[29],InstructionDocs[2]),
             new Op(0x43,"SRE","(d,x)"   ,2,nFlag | zFlag | cFlag | aChanges | memChanges,CycleDocs[23],InstructionDocs[20]),

@@ -195,7 +195,6 @@ namespace TriCNES
         public bool IgnoreH;         // However, with a well-timed DMA, the H register isn't actually part of the equation on some of those.
         public byte dataBus = 0;     // The Data Bus.
         public ushort addressBus = 0;// The Address Bus. "Where are we reading/writing"
-        public ushort pointerBus = 0;// When using offsets, this holds the value + the offset before updating the address bus.
         public byte specialBus = 0;  // The Special Bus is used in certain instructions. //TODO: What's the actual use for this bus??
         public byte dl = 0;          // Data Latch. This holds values between CPU cycles that are used in later cycles within an instruction.
 
@@ -477,12 +476,11 @@ namespace TriCNES
         public bool FirstCycleOfOAMDMA; // The first cycle caa behave differently.
         public bool DoDMCDMA; // If set, the Delta Modulation Channel's Direct Memory Access will occur.
         public byte DMCDMADelay; // There's actually a slight delay between the audio chip preparing the DMA, and the CPU actually running it.
+        public byte CannotRunDMCDMARightNow = 0;
 
         public bool SuppressInterrupt; // If the IRQ happens on the wrong cycle of a DMA, it gets suppressed, and never runs.
         public bool InterruptHijackedByIRQ; // If a BRK or NMI occurs, and an IRQ happens in the middle of it, it's possible for the instruction to be "hijacked" and move the PC to the wrong address.
         public bool InterruptHijackedByNMI; // If a BRK or IRQ occurs, and an NMI happens in the middle of it, it's possible for the instruction to be "hijacked" and move the PC to the wrong address.
-
-        public byte ApuFrameCounterIRQDelay; // A small delay between the APU preparing to run an IRQ, and the CPU actually being set to run the IRQ.
 
         public byte DMAPage;    // When running an OAM DMA, this is used to determine which "page" to read bytes from. Typically, this is page 2 (address $200 through $2FF)
         public byte DMAAddress; // While this DMA runs, this value is incremented until it overflows.
@@ -581,8 +579,10 @@ namespace TriCNES
             if (PPUClock == 0)
             {
                 _EmulatePPU();
-
-
+                if (PPUBus != 0)
+                {
+                    DecayPPUDataBus();
+                }
                 PPUClock = 4; // there is 1 PPU cycle for every 12 master clock cycles
             }
             if (CPUClock == 5)
@@ -649,6 +649,8 @@ namespace TriCNES
         public bool APU_Status_Triangle;      // Bit 2 of $4015
         public bool APU_Status_Pulse2;        // Bit 1 of $4015
         public bool APU_Status_Pulse1;        // Bit 0 of $4015
+
+        public bool Clearing_APU_FrameInterrupt;
 
 
         public byte APU_DelayedDMC4015;         // When writing to $4015, there's a 3 or 4 cycle delay between the APU actually changing this value.
@@ -749,8 +751,8 @@ namespace TriCNES
 
             if (APU_EvenCycle)
             {
-                // controller reading is handled here in the APU chip.
 
+                // controller reading is handled here in the APU chip.
 
                 // If a 1 was written to $4016, we are strobing the controller.
                 if (APU_ControllerPortsStrobing)
@@ -827,30 +829,44 @@ namespace TriCNES
 
                         if (APU_DMC_BytesRemaining > 0 || APU_SetImplicitAbortDMC4015)
                         {
-                            if (!DoDMCDMA)
+                            if (!DoDMCDMA && CannotRunDMCDMARightNow != 2)
                             {
                                 // if playing a sample:
                                 DoDMCDMA = true;
                                 DMCDMA_Halt = true;
                             }
-                            APU_ImplicitAbortDMC4015 = APU_SetImplicitAbortDMC4015; // check for weird DMA abord behavior
-                            APU_SetImplicitAbortDMC4015 = false;
+                            if (APU_SetImplicitAbortDMC4015)
+                            {
+                                APU_ImplicitAbortDMC4015 = true; // check for weird DMA abort behavior
+                                APU_SetImplicitAbortDMC4015 = false;
+                            }
                             APU_DMC_Shifter = APU_DMC_Buffer; // and set up the shifter with the new values.
                             APU_Silent = false; // The APU is not silent.
+                            
                         }
                         else
                         {
                             APU_Silent = true;
                         }
-                    }
+                    }                   
+                }
+                if (CannotRunDMCDMARightNow > 0)
+                {
+                    CannotRunDMCDMARightNow -= 2;
                 }
             }
             else
             {
+                if (Clearing_APU_FrameInterrupt)
+                {
+                    Clearing_APU_FrameInterrupt = false;
+                    APU_Status_FrameInterrupt = false;
+                    IRQ_LevelDetector = false;
+                }
                 // DMC load from 4015
                 if (DMCDMADelay > 0)
                 {
-                    DMCDMADelay--; // there's as mall delay beetween the write occuring and the DMA beginning
+                    DMCDMADelay--; // there's a small delay beetween the write occuring and the DMA beginning
                     if (DMCDMADelay == 0 && !DoDMCDMA) // if the DMA is already happening because of the timer
                     {
                         DoDMCDMA = true;
@@ -937,19 +953,18 @@ namespace TriCNES
                         APU_QuarterFrameClock = true;
                         break;
                     case 29828:
-                        APU_Status_FrameInterrupt = !APU_FrameCounterInhibitIRQ;
-                        ApuFrameCounterIRQDelay = 2;
+                        APU_Status_FrameInterrupt = true;
                         break;
                     case 29829:
                         APU_QuarterFrameClock = true;
+                        APU_Status_FrameInterrupt = true;
+                        IRQ_LevelDetector |= !APU_FrameCounterInhibitIRQ;
                         APU_HalfFrameClock = true;
-                        APU_Status_FrameInterrupt = !APU_FrameCounterInhibitIRQ;
-                        IRQ_LevelDetector |= APU_Status_FrameInterrupt;
-
+                        
                         break;
                     case 29830:
                         APU_Status_FrameInterrupt = !APU_FrameCounterInhibitIRQ;
-                        IRQ_LevelDetector |= APU_Status_FrameInterrupt;
+                        IRQ_LevelDetector |= !APU_FrameCounterInhibitIRQ;
 
                         APU_Framecounter = 0;
 
@@ -1035,6 +1050,8 @@ namespace TriCNES
         // PPU varaibles
 
         public byte PPUBus; // The databus of the Picture Processing Unit
+        public int[] PPUBusDecay = new int[8];
+        public int PPUBusDecayConstant = 1786830; // 20 frames. Approximately how long it takes for the PPU bus to decay on my console.
         public byte PPUOAMAddress; // The address unsed to index into Object Attribute Memory
         public bool PPUStatus_VBlank; // This is set during Vblank, and cleared at the end, or if $2002 is read. This value can be read in address $2002
         public bool PPUStatus_VBlank_Delayed; // when writing to $2000 to potentially start an NMI, there's a 1 ppu cycle delay on this flag
@@ -1334,11 +1351,12 @@ namespace TriCNES
                     if ((CPUClock & 3) != 0) // This write only occurs on phases 1, 2, and 3
                     {
                         StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
-                        PPU_Data_StateMachine_InterruptedReadToWrite = false;
-                        PPU_ReadWriteAddress += PPUControlIncrementMode32 ? (ushort)32 : (ushort)1; // add either 1 or 32 depending on PPU_CRTL
-                        PPU_ReadWriteAddress &= 0x3FFF; // and truncate to just 15 bits
-                        PPU_AddressBus = PPU_ReadWriteAddress;
                     }
+                    PPU_Data_StateMachine_InterruptedReadToWrite = false;
+                    PPU_ReadWriteAddress += PPUControlIncrementMode32 ? (ushort)32 : (ushort)1; // add either 1 or 32 depending on PPU_CRTL
+                    PPU_ReadWriteAddress &= 0x3FFF; // and truncate to just 15 bits
+                    PPU_AddressBus = PPU_ReadWriteAddress;
+                    
 
                 }
             }
@@ -2866,6 +2884,23 @@ namespace TriCNES
             PPU_ReadWriteAddress = (ushort)((PPU_ReadWriteAddress & 0b0000010000011111) | (PPU_TempVRAMAddress & 0b0111101111100000));
         }
 
+        void DecayPPUDataBus()
+        {
+            int i = 0;
+            while (i < PPUBusDecay.Length)
+            {
+                if (PPUBusDecay[i] > 0)
+                {
+                    PPUBusDecay[i]--;
+                    if(PPUBusDecay[i]==0)
+                    {
+                        PPUBus &= DecayBitmask[i];
+                    }
+                }
+                i++;
+            }
+        }
+        byte[] DecayBitmask = { 0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F };
 
         // The object attribute memory DMA!
         bool OAMDMA_Aligned = false;
@@ -2912,7 +2947,7 @@ namespace TriCNES
                     return;
                 }
             }
-            else // if this is an elignment cycle
+            else // if this is an alignment cycle
             {
                 Fetch(addressBus); // just read from the current address bus
             }
@@ -2922,9 +2957,13 @@ namespace TriCNES
         void DMCDMA_Get()
         {
             // now reload the DMC buffer.
-            APU_DMC_Buffer = Fetch(APU_DMC_SampleAddress);
-
+            APU_DMC_Buffer = Fetch(APU_DMC_AddressCounter);
+            
             APU_DMC_AddressCounter++;
+            if(APU_DMC_AddressCounter == 0)
+            {
+                APU_DMC_AddressCounter = 0x8000;
+            }
             if (APU_DMC_BytesRemaining > 0)
             {
                 // due to writes to $4015 setting the BytesRemaining to 0 if disabled, this could potentially underflow without the if statement.
@@ -2951,6 +2990,8 @@ namespace TriCNES
             }
             DoDMCDMA = false;
             OAMDMA_Aligned = false;
+            CannotRunDMCDMARightNow = 2;
+
         }
 
         void DMCDMA_Halted()
@@ -2979,8 +3020,6 @@ namespace TriCNES
         {
             if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || DoOAMDMA) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
             {
-                APU_ImplicitAbortDMC4015 = false; // If this DMA cycle is only running because the edge case where this aborts, clear this flag.
-
                 if (
                     (opCode == 0x93 && operationCycle == 4) ||
                     (opCode == 0x9B && operationCycle == 3) ||
@@ -3146,7 +3185,7 @@ namespace TriCNES
                                 if (!DoBRK)
                                 {
                                     addressBus = programCounter;
-                                    Fetch(addressBus); //dummy fetch
+                                    Fetch(addressBus); //dummy fetch without incrementing PC.
                                 }
                                 else
                                 {
@@ -3674,10 +3713,10 @@ namespace TriCNES
                         break;
 
                     case 0x18: //CLC
+                        PollInterrupts();
                         Fetch(addressBus); // dummy read
                         flag_Carry = false;
                         operationComplete = true;
-                        PollInterrupts();
                         break;
 
                     case 0x19: //ORA Abs, Y
@@ -3808,7 +3847,7 @@ namespace TriCNES
                                 dl = Fetch(addressBus);
                                 programCounter++;
                                 break;
-                            case 2: // transfer stack pointer to address bus, and alu to stack pointer. I'm just reusing `pd` here, but this instruction actually uses the Arithmetic Logic Unit for this.
+                            case 2: // transfer stack pointer to address bus, and alu to stack pointer. I'm just reusing `dl` here, but this instruction actually uses the Arithmetic Logic Unit for this.
                                 addressBus = (ushort)(0x100 | stackPointer);
                                 stackPointer = dl;
                                 CPU_Read = false;
@@ -5736,7 +5775,7 @@ namespace TriCNES
                         GetImmediate();
                         //A = (((A | 0xFF) & X) & temp); 
                         // Magic = FF
-                        A = (byte)((A | 0xEE) & X & dl); // 0xEE is also known as "MAGIC", and can supposedly be different depending on the CPU's temperature.
+                        A = (byte)((A | 0xFF) & X & dl); // 0xEE is also known as "MAGIC", and can supposedly be different depending on the CPU's temperature.
                         flag_Zero = A == 0;
                         flag_Negative = A >= 0x80;
                         operationComplete = true;
@@ -5994,7 +6033,7 @@ namespace TriCNES
                             case 1:
                             case 2:
                             case 3:
-                                GetAddressAbsOffY(true);
+                                GetAddressAbsOffY(false);
                                 if (operationCycle == 3) { CPU_Read = false; }
                                 break;
                             case 4: // read from address
@@ -7770,6 +7809,10 @@ namespace TriCNES
                 operationCycle++; // increment this for next CPU cycle.
                 // If operationComplete is true, operationCycle will be set to 0 for next instruction.
             }
+            if (DoDMCDMA && APU_ImplicitAbortDMC4015)
+            {
+                APU_ImplicitAbortDMC4015 = false; // If this was delayed by a write cycle, it won't run at all.
+            }
         }
 
 
@@ -7833,7 +7876,8 @@ namespace TriCNES
                 case 0x2000:
                     // writing here updates a large amount of PPU flags
                     PPUBus = In;
-                    if(PPU_RESET)
+                    for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
+                    if (PPU_RESET)
                     {
                         return;
                     }
@@ -7868,6 +7912,7 @@ namespace TriCNES
                     // writing here updates a large amount of PPU flags
                     // Is the background being drawn? Are sprites being drawn? Greyscale / color emphasis?
                     PPUBus = In;
+                    for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                     if (PPU_RESET)
                     {
                         return;
@@ -7927,22 +7972,25 @@ namespace TriCNES
 
                 case 0x2002: // this value is Read only.
                     PPUBus = In;
+                    for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                     break;
 
                 case 0x2003:
                     // writing here updates the OAM address
                     PPUBus = In;
+                    for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                     PPUOAMAddress = PPUBus;
                     break;
 
                 case 0x2004:
                     // writing here updates the OAM byte at the current OAM address
                     PPUBus = In;
+                    for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                     if (((PPU_Scanline >= 240 && PPU_Scanline < 261) && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) || (!PPU_Mask_ShowBackground && !PPU_Mask_ShowSprites))
                     {
                         if ((PPUOAMAddress & 3) == 2)
                         {
-                            In &= 0xE7;
+                            In &= 0xE3;
                         }
                         OAM[PPUOAMAddress] = In;
                         PPUOAMAddress++;
@@ -7950,12 +7998,15 @@ namespace TriCNES
                     else
                     {
                         PPUOAMAddress += 4;
+                        PPUOAMAddress &= 0xFC;
+
                     }
                     break;
 
                 case 0x2005:
                     // writing here updates the X and Y scroll
                     PPUBus = In;
+                    for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                     if (PPU_RESET)
                     {
                         return;
@@ -7984,6 +8035,7 @@ namespace TriCNES
                 case 0x2006:
                     // writing here updates the PPU's read/write address.
                     PPUBus = In;
+                    for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                     if (PPU_RESET)
                     {
                         return;
@@ -8012,6 +8064,7 @@ namespace TriCNES
                 case 0x2007:
                     // writing here updates the byte at the current read/write address
                     PPUBus = In;
+                    for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                     PPU_Data_StateMachine_InputValue = In;
 
                     ushort Address = PPU_ReadWriteAddress;
@@ -8198,23 +8251,24 @@ namespace TriCNES
             dataBus = t; // restore the old databus
             return t2; // return the new databus
         }
-
+        bool DataPinsAreNotFloating = false;   // used in controller reading + OAM DMA.
         public byte Fetch(ushort Address)
         {
+            DataPinsAreNotFloating = false;
             // Reading from anywhere goes through this function.
             if ((Address >= 0x8000))
             {
                 // Reading from ROM.
                 // Different mappers could rearrange the data from the ROM into different locations on the system bus.
                 MapperFetch(Address, Cart.MemoryMapper);
-                return dataBus;
+                DataPinsAreNotFloating = true;
             }
             else if (Address < 0x2000)
             {
                 // Reading from RAM.
                 // Ram mirroring! Only addresses $0000 through $07FF exist in RAM, so ignore bits 11 and 12
                 dataBus = RAM[Address & 0x7FF];
-                return dataBus;
+                DataPinsAreNotFloating = true;
             }
             else if (Address >= 0x2000 && Address < 0x4000)
             {
@@ -8252,6 +8306,7 @@ namespace TriCNES
                             }
                             PPU_PendingVBlank = false;
                             PPUBus = dataBus;
+                            for (int i = 5; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                         }
                         break;
                     case 0x2003:
@@ -8267,6 +8322,7 @@ namespace TriCNES
                         if (!DebugObserve)
                         {
                             PPUBus = dataBus;
+                            for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                         }
                         break;
                     case 0x2005:
@@ -8345,11 +8401,16 @@ namespace TriCNES
                                     // and if this is phase 0 or 1, the buffer is updated later.
                                     PPU_Data_StateMachine_UpdateVRAMBufferLate = true;
                                 }
+                                if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015)))
+                                {
+                                    PPU_ReadWriteAddress++; // I'm unsure on the timing of this, but I know the DMC DMA landing here ends up incrementing this one more time than my "state machine" currently runs.
+                                }
                             }
 
                             PPU_Data_SateMachine_Read = true; // This is a read instruction, so the state machien needs to read.
                             PPU_Data_SateMachine_Read_Delayed = true; // This is also set, in case the state machine is interrupted.
                             PPUBus = dataBus;
+                            for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                         }
                         else
                         { // else, if this is just reading from $2007 with the debug logger...
@@ -8362,19 +8423,18 @@ namespace TriCNES
                                 dataBus = PPU_VRAMAddressBuffer; // just read the buffer, and don't update it.
                             }
                         }
-
-
                         break;
                 }
-                return dataBus;
+                DataPinsAreNotFloating = true;
+
             }
-            if (Address >= 0x6000)
+            else
             {
-                //certain mappers have data here, but it could be open bus.
+                //mapper chip stuff, but also open bus!
                 MapperFetch(Address, Cart.MemoryMapper);
-                return dataBus;
             }
-            else if (addressBus >= 0x4000 && addressBus <= 0x401F) // Use the 6502 address bus here. If an OAM DMA using page $40, this won't actually read the values unless the PC is in the $4000 - $401F range.
+
+            if ((addressBus >= 0x4000 && addressBus <= 0x401F) || DebugObserve) // If APU registers are active, bus conflicts can occur. Or perhaps you are intentionally reading from the APU registers...
             {
                 //addressBus 
                 byte Reg = (byte)(Address & 0x1F);
@@ -8389,25 +8449,30 @@ namespace TriCNES
                     InternalBus &= 0x20;
                     InternalBus |= (byte)(APU_Status_DMCInterrupt ? 0x80 : 0);
                     InternalBus |= (byte)(APU_Status_FrameInterrupt ? 0x40 : 0);
-                    InternalBus |= (byte)((APU_DMC_BytesRemaining != 0) ? 0x10 : 0);
+                    InternalBus |= (byte)((APU_DMC_BytesRemaining != 0 && APU_Status_DelayedDMC) ? 0x10 : 0); // see footnote.
                     InternalBus |= (byte)((APU_LengthCounter_Noise != 0) ? 0x08 : 0);
                     InternalBus |= (byte)((APU_LengthCounter_Triangle != 0) ? 0x04 : 0);
                     InternalBus |= (byte)((APU_LengthCounter_Pulse2 != 0) ? 0x02 : 0);
                     InternalBus |= (byte)((APU_LengthCounter_Pulse1 != 0) ? 0x01 : 0);
                     if (!DebugObserve)
                     {
-                        APU_Status_FrameInterrupt = false;
-                        IRQ_LevelDetector = false;
+                        Clearing_APU_FrameInterrupt = true;
                     }
+
+                    // footnote:
+                    // Consider the following. LDA #0, STA $4015, LDA $4015.
+                    // The APU_DMC_BytesRemaining byte isn't cleared until 3 or 4 cycles after writing 0 to $4015.
+                    // However, reading from $4015 after the needs to immediately have bit 4 cleared.
 
                     return InternalBus; // reading from $4015 can not affect the databus
                 }
                 else if (Reg == 0x16 || Reg == 0x17)
                 {
+                    byte ControllerRead = (byte)((((Reg == 0x16) ? (ControllerShiftRegister1 & 0x80) : (ControllerShiftRegister2 & 0x80)) == 0 ? 0 : 1) | (dataBus & 0xE0));
+                    
                     // controller ports
                     // grab 1 bit from the controller's shift register.
                     // also add the upper 3 bits of the databus.
-                    dataBus = (byte)((((Reg == 0x16) ? (ControllerShiftRegister1 & 0x80) : (ControllerShiftRegister2 & 0x80)) == 0 ? 0 : 1) | (dataBus & 0xE0));
                     if (!DebugObserve)
                     {
                         if (Reg == 0x16)
@@ -8422,20 +8487,16 @@ namespace TriCNES
                         }
                     }
                     APU_ControllerPortsStrobed = false; // This allows data to rapidly be streamed in through the A button if the controllers are read while strobed.
-                    return dataBus;
+                    if (DoOAMDMA && DataPinsAreNotFloating) // If all the databus pins are floating, then the controller bits are visible. Otherwise... not so much.
+                    {
+                        return dataBus;
+                    }
+                    dataBus = ControllerRead;
+
                 }
-                else
-                {
-                    return dataBus;
-                }     
-            }
-            else
-            {
-                //mapper chip stuff, but also open bus!
-                MapperFetch(Address, Cart.MemoryMapper);
-                return dataBus;
             }
 
+            return dataBus;
         }
         void MapperFetch(ushort Address, byte Mapper)
         {
@@ -8446,6 +8507,7 @@ namespace TriCNES
                     if (Address >= 0x8000)
                     {
                         dataBus = Cart.PRGROM[Address & (Cart.PRGROM.Length - 1)]; // Get the address form the ROM file. If the ROM only has $4000 bytes, this will make addresses > $BFFF mirrors of $8000 through $BFFF.
+                        DataPinsAreNotFloating = true;
                         return;
                     }
                     //open bus
@@ -8454,6 +8516,7 @@ namespace TriCNES
                 case 1: //MMC1
                     if (Address >= 0x8000)
                     {
+                        DataPinsAreNotFloating = true;
                         // The bank mode for MMC1:
                         byte MMC1PRGROMBankMode = (byte)((Cart.Mapper_1_Control & 0b01100) >> 2);
                         switch (MMC1PRGROMBankMode)
@@ -8501,6 +8564,7 @@ namespace TriCNES
                         if (((Cart.Mapper_1_PRG & 0x10) == 0)) // if Work RAM is enabled
                         {
                             dataBus = Cart.PRGRAM[Address & 0x1FFF];
+                            DataPinsAreNotFloating = true;
                             return;
                         }
                         // else, open bus.
@@ -8508,9 +8572,11 @@ namespace TriCNES
                     //open bus
                     return;
 
+                case 71:
                 case 2: //UxROM
                     if (Address >= 0x8000)
                     {
+                        DataPinsAreNotFloating = true;
                         if (Address >= 0xC000)
                         {
                             ushort tempo = (ushort)(Address & 0x3FFF);
@@ -8532,11 +8598,13 @@ namespace TriCNES
                     //MMC3
                     if (Address >= 0xE000) // This bank is fixed the the final PRG bank of the ROM
                     {
+                        DataPinsAreNotFloating = true;
                         dataBus = Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x3FFF)];
                         return;
                     }
                     else if (Address >= 0xC000)
                     {
+                        DataPinsAreNotFloating = true;
                         if ((Cart.Mapper_4_8000 & 0x40) == 0x40)
                         {
                             //$C000 swappable
@@ -8551,7 +8619,7 @@ namespace TriCNES
                     }
                     else if (Address >= 0xA000)
                     {
-
+                        DataPinsAreNotFloating = true;
                         //$8000 swappable
                         dataBus = Cart.PRGROM[(Cart.Mapper_4_BankA << 13) | (Address & 0x1FFF)];
 
@@ -8559,6 +8627,7 @@ namespace TriCNES
                     }
                     else if (Address >= 0x8000)
                     {
+                        DataPinsAreNotFloating = true;
                         if ((Cart.Mapper_4_8000 & 0x40) == 0x40)
                         {
                             //$8000 swappable
@@ -8575,6 +8644,7 @@ namespace TriCNES
                     {
                         if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
                         {
+                            DataPinsAreNotFloating = true;
                             dataBus = Cart.PRGRAM[Address & 0x1FFF];
                         }
                         //else, open bus
@@ -8583,6 +8653,7 @@ namespace TriCNES
                 case 7: // AOROM
                     if (Address >= 0x8000)
                     {
+                        DataPinsAreNotFloating = true;
                         ushort tempo = (ushort)(Address & 0x7FFF);
                         dataBus = Cart.PRGROM[(0x8000 * (Cart.Mapper_7_BankSelect & 0x07) + tempo)&(Cart.PRGROM.Length-1)];
                     }
@@ -8603,7 +8674,7 @@ namespace TriCNES
                                     if (Cart.Mapper_69_Bank_6_isRAMEnabled)
                                     {
                                         dataBus = Cart.PRGRAM[Address & 0x1FFF];
-
+                                        DataPinsAreNotFloating = true;
                                         return;
                                     }
                                     else
@@ -8613,27 +8684,32 @@ namespace TriCNES
                                 }
                                 else
                                 {   //read from ROM
+                                    DataPinsAreNotFloating = true;
                                     dataBus = Cart.PRGROM[(Cart.Mapper_69_Bank_6 * 0x2000 + tempo) % Cart.PRGROM.Length];
                                     return;
                                 }
                             }
                             else if (Address < 0xA000)
                             {
+                                DataPinsAreNotFloating = true;
                                 dataBus = Cart.PRGROM[(Cart.Mapper_69_Bank_8 * 0x2000 + tempo) % Cart.PRGROM.Length];
                                 return;
                             }
                             else if (Address < 0xC000)
                             {
+                                DataPinsAreNotFloating = true;
                                 dataBus = Cart.PRGROM[(Cart.Mapper_69_Bank_A * 0x2000 + tempo) % Cart.PRGROM.Length];
                                 return;
                             }
                             else if (Address < 0xE000)
                             {
+                                DataPinsAreNotFloating = true;
                                 dataBus = Cart.PRGROM[(Cart.Mapper_69_Bank_C * 0x2000 + tempo) % Cart.PRGROM.Length];
                                 return;
                             }
                             else
                             {
+                                DataPinsAreNotFloating = true;
                                 dataBus = Cart.PRGROM[Cart.PRGROM.Length - 0x2000 + tempo];
                                 return;
                             }
@@ -8650,7 +8726,15 @@ namespace TriCNES
         {
             if((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline < 240)
             {
-                if(PPU_ScanCycle >= 1 && PPU_ScanCycle <= 64)
+                if (PPU_ScanCycle >0 && PPU_ScanCycle <= 64)
+                {
+                    return 0xFF;
+                }
+                else if (PPU_ScanCycle <= 256)
+                {
+                    return OAM[PPUOAMAddress];
+                }
+                else if (PPU_ScanCycle <= 320)
                 {
                     return 0xFF;
                 }
@@ -8756,7 +8840,8 @@ namespace TriCNES
                             OAMDMA_Halt = true;
                         }
                         break;
-                    case 0x4015:    //DMC DMA
+                    case 0x4015:    //DMC DMA (and other audio channels)
+
                         APU_Status_DelayedDMC = (Input & 0x10) != 0;
                         APU_Status_Noise = (Input & 0x08) != 0;
                         APU_Status_Triangle = (Input & 0x04) != 0;
@@ -8764,7 +8849,6 @@ namespace TriCNES
                         APU_Status_Pulse1 = (Input & 0x01) != 0;
 
                         APU_DelayedDMC4015 = (byte)(APU_EvenCycle ? 3 : 4); // Enable in 1.5 APU cycles, or 2 APU cycles.
-
 
                         if (APU_Status_DelayedDMC && APU_DMC_BytesRemaining == 0)
                         {
@@ -8777,7 +8861,6 @@ namespace TriCNES
                             }
                         }
 
-
                         if (!APU_Status_Noise) { APU_LengthCounter_Noise = 0; }
                         if (!APU_Status_Triangle) { APU_LengthCounter_Triangle = 0; }
                         if (!APU_Status_Pulse2) { APU_LengthCounter_Pulse2 = 0; }
@@ -8785,22 +8868,21 @@ namespace TriCNES
                         APU_Status_DMCInterrupt = false;
                         IRQ_LevelDetector = false;
 
+                        // Explicit abort stuff.
                         if (!APU_Status_DelayedDMC && ((APU_ChannelTimer_DMC == 2 && !APU_EvenCycle) || (APU_ChannelTimer_DMC == APU_DMC_Rate && APU_EvenCycle))) // this will be the APU cycle that fires a DMC DMA
                         {
                             APU_DelayedDMC4015 = (byte)(APU_EvenCycle ? 5 : 6); // Disable in 2.5 APU cycles, or 3 APU cycles.
                             // basically, if the DMA has already begun, don't abort it for *this* edge case.
                         }
 
+                        // Implicit abort stuff.
                         if (APU_Status_DelayedDMC && ((APU_ChannelTimer_DMC == 10 && !APU_EvenCycle) || (APU_ChannelTimer_DMC == 8 && APU_EvenCycle)))
                         {
                             // okay, so the series of events is as follows:
                             // the Load DMA will occur
                             // regardless of the buffer being empty, there will be a 1-cycle DMA that gets aborted 2 cycles after the load DMA ends.
                             APU_SetImplicitAbortDMC4015 = true; // This will occur in 8 (or 9) cpu cycles
-
                         }
-
-
 
                         break;
                 }
@@ -8912,6 +8994,7 @@ namespace TriCNES
                     }
                     break;
 
+                case 71:
                 case 2: //UxROM
                     if (Address >= 0x8000)
                     {
@@ -9091,19 +9174,19 @@ namespace TriCNES
             switch (operationCycle)
             {
                 case 1: // fetch pointer address
-                    pointerBus = Fetch(programCounter);
+                    addressBus = Fetch(programCounter);
                     programCounter++;
                     break;
                 case 2: // Add X
                     // dummy read
-                    Fetch(pointerBus);
-                    pointerBus = (byte)(pointerBus + X);
+                    Fetch(addressBus);
+                    addressBus = (byte)(addressBus + X);
                     break;
                 case 3: // fetch address low
-                    dl = Fetch((byte)(pointerBus));
+                    dl = Fetch((byte)(addressBus));
                     break;
                 case 4: // fetch address high
-                    addressBus = (ushort)(dl | (Fetch((byte)(pointerBus + 1)) << 8));
+                    addressBus = (ushort)(dl | (Fetch((byte)(addressBus + 1)) << 8));
                     break;
             }
         }
@@ -9119,14 +9202,14 @@ namespace TriCNES
                 switch (operationCycle)
                 {
                     case 1: // fetch pointer address
-                        pointerBus = Fetch(programCounter);
+                        addressBus = Fetch(programCounter);
                         programCounter++;
                         break;
                     case 2: // fetch address low
-                        dl = Fetch((byte)(pointerBus));
+                        dl = Fetch((byte)(addressBus));
                         break;
                     case 3: // fetch address high, add Y to low byte
-                        addressBus = (ushort)(dl | (Fetch((byte)(pointerBus + 1)) << 8));
+                        addressBus = (ushort)(dl | (Fetch((byte)(addressBus + 1)) << 8));
                         temporaryAddress = addressBus;
                         H = (byte)(addressBus >> 8);
                         if (((temporaryAddress + Y) & 0xFF00) == (temporaryAddress & 0xFF00))
@@ -9148,14 +9231,14 @@ namespace TriCNES
                 switch (operationCycle)
                 {
                     case 1: // fetch pointer address
-                        pointerBus = Fetch(programCounter);
+                        addressBus = Fetch(programCounter);
                         programCounter++;
                         break;
                     case 2: // fetch address low
-                        dl = Fetch((byte)(pointerBus));
+                        dl = Fetch((byte)(addressBus));
                         break;
                     case 3: // fetch address high, add Y to low byte
-                        addressBus = (ushort)(dl | (Fetch((byte)(pointerBus + 1)) << 8));
+                        addressBus = (ushort)(dl | (Fetch((byte)(addressBus + 1)) << 8));
                         temporaryAddress = addressBus;
                         addressBus = (ushort)((addressBus & 0xFF00) | ((addressBus + Y) & 0xFF));
                         break;
@@ -9228,10 +9311,7 @@ namespace TriCNES
 
                         if (((temporaryAddress + X) & 0xFF00) == (temporaryAddress & 0xFF00))
                         {
-                            if (opCode != 0x9D) //STA ,X doesn't skip
-                            {
-                                operationCycle++; //skip next cycle
-                            }
+                            operationCycle++; //skip next cycle
                             FixHighByte = false;
                         }
                         else
@@ -9310,10 +9390,7 @@ namespace TriCNES
 
                         if (((temporaryAddress + Y) & 0xFF00) == (temporaryAddress & 0xFF00))
                         {
-                            if (opCode != 0x99) //STA ,Y doesn't skip
-                            {
-                                operationCycle++; //skip next cycle
-                            }
+                            operationCycle++; //skip next cycle
                             FixHighByte = false;
                         }
                         else
@@ -9743,7 +9820,7 @@ namespace TriCNES
 
             string LogLine = "$" + addr + "\t" + bytes + "\t" + instruction + "\tA:" + sA + "\tX:" + sX + "\tY:" + sY + "\tSP:" + sS + "\t" + Flags + "\tCycle: " + totalCycles + "\tPPU_cycle: " + PPUCycle + " " + PPUPos;
 
-            bool LogExtra = false;
+            bool LogExtra = true;
             if (LogExtra)
             {
                 string TempLine_APU_Full = LogLine + "\t" + "DMC :: S_Addr: $" + APU_DMC_SampleAddress.ToString("X4") + "\t S_Length:" + APU_DMC_SampleLength.ToString() + "\t AddrCounter: $" + APU_DMC_AddressCounter.ToString("X4") + "\t BytesLeft:" + APU_DMC_BytesRemaining.ToString() + "\t Shifter:" + APU_DMC_Shifter.ToString() + ":" + APU_DMC_ShifterBitsRemaining.ToString() + "\tDMC_Timer:" + (APU_EvenCycle ? APU_ChannelTimer_DMC : (APU_ChannelTimer_DMC - 1)).ToString();

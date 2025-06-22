@@ -157,6 +157,11 @@ namespace TriCNES
             };
             if (ofd.ShowDialog() == DialogResult.OK)
             {
+                if(TASPropertiesForm != null)
+                {
+                    TASPropertiesForm.Close();
+                    TASPropertiesForm.Dispose();
+                }
                 TASPropertiesForm = new TASProperties();
                 TASPropertiesForm.TasFilePath = ofd.FileName;
                 TASPropertiesForm.MainGUI = this;
@@ -304,6 +309,11 @@ namespace TriCNES
             };
             if (ofd.ShowDialog() == DialogResult.OK)
             {
+                if (TASPropertiesForm3ct != null)
+                {
+                    TASPropertiesForm3ct.Close();
+                    TASPropertiesForm3ct.Dispose();
+                }
                 TASPropertiesForm3ct = new TASProperties3ct();
                 TASPropertiesForm3ct.TasFilePath = ofd.FileName;
                 TASPropertiesForm3ct.MainGUI = this;
