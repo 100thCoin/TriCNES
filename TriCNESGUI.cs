@@ -42,10 +42,17 @@ namespace TriCNES
             {
                 while (true)
                 {
-                    if(PendingScreenshot)
+                    if (PendingScreenshot)
                     {
                         PendingScreenshot = false;
-                        Clipboard.SetImage(EMU.Screen.Bitmap);
+                        if (EMU.PPU_DecodeSignal)
+                        {
+                            Clipboard.SetImage(EMU.NTSCScreen.Bitmap);
+                        }
+                        else
+                        {
+                            Clipboard.SetImage(EMU.Screen.Bitmap);
+                        }
                     }
                     byte controller1 = 0;
                     if (Keyboard.IsKeyDown(Key.X)) { controller1 |= 0x80; }
@@ -63,12 +70,26 @@ namespace TriCNES
                         pb_Screen.Invoke(new MethodInvoker(
                         delegate ()
                         {
-                            pb_Screen.Image = EMU.Screen.Bitmap;
+                            if (EMU.PPU_DecodeSignal)
+                            {
+                                pb_Screen.Image = EMU.NTSCScreen.Bitmap;
+                            }
+                            else
+                            {
+                                pb_Screen.Image = EMU.Screen.Bitmap;
+                            }
                         }));
                     }
                     else
                     {
-                        pb_Screen.Image = EMU.Screen.Bitmap;
+                        if (EMU.PPU_DecodeSignal)
+                        {
+                            pb_Screen.Image = EMU.NTSCScreen.Bitmap;
+                        }
+                        else
+                        {
+                            pb_Screen.Image = EMU.Screen.Bitmap;
+                        }
                     }
 
                 }
@@ -444,9 +465,20 @@ namespace TriCNES
 
         private void trueToolStripMenuItem_Click(object sender, EventArgs e)
         {
-           falseToolStripMenuItem.Checked = false;
-           trueToolStripMenuItem.Checked = true;
+            falseToolStripMenuItem.Checked = false;
+            trueToolStripMenuItem.Checked = true;
             EMU.PPU_DecodeSignal = true;
+            Size big = new Size();
+            big.Width = 256 * 8;
+            big.Height = 240 * 8;
+            Size big2 = new Size();
+            big.Width = 256 * 8+16;
+            big.Height = 240 * 8+ 16;
+            pb_Screen.Size = big;
+            MaximumSize = big2;
+            MinimumSize = big2;
+            Height = 240 * 8 + 16;
+            Width = 256 * 8 + 16;
         }
 
         private void falseToolStripMenuItem_Click(object sender, EventArgs e)
@@ -454,6 +486,17 @@ namespace TriCNES
             trueToolStripMenuItem.Checked = false;
             falseToolStripMenuItem.Checked = true;
             EMU.PPU_DecodeSignal = false;
+            Size small = new Size();
+            small.Width = 256;
+            small.Height = 240;
+            Size small2 = new Size();
+            small2.Width = 256+16;
+            small2.Height = 240+ 16;
+            pb_Screen.Size = small;
+            MaximumSize = small2;
+            MinimumSize = small2;
+            Width = 256 + 16;
+            Height = 240 + 16;
         }
     }
 }

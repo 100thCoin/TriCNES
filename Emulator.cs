@@ -1583,25 +1583,21 @@ namespace TriCNES
                     }
                     else
                     {
-                        int Prev = PrevPrevPrevPrevDotColor;
-                        int Next = PrevPrevDotColor;
                         if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
                         {
                             chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
-                            Next &= 0x30;
                         }
-                        PPU_SignalDecode(Prev, chosenColor | emphasis, Next | emphasis);
+                        PPU_SignalDecode(chosenColor | emphasis);
                         PrevPrevPrevPrevDotColor = chosenColor | emphasis;
                     }
                 }
-                if(PPU_DecodeSignal && (PPU_ScanCycle == 0))
+                if(PPU_DecodeSignal && (PPU_ScanCycle == 0) && PPU_Scanline < 241)
                 {
+                    ntsc_signal_of_dot_0 = ntsc_signal;
                     chosenColor = PaletteRAM[0x00] & 0x3F;
-                    int Next = PrevPrevDotColor;
                     if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
                     {
                         chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
-                        Next &= 0x30;
                     }
                     // emphasis bits
                     int emphasis = 0;
@@ -1609,8 +1605,16 @@ namespace TriCNES
                     if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
                     if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
                     PrevPrevPrevPrevDotColor = chosenColor | emphasis; // set up samples for dot 1
+                    PPU_SignalDecode(chosenColor | emphasis);
                 }
-
+                if (PPU_DecodeSignal && (PPU_ScanCycle == 260) && PPU_Scanline < 241)
+                {
+                    PPU_SignalDecode(PrevPrevPrevPrevDotColor);
+                }
+                else if (PPU_DecodeSignal && (PPU_ScanCycle == 261) && PPU_Scanline < 241)
+                {
+                    RenderNTSCScanline();
+                }
             }
 
             if (PPU_DecodeSignal)
@@ -1628,25 +1632,26 @@ namespace TriCNES
 		        0.500f, 0.676f, 0.896f, 0.896f  // Signal high, attenuated
 		        };
         public byte ntsc_signal;
-        public double[] NTSC_Samples = new double[257*8];
+        public byte ntsc_signal_of_dot_0;
+        public float[] NTSC_Samples = new float[257*8 + 16];
         static float[] Levels =
             {
-            (Voltages[0] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[1] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[2] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[3] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[4] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[5] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[6] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[7] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[8] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[9] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[10] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[11] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[12] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[13] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[14] - Voltages[1]) / (Voltages[6] - Voltages[1]),
-            (Voltages[15] - Voltages[1]) / (Voltages[6] - Voltages[1])
+            (Voltages[0] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[1] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[2] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[3] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[4] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[5] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[6] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[7] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[8] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[9] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[10] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[11] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[12] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[13] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[14] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
+            (Voltages[15] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f
         };
         float Saturation = 0.75f;
         int SignalBufferWidth = 12;
@@ -1686,50 +1691,10 @@ namespace TriCNES
             return (col + DecodePhase) % 12 < 6;
         }
         static float ntsc_black = 0.312f, ntsc_white = 1.100f;
-        void PPU_SignalDecode(int prevColor, int nesColor, int nextColor)
+        void PPU_SignalDecode(int nesColor)
         {
             byte phase = ntsc_signal;
-            phase += 10;
-            phase %= 12;
-
-            double Y = 0;
-            double U = 0;
-            double V = 0;
-            if (PPU_Scanline == 192 && PPU_ScanCycle == 36)
-            {
-
-            }
-            if (PPU_Scanline == 50 && PPU_ScanCycle == 250)
-            {
-
-            }
-
             int i = 0;
-            while (i < 2)
-            {
-                // Decode the NES color.
-                int colInd = (prevColor & 0x0F);   // 0..15 "cccc"
-                int level = (prevColor >> 4) & 3;  // 0..3  "ll"
-                int emphasis = (prevColor >> 6);   // 0..7  "eee"
-                if (colInd > 13) { level = 1; }   // For colors 14..15, level 1 is forced.
-                int attenuation = (
-                            (((emphasis & 1) != 0) && InColorPhase(0xC, phase)) ||
-                            (((emphasis & 2) != 0) && InColorPhase(0x4, phase)) ||
-                            (((emphasis & 4) != 0) && InColorPhase(0x8, phase)) && (colInd < 0xE)) ? 8 : 0;
-                float low = Levels[0 + level + attenuation];
-                float high = Levels[4 + level + attenuation];
-                if (colInd == 0) { low = high; } // For color 0, only high level is emitted
-                if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
-                float sample = InColorPhase(colInd, phase) ? high : low;
-                Y += sample;
-                U += sample * SinTable[(phase) % 12];
-                V += sample * CosTable[(phase) % 12];
-                phase++;
-                phase %= 12;
-                i++;
-            }
-
-            i = 0;
             while (i < 8)
             {
                 // Decode the NES color.
@@ -1746,54 +1711,62 @@ namespace TriCNES
                 if (colInd == 0) { low = high; } // For color 0, only high level is emitted
                 if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
                 float sample = InColorPhase(colInd, phase) ? high : low;
-
-                Y += sample;
-                U += sample * SinTable[(phase) % 12];
-                V += sample * CosTable[(phase) % 12];
+                if (PPU_ScanCycle == 0)
+                {
+                    NTSC_Samples[i] = sample;
+                }
+                else
+                {
+                    NTSC_Samples[(PPU_ScanCycle - 3) * 8 + i] = sample;
+                }
                 phase++;
                 phase %= 12;
                 i++;
             }
+        }
+        void RenderNTSCScanline()
+        {
+            byte phase = ntsc_signal_of_dot_0;
 
-            i = 0;
-            while (i < 2)
+            int i = 0;
+            while(i < NTSCScreen.Width)
             {
-                // Decode the NES color.
-                int colInd = (nextColor & 0x0F);   // 0..15 "cccc"
-                int level = (nextColor >> 4) & 3;  // 0..3  "ll"
-                int emphasis = (nextColor >> 6);   // 0..7  "eee"
-                if (colInd > 13) { level = 1; }   // For colors 14..15, level 1 is forced.
-                int attenuation = (
-                            (((emphasis & 1) != 0) && InColorPhase(0xC, phase)) ||
-                            (((emphasis & 2) != 0) && InColorPhase(0x4, phase)) ||
-                            (((emphasis & 4) != 0) && InColorPhase(0x8, phase)) && (colInd < 0xE)) ? 8 : 0;
-                float low = Levels[0 + level + attenuation];
-                float high = Levels[4 + level + attenuation];
-                if (colInd == 0) { low = high; } // For color 0, only high level is emitted
-                if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
-                float sample = InColorPhase(colInd, phase) ? high : low;
-                Y += sample;
-                U += sample * SinTable[(phase) % 12];
-                V += sample * CosTable[(phase) % 12];
-                phase++;
-                phase %= 12;
+                int center = i+8;
+                int begin = center - 6;
+                int end = center + 6;
+                double Y = 0;
+                double U = 0;
+                double V = 0;
+                for (int p = begin; p < end; ++p) // Collect and accumulate samples
+                {
+                    float sample = NTSC_Samples[p] / 12;
+                    Y += sample;
+                    U += sample * SinTable[(phase+p) % 12];
+                    V += sample * CosTable[(phase+p) % 12];
+                }
+                Y *= 12;
+                U *= 12;
+                V *= 12;
+                U = U * 0.5f + 0.5f;
+                V = V * 0.5f + 0.5f;
+                // convert YUV to RGB
+                double R = 1.164 * (Y - 16 / 256.0) + 1.596 * (V - 128 / 256.0);
+                double G = 1.164 * (Y - 16 / 256.0) - 0.392 * (U - 128 / 256.0) - 0.813 * (V - 128 / 256.0);
+                double B = 1.164 * (Y - 16 / 256.0) + 2.017 * (U - 128 / 256.0);
+                if (R < 0) { R = 0; }
+                if (R > 1) { R = 1; }
+                if (G < 0) { G = 0; }
+                if (G > 1) { G = 1; }
+                if (B < 0) { B = 0; }
+                if (B > 1) { B = 1; }
+                int j = 0;
+                while (j < 8)
+                {
+                    NTSCScreen.SetPixel(i, PPU_Scanline*8+j, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
+                    j++;
+                }
                 i++;
             }
-            Y /= 12.0;
-            U /= 12.0;
-            V /= 12.0;
-            U = U * 0.5f + 0.5f;
-            V = V * 0.5f + 0.5f;
-            // convert YUV to RGB
-            double tempp = U + V;
-            double R = 1.164 * (Y - 16 / 256.0) + 1.596 * (V - 128 / 256.0);
-            double G = 1.164 * (Y - 16 / 256.0) - 0.392 * (U - 128 / 256.0) - 0.813 * (V - 128 / 256.0);
-            double B = 1.164 * (Y - 16 / 256.0) + 2.017 * (U - 128 / 256.0);
-            if(R < 0) { R = 0;} if(R > 1) { R = 1; }
-            if(G < 0) { G = 0;} if(G > 1) { G = 1; }
-            if(B < 0) { B = 0;} if(B > 1) { B = 1; }
-            Screen.SetPixel(PPU_ScanCycle - 4, PPU_Scanline, Color.FromArgb((byte)(R*255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
-
         }
 
         void PPU_MapperSpecificFunctions()
@@ -3365,10 +3338,6 @@ namespace TriCNES
             else if (operationCycle == 0) // We are not running any DMAs, and this is the first cycle of an instruction.
             {
                 // cycle 0. fetch opcode:
-                if(programCounter == 0xD1ff)
-                {
-
-                }
                 addressBus = programCounter;
                 opCode = Fetch(addressBus); // Fetch the value at the program counter. This is the opcode.
 
