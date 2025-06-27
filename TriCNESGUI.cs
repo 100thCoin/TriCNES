@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Windows.Input;
 using System.Threading;
 using System.Security.Cryptography;
 
@@ -27,7 +28,7 @@ namespace TriCNES
             pb_Screen.DragDrop += new DragEventHandler(pb_Screen_DragDrop);
             FormClosing += new FormClosingEventHandler(TriCNESGUI_Closing);
         }
-
+        
         public Emulator EMU;
         Thread EmuClock;
         string filePath;
@@ -41,6 +42,21 @@ namespace TriCNES
             {
                 while (true)
                 {
+                    if(PendingScreenshot)
+                    {
+                        PendingScreenshot = false;
+                        Clipboard.SetImage(EMU.Screen.Bitmap);
+                    }
+                    byte controller1 = 0;
+                    if (Keyboard.IsKeyDown(Key.X)) { controller1 |= 0x80; }
+                    if (Keyboard.IsKeyDown(Key.Z)) { controller1 |= 0x40; }
+                    if (Keyboard.IsKeyDown(Key.RightShift)) { controller1 |= 0x20; }
+                    if (Keyboard.IsKeyDown(Key.Enter)) { controller1 |= 0x10; }
+                    if (Keyboard.IsKeyDown(Key.Up)) { controller1 |= 0x08; }
+                    if (Keyboard.IsKeyDown(Key.Down)) { controller1 |= 0x04; }
+                    if (Keyboard.IsKeyDown(Key.Left)) { controller1 |= 0x02; }
+                    if (Keyboard.IsKeyDown(Key.Right)) { controller1 |= 0x01; }
+                    EMU.ControllerPort1 = controller1;
                     EMU._CoreFrameAdvance();
                     if (pb_Screen.InvokeRequired)
                     {
@@ -129,6 +145,7 @@ namespace TriCNES
                 Cartridge Cart = new Cartridge(filePath);
                 EMU.Cart = Cart;
                 EmuClock = new Thread(ClockEmulator);
+                EmuClock.SetApartmentState(ApartmentState.STA);
                 EmuClock.IsBackground = true;
                 EmuClock.Start();
             }
@@ -257,6 +274,7 @@ namespace TriCNES
             }
 
             EmuClock = new Thread(ClockEmulator);
+            EmuClock.SetApartmentState(ApartmentState.STA);
             EmuClock.IsBackground = true;
             EmuClock.Start();
         }
@@ -335,9 +353,10 @@ namespace TriCNES
             EMU = Emu2;
         }
 
+        bool PendingScreenshot;
         private void screenshotToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Clipboard.SetImage(EMU.Screen.Bitmap);
+            PendingScreenshot = true;
         }
 
         private void pb_Screen_DragEnter(object sender, DragEventArgs e)
@@ -356,6 +375,7 @@ namespace TriCNES
             Cartridge Cart = new Cartridge(filePath);
             EMU.Cart = Cart;
             EmuClock = new Thread(ClockEmulator);
+            EmuClock.SetApartmentState(ApartmentState.STA);
             EmuClock.IsBackground = true;
             EmuClock.Start();
             // Do stuff
@@ -377,5 +397,63 @@ namespace TriCNES
             Application.Exit();
         }
 
+        private void phase0ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            phase0ToolStripMenuItem.Checked = true;
+            phase1ToolStripMenuItem.Checked = false;
+            phase2ToolStripMenuItem.Checked = false;
+            phase3ToolStripMenuItem.Checked = false;
+            RebootWithAlignment(0);
+        }
+
+        private void phase1ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            phase0ToolStripMenuItem.Checked = false;
+            phase1ToolStripMenuItem.Checked = true;
+            phase2ToolStripMenuItem.Checked = false;
+            phase3ToolStripMenuItem.Checked = false;
+            RebootWithAlignment(1);
+        }
+
+        private void phase2ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            phase0ToolStripMenuItem.Checked = false;
+            phase1ToolStripMenuItem.Checked = false;
+            phase2ToolStripMenuItem.Checked = true;
+            phase3ToolStripMenuItem.Checked = false;
+            RebootWithAlignment(2);
+        }
+
+        private void phase3ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            phase0ToolStripMenuItem.Checked = false;
+            phase1ToolStripMenuItem.Checked = false;
+            phase2ToolStripMenuItem.Checked = false;
+            phase3ToolStripMenuItem.Checked = true;
+            RebootWithAlignment(3);
+        }
+
+        private void RebootWithAlignment(int Alignment)
+        {
+            Emulator Emu2 = new Emulator();
+            Emu2.Cart = EMU.Cart;
+            EMU = Emu2;
+            EMU.PPUClock = Alignment;
+            EMU.CPUClock = 0;
+        }
+
+        private void trueToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+           falseToolStripMenuItem.Checked = false;
+           trueToolStripMenuItem.Checked = true;
+            EMU.PPU_DecodeSignal = true;
+        }
+
+        private void falseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            trueToolStripMenuItem.Checked = false;
+            falseToolStripMenuItem.Checked = true;
+            EMU.PPU_DecodeSignal = false;
+        }
     }
 }

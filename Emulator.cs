@@ -1,20 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Security.Policy;
 using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Xml;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 using System.IO;
-using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
-using System.Diagnostics;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
@@ -270,6 +257,7 @@ namespace TriCNES
         Color[] NESPal = SetupPalette(); // This runs the function.
         int chosenColor; // During screen rendering, this value is the index into the color array.
         public DirectBitmap Screen = new DirectBitmap(256, 240); // This uses a class called "DirectBitmap". It's pretty much jsut the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+        public DirectBitmap NTSCScreen = new DirectBitmap(256*8, 240*8); // This uses a class called "DirectBitmap". It's pretty much jsut the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
 
         //Debugging
         public bool Logging;    // If set, the tracelogger will record all instructions ran.
@@ -588,7 +576,10 @@ namespace TriCNES
             if (CPUClock == 5)
             {
                 IRQLine = IRQ_LevelDetector;
-                IRQ_LevelDetector |= APU_Status_FrameInterrupt; // if the APU frame counter flag is never cleared, you will get another IRQ when the I flag is cleared.
+                if(APU_Status_FrameInterrupt && !APU_FrameCounterInhibitIRQ)
+                {
+                    IRQ_LevelDetector = true; // if the APU frame counter flag is never cleared, you will get another IRQ when the I flag is cleared.
+                }
                 if ((PPU_AddressBus & 0b0001000000000000) == 0)
                 {
                     if (MMC3_M2Filter < 3)
@@ -1070,8 +1061,10 @@ namespace TriCNES
         public byte PPU_OAMCorruptionIndex;  // The object that gets corrupted depends on when the data was corrupted
         // OAM corruption during OAM evaluation happens with the instant write to $2001 using the databus value. Other parts of sprite evaluation apparently do not.
         public bool PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant;  // When rendering is disabled on specific dots of visible scanlines, OAM data can become corrupted
+        public bool PPU_OAMCorruptionRenderingEnabledOutOfVBlank; // If enabling rendering outside vblank, there are alignment specific effects.
         public bool PPU_OAMEvaluationCorruptionOddCycle; // If rendering is disabled during OAM evaluation, it matters if it was on an odd or even cycle.
         public bool PPU_OAMEvaluationObjectInRange; // If rendering is disabled during OAM evaluation, it matters if the most recent object evaluated was in vertical range of this scanline.
+        public bool PPU_OAMEvaluationObjectInXRange; // If rendering is disabled during OAM evaluation, it matters if the most recent object evaluated was in vertical range of this scanline.
 
         public bool PPU_PaletteCorruptionRenderingDisabledOutOfVBlank;  // When rendering is disabled on specific dots of visible scanlines, OAM data can become corrupted
 
@@ -1129,6 +1122,7 @@ namespace TriCNES
         public byte PrevDotColor; // This is the value from last cycle.
         public byte PrevPrevDotColor; // And this is from 2 cycles ago.
         public byte PrevPrevPrevDotColor; // And this is from 2 cycles ago.
+        public int PrevPrevPrevPrevDotColor; // This is used with NTSC signal decoding.
         public byte PaletteRAMAddress;
 
         public bool NMI_PinsSignal; // I'm using this to detect the rising edge of $2000.7 and $2002.7
@@ -1513,13 +1507,21 @@ namespace TriCNES
                 if (PPU_Update2001Delay == 0) // if we've waited enough cycles, apply the changes
                 {
                     PPU_Mask = PPU_Update2001Value; // this value is only used for debugging.
-                    bool temp_rendering = PPU_Mask_ShowBackground || PPU_Mask_ShowSprites;
                     PPU_Mask_8PxShowBackground = (PPU_Update2001Value & 0x02) != 0;
                     PPU_Mask_8PxShowSprites = (PPU_Update2001Value & 0x04) != 0;
                     PPU_Mask_ShowBackground = (PPU_Update2001Value & 0x08) != 0;
                     PPU_Mask_ShowSprites = (PPU_Update2001Value & 0x10) != 0;
 
-                    if (temp_rendering && !PPU_Mask_ShowBackground && !PPU_Mask_ShowSprites)
+                    PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
+                    PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
+                }
+            }
+            if (PPU_Update2001OAMCorruptionDelay > 0) // if we wrote to 2001 recently
+            {
+                PPU_Update2001OAMCorruptionDelay--;
+                if (PPU_Update2001OAMCorruptionDelay == 0) // if we've waited enough cycles, apply the changes
+                {
+                    if (PPU_WasRenderingBefore2001Write && (PPU_Update2001Value & 0x08) == 0 && (PPU_Update2001Value & 0x10) == 0)
                     {
                         if ((PPU_Scanline < 240 || PPU_Scanline == 261)) // if this is the pre-render line, or any line before vblank
                         {
@@ -1529,14 +1531,9 @@ namespace TriCNES
                             }
                         }
                     }
-
-                    
-
-                    PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
-                    PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
                 }
             }
-            if(PPU_Update2001EmphasisBitsDelay > 0)
+            if (PPU_Update2001EmphasisBitsDelay > 0)
             {
                 PPU_Update2001EmphasisBitsDelay--;
                 if(PPU_Update2001EmphasisBitsDelay == 0)
@@ -1551,7 +1548,7 @@ namespace TriCNES
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
             {
                 PrevPrevPrevDotColor = PrevPrevDotColor; // Drawing a color to the screen has a 3(?) ppu cycle delay between deciding the color, and drawing it.
-                PrevPrevDotColor = PrevDotColor; 
+                PrevPrevDotColor = PrevDotColor;
                 PrevDotColor = DotColor; // These varaibles here just record the color, and swap them through these varaibles so it can be used 3 cycles after it was chosen.
 
                 if ((PPU_ScanCycle > 0 && PPU_ScanCycle <= 256) || (PPU_ScanCycle > 320 && PPU_ScanCycle <= 336)) // if this is a visible pixel, or preparing the start of next scanline
@@ -1576,17 +1573,228 @@ namespace TriCNES
                         chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
                     }
                     // emphasis bits
-                    if (PPU_Mask_EmphasizeRed) { chosenColor |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeGreen) { chosenColor |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeBlue) { chosenColor |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
-
-                    Screen.SetPixel(PPU_ScanCycle - 4, PPU_Scanline, NesPalInts[chosenColor]); // this sets the pixel on screen to the chosen color.
+                    int emphasis = 0;
+                    if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                    if (!PPU_DecodeSignal)
+                    {
+                        Screen.SetPixel(PPU_ScanCycle - 4, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
+                    }
+                    else
+                    {
+                        int Prev = PrevPrevPrevPrevDotColor;
+                        int Next = PrevPrevDotColor;
+                        if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                        {
+                            chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                            Next &= 0x30;
+                        }
+                        PPU_SignalDecode(Prev, chosenColor | emphasis, Next | emphasis);
+                        PrevPrevPrevPrevDotColor = chosenColor | emphasis;
+                    }
                 }
-
+                if(PPU_DecodeSignal && (PPU_ScanCycle == 0))
+                {
+                    chosenColor = PaletteRAM[0x00] & 0x3F;
+                    int Next = PrevPrevDotColor;
+                    if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                    {
+                        chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        Next &= 0x30;
+                    }
+                    // emphasis bits
+                    int emphasis = 0;
+                    if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                    PrevPrevPrevPrevDotColor = chosenColor | emphasis; // set up samples for dot 1
+                }
 
             }
 
+            if (PPU_DecodeSignal)
+            {
+                ntsc_signal+=8;
+                ntsc_signal %= 12;
+            }
         } // and that's all for the PPU cycle!
+        public bool PPU_DecodeSignal;
+        static float chroma_saturation_correction = 2.4f;
+        static float[] Voltages =
+            { 0.228f, 0.312f, 0.552f, 0.880f, // Signal low
+		        0.616f, 0.840f, 1.100f, 1.100f, // Signal high
+		        0.192f, 0.256f, 0.448f, 0.712f, // Signal low, attenuated
+		        0.500f, 0.676f, 0.896f, 0.896f  // Signal high, attenuated
+		        };
+        public byte ntsc_signal;
+        public double[] NTSC_Samples = new double[257*8];
+        static float[] Levels =
+            {
+            (Voltages[0] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[1] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[2] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[3] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[4] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[5] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[6] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[7] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[8] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[9] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[10] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[11] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[12] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[13] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[14] - Voltages[1]) / (Voltages[6] - Voltages[1]),
+            (Voltages[15] - Voltages[1]) / (Voltages[6] - Voltages[1])
+        };
+        float Saturation = 0.75f;
+        int SignalBufferWidth = 12;
+        static double hue = 0;
+        static double[] SinTable =
+            {
+            Math.Sin(Math.PI* (0 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (1 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (2 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (3 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (4 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (5 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (6 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (7 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (8 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (9 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (10 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Sin(Math.PI* (11 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction
+             };
+        static double[] CosTable =
+            {
+            Math.Cos(Math.PI* (0 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (1 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (2 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (3 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (4 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (5 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (6 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (7 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (8 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (9 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (10 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
+            Math.Cos(Math.PI* (11 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction
+             };
+        bool InColorPhase(int col, int DecodePhase)
+        {
+            return (col + DecodePhase) % 12 < 6;
+        }
+        static float ntsc_black = 0.312f, ntsc_white = 1.100f;
+        void PPU_SignalDecode(int prevColor, int nesColor, int nextColor)
+        {
+            byte phase = ntsc_signal;
+            phase += 10;
+            phase %= 12;
+
+            double Y = 0;
+            double U = 0;
+            double V = 0;
+            if (PPU_Scanline == 192 && PPU_ScanCycle == 36)
+            {
+
+            }
+            if (PPU_Scanline == 50 && PPU_ScanCycle == 250)
+            {
+
+            }
+
+            int i = 0;
+            while (i < 2)
+            {
+                // Decode the NES color.
+                int colInd = (prevColor & 0x0F);   // 0..15 "cccc"
+                int level = (prevColor >> 4) & 3;  // 0..3  "ll"
+                int emphasis = (prevColor >> 6);   // 0..7  "eee"
+                if (colInd > 13) { level = 1; }   // For colors 14..15, level 1 is forced.
+                int attenuation = (
+                            (((emphasis & 1) != 0) && InColorPhase(0xC, phase)) ||
+                            (((emphasis & 2) != 0) && InColorPhase(0x4, phase)) ||
+                            (((emphasis & 4) != 0) && InColorPhase(0x8, phase)) && (colInd < 0xE)) ? 8 : 0;
+                float low = Levels[0 + level + attenuation];
+                float high = Levels[4 + level + attenuation];
+                if (colInd == 0) { low = high; } // For color 0, only high level is emitted
+                if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
+                float sample = InColorPhase(colInd, phase) ? high : low;
+                Y += sample;
+                U += sample * SinTable[(phase) % 12];
+                V += sample * CosTable[(phase) % 12];
+                phase++;
+                phase %= 12;
+                i++;
+            }
+
+            i = 0;
+            while (i < 8)
+            {
+                // Decode the NES color.
+                int colInd = (nesColor & 0x0F);   // 0..15 "cccc"
+                int level = (nesColor >> 4) & 3;  // 0..3  "ll"
+                int emphasis = (nesColor >> 6);   // 0..7  "eee"
+                if (colInd > 13) { level = 1; }   // For colors 14..15, level 1 is forced.
+                int attenuation = (
+                            (((emphasis & 1) != 0) && InColorPhase(0xC, phase)) ||
+                            (((emphasis & 2) != 0) && InColorPhase(0x4, phase)) ||
+                            (((emphasis & 4) != 0) && InColorPhase(0x8, phase)) && (colInd < 0xE)) ? 8 : 0;
+                float low = Levels[0 + level + attenuation];
+                float high = Levels[4 + level + attenuation];
+                if (colInd == 0) { low = high; } // For color 0, only high level is emitted
+                if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
+                float sample = InColorPhase(colInd, phase) ? high : low;
+
+                Y += sample;
+                U += sample * SinTable[(phase) % 12];
+                V += sample * CosTable[(phase) % 12];
+                phase++;
+                phase %= 12;
+                i++;
+            }
+
+            i = 0;
+            while (i < 2)
+            {
+                // Decode the NES color.
+                int colInd = (nextColor & 0x0F);   // 0..15 "cccc"
+                int level = (nextColor >> 4) & 3;  // 0..3  "ll"
+                int emphasis = (nextColor >> 6);   // 0..7  "eee"
+                if (colInd > 13) { level = 1; }   // For colors 14..15, level 1 is forced.
+                int attenuation = (
+                            (((emphasis & 1) != 0) && InColorPhase(0xC, phase)) ||
+                            (((emphasis & 2) != 0) && InColorPhase(0x4, phase)) ||
+                            (((emphasis & 4) != 0) && InColorPhase(0x8, phase)) && (colInd < 0xE)) ? 8 : 0;
+                float low = Levels[0 + level + attenuation];
+                float high = Levels[4 + level + attenuation];
+                if (colInd == 0) { low = high; } // For color 0, only high level is emitted
+                if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
+                float sample = InColorPhase(colInd, phase) ? high : low;
+                Y += sample;
+                U += sample * SinTable[(phase) % 12];
+                V += sample * CosTable[(phase) % 12];
+                phase++;
+                phase %= 12;
+                i++;
+            }
+            Y /= 12.0;
+            U /= 12.0;
+            V /= 12.0;
+            U = U * 0.5f + 0.5f;
+            V = V * 0.5f + 0.5f;
+            // convert YUV to RGB
+            double tempp = U + V;
+            double R = 1.164 * (Y - 16 / 256.0) + 1.596 * (V - 128 / 256.0);
+            double G = 1.164 * (Y - 16 / 256.0) - 0.392 * (U - 128 / 256.0) - 0.813 * (V - 128 / 256.0);
+            double B = 1.164 * (Y - 16 / 256.0) + 2.017 * (U - 128 / 256.0);
+            if(R < 0) { R = 0;} if(R > 1) { R = 1; }
+            if(G < 0) { G = 0;} if(G > 1) { G = 1; }
+            if(B < 0) { B = 0;} if(B > 1) { B = 1; }
+            Screen.SetPixel(PPU_ScanCycle - 4, PPU_Scanline, Color.FromArgb((byte)(R*255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
+
+        }
 
         void PPU_MapperSpecificFunctions()
         {
@@ -1656,6 +1864,7 @@ namespace TriCNES
                 OAM[PPU_OAMCorruptionIndex * 8 + i] = OAM[i]; // The corrupted row is replaced with the values from row 0
                 i++;
             }
+            SecondaryOAM[PPU_OAMCorruptionIndex] = SecondaryOAM[0]; // Also corrupt this byte.
             // this all happens in a single cycle.
         }
 
@@ -1674,10 +1883,13 @@ namespace TriCNES
                 if (PPU_PendingOAMCorruption) // OAM corruption occurs on the visible dot after rendering was enabled. It also can happen on the pre-render line.
                 {
                     PPU_PendingOAMCorruption = false;
-                    CorruptOAM();
+                    if (!PPU_OAMCorruptionRenderingEnabledOutOfVBlank)
+                    {
+                        CorruptOAM();
+                    }
+                    PPU_OAMCorruptionRenderingEnabledOutOfVBlank = false;
                 }
             }
-
 
             if ((PPU_ScanCycle >= 1 && PPU_ScanCycle <= 64) && PPU_Scanline < 240) // Dots 1 through 64, not on the pre-render line
             {
@@ -1736,20 +1948,14 @@ namespace TriCNES
                             PPU_PendingOAMCorruption = true;
                             if (!PPU_OAMEvaluationObjectInRange)
                             {
-                                PPUOAMAddress++;
-                            }
-
-                            if ((SecondaryOAMAddress & 3) == 0)
-                            {
-                                if (!PPU_OAMEvaluationObjectInRange)
+                                if (true) // WHAT ACTUALLY CAUSES THIS?
                                 {
-                                    if (!OAMAddressOverflowedDuringSpriteEvaluation)
-                                    {
-                                        //SecondaryOAMAddress += 4;
-                                    }
+                                    PPUOAMAddress++;
                                 }
                             }
-                            else
+                           
+                            
+                            if (PPU_OAMEvaluationObjectInRange && (SecondaryOAMAddress & 3) != 0)
                             {
                                 if (!OAMAddressOverflowedDuringSpriteEvaluation)
                                 {
@@ -1757,9 +1963,16 @@ namespace TriCNES
                                     SecondaryOAMAddress += 4;
                                 }
                             }
+                           
+                            if (PPUClock == 0 || PPUClock == 3)
+                            {
+                                PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress & 0x1C); // this value will be used when rendering is re-enabled and the corruption occurs
+                            }
 
-
-                            PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress); // this value will be used when rendering is re-enabled and the corruption occurs
+                            if (PPUClock == 1 || PPUClock == 2)
+                            {
+                                PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress & 0x1C); // this value will be used when rendering is re-enabled and the corruption occurs
+                            }
                         }
                         else
                         {
@@ -1781,6 +1994,7 @@ namespace TriCNES
                             }
                             if (SpriteEvaluationTick == 0) // tick 0: check if this object's y position is in range for this scanline
                             {
+                                PPU_OAMEvaluationObjectInXRange = false;
                                 if (PPU_Scanline - PPU_SpriteEvaluationTemp >= 0 && PPU_Scanline - PPU_SpriteEvaluationTemp < (PPU_Spritex16 ? 16 : 8))
                                 {
                                     PPU_OAMEvaluationObjectInRange = true;
@@ -1830,39 +2044,19 @@ namespace TriCNES
                                         PPUOAMAddress += 4; // +4
                                         PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
                                     }
-                                    if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && !PPU_OAMEvaluationCorruptionOddCycle) // if we just disabled rendering mid OAM evaluation, the address is incremented yet again.
-                                    {
-                                        PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
-                                        PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
-                                        PPUOAMAddress++;
-                                        PPU_PendingOAMCorruption = true;
-                                        if ((SecondaryOAMAddress & 3) != 0)
-                                        {
-                                            SecondaryOAMAddress &= 0xFC;
-                                            SecondaryOAMAddress += 4;
-                                        }
-                                        if (!SecondaryOAMFull) // if secondary OAM is not full
-                                        {
-                                            SecondaryOAMAddress &= 0x1F; // keep the secondary OAM address in-bounds
-                                            if (SecondaryOAMAddress == 0) // If we've overflowed the secondary OAM address
-                                            {
-                                                SecondaryOAMFull = true; // secondary OAM is now full.
-                                            }
-                                        }
-                                        PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
-                                    }
-
                                 }
                             }
                             else // ticks 1, 2, or 3
                             {
                                 if (SpriteEvaluationTick == 3) // tick 3: X position.
                                 {
+                                    PPU_OAMEvaluationObjectInRange = false;
                                     // OAM X coordinate.
                                     // This also runs the "vertical in range check", though typically the result doesn't matter.
                                     if (PPU_Scanline - PPU_SpriteEvaluationTemp >= 0 && PPU_Scanline - PPU_SpriteEvaluationTemp < (PPU_Spritex16 ? 16 : 8))
                                     {
                                         // if this sprite is within range.
+                                        PPU_OAMEvaluationObjectInXRange = true;
                                         if (!SecondaryOAMFull)
                                         {
                                             PPUOAMAddress++; // +1
@@ -1870,7 +2064,7 @@ namespace TriCNES
                                     }
                                     else
                                     {
-                                        PPU_OAMEvaluationObjectInRange = false;
+                                        PPU_OAMEvaluationObjectInXRange = false;
                                         if (!SecondaryOAMFull)
                                         {
                                             PPUOAMAddress += 1; // +1 (In theory, this should be +4, though my experiments only reflect my consoles behavior if this is +1?)
@@ -1900,6 +2094,37 @@ namespace TriCNES
                             {
                                 OAMAddressOverflowedDuringSpriteEvaluation = true; // set this flag.
                             }
+
+                            if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && !PPU_OAMEvaluationCorruptionOddCycle) // if we just disabled rendering mid OAM evaluation, the address is incremented yet again.
+                            {
+                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
+                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
+                                PPUOAMAddress++;
+                                PPU_PendingOAMCorruption = true;
+                                if (PPU_OAMEvaluationObjectInRange || PPU_OAMEvaluationObjectInXRange) // Alright. I give up. I have no idea what actually determines if secondary OAM gets the "+4" treatment.
+                                {
+                                    SecondaryOAMAddress &= 0xFC; // TODO: Figure this junk out.
+                                    SecondaryOAMAddress += 4;    // I'm using SecondaryOAMAddress here, since the row of OAM that gets corrupt is always am ultiple of 4.
+                                }
+                                if (PPUClock == 0 || PPUClock == 3)
+                                {
+                                    PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress & 0x1C); // this value will be used when rendering is re-enabled and the corruption occurs
+                                }
+                                
+                                if (!SecondaryOAMFull) // if secondary OAM is not full
+                                {
+                                    SecondaryOAMAddress &= 0x1F; // keep the secondary OAM address in-bounds
+                                    if (SecondaryOAMAddress == 0) // If we've overflowed the secondary OAM address
+                                    {
+                                        SecondaryOAMFull = true; // secondary OAM is now full.
+                                    }
+                                }
+                                if (PPUClock == 1 || PPUClock == 2)
+                                {
+                                    PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress & 0x1C); // this value will be used when rendering is re-enabled and the corruption occurs
+                                }
+                            }
+
                         }
                         else
                         {   // OAM Address Overflowerd During Sprite Evaluation
@@ -1919,13 +2144,19 @@ namespace TriCNES
                             {
                                 PPUOAMAddress++;
                             }
-
-                            if (SecondaryOAMAddress != 0 && !OAMAddressOverflowedDuringSpriteEvaluation)
+                            if(PPUClock == 0 || PPUClock == 3)
+                            {
+                                PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress); // this value will be used when rendering is re-enabled and the corruption occurs
+                            }
+                            if ((SecondaryOAMAddress & 3) != 0 && !OAMAddressOverflowedDuringSpriteEvaluation)
                             {
                                 SecondaryOAMAddress &= 0xFC;
                                 SecondaryOAMAddress += 4;
                             }
-                            PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress); // this value will be used when rendering is re-enabled and the corruption occurs
+                            if (PPUClock == 1 || PPUClock == 2)
+                            {
+                                PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress); // this value will be used when rendering is re-enabled and the corruption occurs
+                            }
                         }
                     }
                 }
@@ -1952,7 +2183,7 @@ namespace TriCNES
                     SpriteEvaluationTick = 0;
                 }
 
-                if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
+                if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank && (PPUClock == 0 || PPUClock == 3))
                 {
                     PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
                     PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
@@ -1976,6 +2207,7 @@ namespace TriCNES
                     // next cycle, case 1.
                     // next cycle, case 2, and so on.
                     // case 7 then leads back to case 0.
+
 
                     case 0: // Y position         dot 257, (+8), (+16) ...
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
@@ -2080,9 +2312,17 @@ namespace TriCNES
                         break;
                 }
                 SecondaryOAMAddress &= 0x1F; // keep the secondary OAM address in-bounds
-
+                            
                 SpriteEvaluationTick++; // increment the tick, so next cycle uses the following case in the switch statement
                 SpriteEvaluationTick &= 7; // and reset at 8
+
+                if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank && (PPUClock == 1 || PPUClock == 2))
+                {
+                    PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
+                    PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
+                    PPU_PendingOAMCorruption = true;
+                    PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
+                }
 
             }
             // and that's all for sprite evaluation!
@@ -3125,7 +3365,10 @@ namespace TriCNES
             else if (operationCycle == 0) // We are not running any DMAs, and this is the first cycle of an instruction.
             {
                 // cycle 0. fetch opcode:
+                if(programCounter == 0xD1ff)
+                {
 
+                }
                 addressBus = programCounter;
                 opCode = Fetch(addressBus); // Fetch the value at the program counter. This is the opcode.
 
@@ -7853,9 +8096,12 @@ namespace TriCNES
         byte PPU_Update2005Value;   // The value written to $2005, for use when the delay has ended.
         byte PPU_Update2001Delay;   // The number of PPU cycles to wait between writing to $2001 and the ppu from updating
         byte PPU_Update2001EmphasisBitsDelay;   // The number of PPU cycles to wait between writing to $2001 and the ppu from updating the emphasis bits and greyscale
+        byte PPU_Update2001OAMCorruptionDelay;  // The number of PPU cycles to wait before OAM gets corrupted if OAM corruption is occuring.
         byte PPU_Update2001Value;   // The value written to $2001, for use when the delay has ended.
         byte PPU_Update2000Delay;   // The number of PPU cycles to wait between writing to $2000 and the ppu from updating
         byte PPU_Update2000Value;   // The value written to $2000, for use when the delay has ended.
+
+        bool PPU_WasRenderingBefore2001Write; // Were we rendering before writing to $2001? (used for OAM corruption)
 
         byte PPU_VRAMAddressBuffer = 0; // when reading from $2007, this buffer holds the value from VRAM that gets read. Updated after reading from $2007.
 
@@ -7920,15 +8166,16 @@ namespace TriCNES
                     switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
                     {
                         case 0:
-                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; break;
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; PPU_Update2001OAMCorruptionDelay = 2; break;
                         case 1:
-                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 1; break; // it's actually 2, but different behavior than case 0 and 3.
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 1; PPU_Update2001OAMCorruptionDelay = 3; break; // PPU_Update2001EmphasisBitsDelay is actually 2, but different behavior than case 0 and 3.
                         case 2:
-                            PPU_Update2001Delay = 3; PPU_Update2001EmphasisBitsDelay = 1; break; // it's actually 2, but different behavior than case 0 and 3.
+                            PPU_Update2001Delay = 3; PPU_Update2001EmphasisBitsDelay = 1; PPU_Update2001OAMCorruptionDelay = 3; break; // PPU_Update2001EmphasisBitsDelay is actually 2, but different behavior than case 0 and 3.
                         case 3:
-                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; break;
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; PPU_Update2001OAMCorruptionDelay = 2; break;
                     }
-                    bool temp_rendering = PPU_Mask_ShowBackground || PPU_Mask_ShowSprites;
+                    PPU_WasRenderingBefore2001Write = PPU_Mask_ShowBackground || PPU_Mask_ShowSprites;
+                    bool temp_rendering = PPU_WasRenderingBefore2001Write;
                     bool temp_renderingFromInput = ((In & 0x08) != 0) || ((In & 0x10) != 0);
                     //PPU_Mask_8PxShowBackground = (dataBus & 0x02) != 0;
                     //PPU_Mask_8PxShowSprites = (dataBus & 0x04) != 0;
@@ -7938,7 +8185,7 @@ namespace TriCNES
                     // disabling rendering can cause OAM corruption.
                     if (temp_rendering && !temp_renderingFromInput)
                     {
-                        // we are disabling vblank
+                        // we are disabling rendering inside vblank
                         if (PPU_Scanline < 241 || PPU_Scanline == 261)
                         {
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = true; // used in the next cycle of sprite evaluation
@@ -7948,6 +8195,22 @@ namespace TriCNES
                                 if ((PPU_ReadWriteAddress & 0x3FFF) >= 0x3C00) // palette corruption only appears to occur when disabling rendering if the VRAM address is currently greater than 3C00
                                 {
                                     PPU_PaletteCorruptionRenderingDisabledOutOfVBlank = true; // used in the color calculation for the next dot being drawn
+                                }
+                            }
+                        }
+                    }
+                    else if (!temp_rendering && temp_renderingFromInput)
+                    {
+                        if (PPU_Scanline < 241 || PPU_Scanline == 261)
+                        {
+                            // if re-enabling rendering outside vblank
+                            if (PPU_PendingOAMCorruption)
+                            {
+                                // If OAM corruption is going to occur
+                                if (PPUClock == 1 || PPUClock == 2)
+                                {
+                                    // if on clock alignment 1 or 2, it doesn't happen!
+                                    PPU_OAMCorruptionRenderingEnabledOutOfVBlank = true;
                                 }
                             }
                         }
@@ -8434,7 +8697,7 @@ namespace TriCNES
                 MapperFetch(Address, Cart.MemoryMapper);
             }
 
-            if ((addressBus >= 0x4000 && addressBus <= 0x401F) || DebugObserve) // If APU registers are active, bus conflicts can occur. Or perhaps you are intentionally reading from the APU registers...
+            if ((addressBus >= 0x4000 && addressBus <= 0x401F) || (DebugObserve && Address >= 0x4000 && Address <= 0x401F)) // If APU registers are active, bus conflicts can occur. Or perhaps you are intentionally reading from the APU registers...
             {
                 //addressBus 
                 byte Reg = (byte)(Address & 0x1F);

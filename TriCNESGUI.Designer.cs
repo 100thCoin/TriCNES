@@ -41,7 +41,16 @@ namespace TriCNES
             this.tASToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadTASToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.load3ctToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.settingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.pPUClockToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.phase0ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.phase1ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.phase2ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.phase3ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pb_Screen = new System.Windows.Forms.PictureBox();
+            this.decodeNTSCSignalsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.trueToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.falseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pb_Screen)).BeginInit();
             this.SuspendLayout();
@@ -50,7 +59,8 @@ namespace TriCNES
             // 
             this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.consoleToolStripMenuItem,
-            this.tASToolStripMenuItem});
+            this.tASToolStripMenuItem,
+            this.settingsToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
             this.menuStrip1.Size = new System.Drawing.Size(256, 24);
@@ -119,15 +129,94 @@ namespace TriCNES
             this.load3ctToolStripMenuItem.Text = "Load .3ct TAS";
             this.load3ctToolStripMenuItem.Click += new System.EventHandler(this.load3ctToolStripMenuItem_Click);
             // 
+            // settingsToolStripMenuItem
+            // 
+            this.settingsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.pPUClockToolStripMenuItem,
+            this.decodeNTSCSignalsToolStripMenuItem});
+            this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
+            this.settingsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
+            this.settingsToolStripMenuItem.Text = "Settings";
+            // 
+            // pPUClockToolStripMenuItem
+            // 
+            this.pPUClockToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.phase0ToolStripMenuItem,
+            this.phase1ToolStripMenuItem,
+            this.phase2ToolStripMenuItem,
+            this.phase3ToolStripMenuItem});
+            this.pPUClockToolStripMenuItem.Name = "pPUClockToolStripMenuItem";
+            this.pPUClockToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
+            this.pPUClockToolStripMenuItem.Text = "PPU Clock";
+            // 
+            // phase0ToolStripMenuItem
+            // 
+            this.phase0ToolStripMenuItem.Checked = true;
+            this.phase0ToolStripMenuItem.CheckOnClick = true;
+            this.phase0ToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.phase0ToolStripMenuItem.Name = "phase0ToolStripMenuItem";
+            this.phase0ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase0ToolStripMenuItem.Text = "Phase 0";
+            this.phase0ToolStripMenuItem.Click += new System.EventHandler(this.phase0ToolStripMenuItem_Click);
+            // 
+            // phase1ToolStripMenuItem
+            // 
+            this.phase1ToolStripMenuItem.CheckOnClick = true;
+            this.phase1ToolStripMenuItem.Name = "phase1ToolStripMenuItem";
+            this.phase1ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase1ToolStripMenuItem.Text = "Phase 1";
+            this.phase1ToolStripMenuItem.Click += new System.EventHandler(this.phase1ToolStripMenuItem_Click);
+            // 
+            // phase2ToolStripMenuItem
+            // 
+            this.phase2ToolStripMenuItem.CheckOnClick = true;
+            this.phase2ToolStripMenuItem.Name = "phase2ToolStripMenuItem";
+            this.phase2ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase2ToolStripMenuItem.Text = "Phase 2";
+            this.phase2ToolStripMenuItem.Click += new System.EventHandler(this.phase2ToolStripMenuItem_Click);
+            // 
+            // phase3ToolStripMenuItem
+            // 
+            this.phase3ToolStripMenuItem.CheckOnClick = true;
+            this.phase3ToolStripMenuItem.Name = "phase3ToolStripMenuItem";
+            this.phase3ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase3ToolStripMenuItem.Text = "Phase 3";
+            this.phase3ToolStripMenuItem.Click += new System.EventHandler(this.phase3ToolStripMenuItem_Click);
+            // 
             // pb_Screen
             // 
+            this.pb_Screen.AllowDrop = true;
             this.pb_Screen.BackColor = System.Drawing.Color.Black;
             this.pb_Screen.Location = new System.Drawing.Point(0, 27);
             this.pb_Screen.Name = "pb_Screen";
             this.pb_Screen.Size = new System.Drawing.Size(256, 240);
             this.pb_Screen.TabIndex = 1;
             this.pb_Screen.TabStop = false;
-            this.pb_Screen.AllowDrop = true;
+            // 
+            // decodeNTSCSignalsToolStripMenuItem
+            // 
+            this.decodeNTSCSignalsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.trueToolStripMenuItem,
+            this.falseToolStripMenuItem});
+            this.decodeNTSCSignalsToolStripMenuItem.Name = "decodeNTSCSignalsToolStripMenuItem";
+            this.decodeNTSCSignalsToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
+            this.decodeNTSCSignalsToolStripMenuItem.Text = "Decode NTSC Signals";
+            // 
+            // trueToolStripMenuItem
+            // 
+            this.trueToolStripMenuItem.Name = "trueToolStripMenuItem";
+            this.trueToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.trueToolStripMenuItem.Text = "True";
+            this.trueToolStripMenuItem.Click += new System.EventHandler(this.trueToolStripMenuItem_Click);
+            // 
+            // falseToolStripMenuItem
+            // 
+            this.falseToolStripMenuItem.Checked = true;
+            this.falseToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.falseToolStripMenuItem.Name = "falseToolStripMenuItem";
+            this.falseToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.falseToolStripMenuItem.Text = "False";
+            this.falseToolStripMenuItem.Click += new System.EventHandler(this.falseToolStripMenuItem_Click);
             // 
             // TriCNESGUI
             // 
@@ -170,6 +259,15 @@ namespace TriCNES
         private System.Windows.Forms.ToolStripMenuItem resetToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem powerCycleToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem screenshotToolStripMenuItem;
+        private ToolStripMenuItem settingsToolStripMenuItem;
+        private ToolStripMenuItem pPUClockToolStripMenuItem;
+        private ToolStripMenuItem phase0ToolStripMenuItem;
+        private ToolStripMenuItem phase1ToolStripMenuItem;
+        private ToolStripMenuItem phase2ToolStripMenuItem;
+        private ToolStripMenuItem phase3ToolStripMenuItem;
+        private ToolStripMenuItem decodeNTSCSignalsToolStripMenuItem;
+        private ToolStripMenuItem trueToolStripMenuItem;
+        private ToolStripMenuItem falseToolStripMenuItem;
     }
 }
 
