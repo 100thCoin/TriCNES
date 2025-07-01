@@ -47,10 +47,19 @@ namespace TriCNES
             this.phase1ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.phase2ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.phase3ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.pb_Screen = new System.Windows.Forms.PictureBox();
             this.decodeNTSCSignalsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.trueToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.falseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.pb_Screen = new System.Windows.Forms.PictureBox();
+            this.viewScaleToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.xToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.xToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.xToolStripMenuItem2 = new System.Windows.Forms.ToolStripMenuItem();
+            this.xToolStripMenuItem3 = new System.Windows.Forms.ToolStripMenuItem();
+            this.xToolStripMenuItem4 = new System.Windows.Forms.ToolStripMenuItem();
+            this.xToolStripMenuItem5 = new System.Windows.Forms.ToolStripMenuItem();
+            this.xToolStripMenuItem6 = new System.Windows.Forms.ToolStripMenuItem();
+            this.xToolStripMenuItem7 = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pb_Screen)).BeginInit();
             this.SuspendLayout();
@@ -133,7 +142,8 @@ namespace TriCNES
             // 
             this.settingsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.pPUClockToolStripMenuItem,
-            this.decodeNTSCSignalsToolStripMenuItem});
+            this.decodeNTSCSignalsToolStripMenuItem,
+            this.viewScaleToolStripMenuItem});
             this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
             this.settingsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
             this.settingsToolStripMenuItem.Text = "Settings";
@@ -155,7 +165,7 @@ namespace TriCNES
             this.phase0ToolStripMenuItem.CheckOnClick = true;
             this.phase0ToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
             this.phase0ToolStripMenuItem.Name = "phase0ToolStripMenuItem";
-            this.phase0ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase0ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
             this.phase0ToolStripMenuItem.Text = "Phase 0";
             this.phase0ToolStripMenuItem.Click += new System.EventHandler(this.phase0ToolStripMenuItem_Click);
             // 
@@ -163,7 +173,7 @@ namespace TriCNES
             // 
             this.phase1ToolStripMenuItem.CheckOnClick = true;
             this.phase1ToolStripMenuItem.Name = "phase1ToolStripMenuItem";
-            this.phase1ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase1ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
             this.phase1ToolStripMenuItem.Text = "Phase 1";
             this.phase1ToolStripMenuItem.Click += new System.EventHandler(this.phase1ToolStripMenuItem_Click);
             // 
@@ -171,7 +181,7 @@ namespace TriCNES
             // 
             this.phase2ToolStripMenuItem.CheckOnClick = true;
             this.phase2ToolStripMenuItem.Name = "phase2ToolStripMenuItem";
-            this.phase2ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase2ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
             this.phase2ToolStripMenuItem.Text = "Phase 2";
             this.phase2ToolStripMenuItem.Click += new System.EventHandler(this.phase2ToolStripMenuItem_Click);
             // 
@@ -179,19 +189,9 @@ namespace TriCNES
             // 
             this.phase3ToolStripMenuItem.CheckOnClick = true;
             this.phase3ToolStripMenuItem.Name = "phase3ToolStripMenuItem";
-            this.phase3ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase3ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
             this.phase3ToolStripMenuItem.Text = "Phase 3";
             this.phase3ToolStripMenuItem.Click += new System.EventHandler(this.phase3ToolStripMenuItem_Click);
-            // 
-            // pb_Screen
-            // 
-            this.pb_Screen.AllowDrop = true;
-            this.pb_Screen.BackColor = System.Drawing.Color.Black;
-            this.pb_Screen.Location = new System.Drawing.Point(0, 27);
-            this.pb_Screen.Name = "pb_Screen";
-            this.pb_Screen.Size = new System.Drawing.Size(256, 240);
-            this.pb_Screen.TabIndex = 1;
-            this.pb_Screen.TabStop = false;
             // 
             // decodeNTSCSignalsToolStripMenuItem
             // 
@@ -205,7 +205,7 @@ namespace TriCNES
             // trueToolStripMenuItem
             // 
             this.trueToolStripMenuItem.Name = "trueToolStripMenuItem";
-            this.trueToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.trueToolStripMenuItem.Size = new System.Drawing.Size(100, 22);
             this.trueToolStripMenuItem.Text = "True";
             this.trueToolStripMenuItem.Click += new System.EventHandler(this.trueToolStripMenuItem_Click);
             // 
@@ -214,9 +214,91 @@ namespace TriCNES
             this.falseToolStripMenuItem.Checked = true;
             this.falseToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
             this.falseToolStripMenuItem.Name = "falseToolStripMenuItem";
-            this.falseToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.falseToolStripMenuItem.Size = new System.Drawing.Size(100, 22);
             this.falseToolStripMenuItem.Text = "False";
             this.falseToolStripMenuItem.Click += new System.EventHandler(this.falseToolStripMenuItem_Click);
+            // 
+            // pb_Screen
+            // 
+            this.pb_Screen.AllowDrop = true;
+            this.pb_Screen.BackColor = System.Drawing.Color.Black;
+            this.pb_Screen.Location = new System.Drawing.Point(0, 27);
+            this.pb_Screen.Name = "pb_Screen";
+            this.pb_Screen.Size = new System.Drawing.Size(256, 240);
+            this.pb_Screen.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
+            this.pb_Screen.TabIndex = 1;
+            this.pb_Screen.TabStop = false;
+            // 
+            // viewScaleToolStripMenuItem
+            // 
+            this.viewScaleToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.xToolStripMenuItem,
+            this.xToolStripMenuItem1,
+            this.xToolStripMenuItem2,
+            this.xToolStripMenuItem3,
+            this.xToolStripMenuItem4,
+            this.xToolStripMenuItem5,
+            this.xToolStripMenuItem6,
+            this.xToolStripMenuItem7});
+            this.viewScaleToolStripMenuItem.Name = "viewScaleToolStripMenuItem";
+            this.viewScaleToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
+            this.viewScaleToolStripMenuItem.Text = "View Scale";
+            // 
+            // xToolStripMenuItem
+            // 
+            this.xToolStripMenuItem.Name = "xToolStripMenuItem";
+            this.xToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.xToolStripMenuItem.Text = "1x";
+            this.xToolStripMenuItem.Click += new System.EventHandler(this.xToolStripMenuItem_Click);
+            // 
+            // xToolStripMenuItem1
+            // 
+            this.xToolStripMenuItem1.Name = "xToolStripMenuItem1";
+            this.xToolStripMenuItem1.Size = new System.Drawing.Size(180, 22);
+            this.xToolStripMenuItem1.Text = "2x";
+            this.xToolStripMenuItem1.Click += new System.EventHandler(this.xToolStripMenuItem1_Click);
+            // 
+            // xToolStripMenuItem2
+            // 
+            this.xToolStripMenuItem2.Name = "xToolStripMenuItem2";
+            this.xToolStripMenuItem2.Size = new System.Drawing.Size(180, 22);
+            this.xToolStripMenuItem2.Text = "3x";
+            this.xToolStripMenuItem2.Click += new System.EventHandler(this.xToolStripMenuItem2_Click);
+            // 
+            // xToolStripMenuItem3
+            // 
+            this.xToolStripMenuItem3.Name = "xToolStripMenuItem3";
+            this.xToolStripMenuItem3.Size = new System.Drawing.Size(180, 22);
+            this.xToolStripMenuItem3.Text = "4x";
+            this.xToolStripMenuItem3.Click += new System.EventHandler(this.xToolStripMenuItem3_Click);
+            // 
+            // xToolStripMenuItem4
+            // 
+            this.xToolStripMenuItem4.Name = "xToolStripMenuItem4";
+            this.xToolStripMenuItem4.Size = new System.Drawing.Size(180, 22);
+            this.xToolStripMenuItem4.Text = "5x";
+            this.xToolStripMenuItem4.Click += new System.EventHandler(this.xToolStripMenuItem4_Click);
+            // 
+            // xToolStripMenuItem5
+            // 
+            this.xToolStripMenuItem5.Name = "xToolStripMenuItem5";
+            this.xToolStripMenuItem5.Size = new System.Drawing.Size(180, 22);
+            this.xToolStripMenuItem5.Text = "6x";
+            this.xToolStripMenuItem5.Click += new System.EventHandler(this.xToolStripMenuItem5_Click);
+            // 
+            // xToolStripMenuItem6
+            // 
+            this.xToolStripMenuItem6.Name = "xToolStripMenuItem6";
+            this.xToolStripMenuItem6.Size = new System.Drawing.Size(180, 22);
+            this.xToolStripMenuItem6.Text = "7x";
+            this.xToolStripMenuItem6.Click += new System.EventHandler(this.xToolStripMenuItem6_Click);
+            // 
+            // xToolStripMenuItem7
+            // 
+            this.xToolStripMenuItem7.Name = "xToolStripMenuItem7";
+            this.xToolStripMenuItem7.Size = new System.Drawing.Size(180, 22);
+            this.xToolStripMenuItem7.Text = "8x";
+            this.xToolStripMenuItem7.Click += new System.EventHandler(this.xToolStripMenuItem7_Click);
             // 
             // TriCNESGUI
             // 
@@ -268,6 +350,15 @@ namespace TriCNES
         private ToolStripMenuItem decodeNTSCSignalsToolStripMenuItem;
         private ToolStripMenuItem trueToolStripMenuItem;
         private ToolStripMenuItem falseToolStripMenuItem;
+        private ToolStripMenuItem viewScaleToolStripMenuItem;
+        private ToolStripMenuItem xToolStripMenuItem;
+        private ToolStripMenuItem xToolStripMenuItem1;
+        private ToolStripMenuItem xToolStripMenuItem2;
+        private ToolStripMenuItem xToolStripMenuItem3;
+        private ToolStripMenuItem xToolStripMenuItem4;
+        private ToolStripMenuItem xToolStripMenuItem5;
+        private ToolStripMenuItem xToolStripMenuItem6;
+        private ToolStripMenuItem xToolStripMenuItem7;
     }
 }
 

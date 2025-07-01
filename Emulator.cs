@@ -257,7 +257,7 @@ namespace TriCNES
         Color[] NESPal = SetupPalette(); // This runs the function.
         int chosenColor; // During screen rendering, this value is the index into the color array.
         public DirectBitmap Screen = new DirectBitmap(256, 240); // This uses a class called "DirectBitmap". It's pretty much jsut the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
-        public DirectBitmap NTSCScreen = new DirectBitmap(256*8, 240*8); // This uses a class called "DirectBitmap". It's pretty much jsut the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+        public DirectBitmap NTSCScreen = new DirectBitmap(256*8, 240); // This uses a class called "DirectBitmap". It's pretty much jsut the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
 
         //Debugging
         public bool Logging;    // If set, the tracelogger will record all instructions ran.
@@ -1759,12 +1759,9 @@ namespace TriCNES
                 if (G > 1) { G = 1; }
                 if (B < 0) { B = 0; }
                 if (B > 1) { B = 1; }
-                int j = 0;
-                while (j < 8)
-                {
-                    NTSCScreen.SetPixel(i, PPU_Scanline*8+j, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
-                    j++;
-                }
+
+                    NTSCScreen.SetPixel(i, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
+
                 i++;
             }
         }
