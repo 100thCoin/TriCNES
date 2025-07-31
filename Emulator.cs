@@ -1131,6 +1131,7 @@ namespace TriCNES
         public bool NMILine; // Set to true if $2000.7 and $2002.7 are both set. This is cehcked during the second half od a CPU cycle.
         public bool IRQLine; // Set during phi2 to true if the IRQ level detector is low.
 
+        bool CopyV = false; // set by writes to $2006. If it occurs on the same dot the scroll values are naturally incremented, some bugs occur.
 
         void _EmulatePPU()
         {
@@ -1139,13 +1140,14 @@ namespace TriCNES
             // This delay can vary depending on the CPU/PPU alignment.
 
             // For instance, after writing to $2006, this delay value will either be 4 or 5.
+            CopyV = false;
             if (PPU_Update2006Delay > 0)
             {
                 PPU_Update2006Delay--; // this counts down,
                 if (PPU_Update2006Delay == 0) // and when it reaches zero
                 {
                     ushort temp_Prev_V = PPU_ReadWriteAddress;
-
+                    CopyV = true;
                     PPU_ReadWriteAddress = PPU_TempVRAMAddress; // the PPU_ReadWriteAddress is updated!
                     PPU_AddressBus = PPU_ReadWriteAddress; // This value is the same thing.
                     if ((temp_Prev_V & 0x3FFF) >= 0x3F00 && (PPU_AddressBus & 0x3FFF) < 0x3F00) // Palette corruption check. Are we leaving Palette ram?
@@ -1844,7 +1846,7 @@ namespace TriCNES
 
 
 
-
+        bool OamCorruptedOnOddCycle;
         public byte PPU_SpriteEvaluationTemp; // is this just the ppubus?
         void PPU_Render_SpriteEvaluation()
         {
@@ -1861,7 +1863,7 @@ namespace TriCNES
                 }
             }
 
-            if ((PPU_ScanCycle >= 1 && PPU_ScanCycle <= 64) && PPU_Scanline < 240) // Dots 1 through 64, not on the pre-render line
+            if ((PPU_ScanCycle >= 0 && PPU_ScanCycle <= 64) && PPU_Scanline < 240) // Dots 1 through 64, not on the pre-render line. (and also dot 0 for OAM corruption purposes)
             {
                 // this step is clearing secondary OAM, and writing FF to each byte in the array.
                 if ((PPU_ScanCycle & 1) == 1)
@@ -1876,11 +1878,6 @@ namespace TriCNES
                         OAMAddressOverflowedDuringSpriteEvaluation = false;
                         PPU_ScanlineContainsSpriteZero = false;
                     }
-                }
-                else
-                { //even cycles
-                    SecondaryOAM[SecondaryOAMAddress] = PPU_SpriteEvaluationTemp; // store FF in secondary OAM
-
                     if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
                     {
                         PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
@@ -1888,15 +1885,45 @@ namespace TriCNES
                         PPU_PendingOAMCorruption = true;
                         PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
                     }
+                }
+                else
+                { //even cycles
+                    if (PPU_ScanCycle > 0)
+                    {
+                        SecondaryOAM[SecondaryOAMAddress] = PPU_SpriteEvaluationTemp; // store FF in secondary OAM
 
-                    SecondaryOAMAddress++;  // increment this value so on the next even cycle, we write to the next SecondaryOAM address.
-                    SecondaryOAMAddress &= 0x1F;  // keep the secondary OAM address in-bounds
+                        if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
+                        {
+                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
+                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
+                            PPU_PendingOAMCorruption = true;
+                            PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
+                        }
 
+                        SecondaryOAMAddress++;  // increment this value so on the next even cycle, we write to the next SecondaryOAM address.
+                        SecondaryOAMAddress &= 0x1F;  // keep the secondary OAM address in-bounds
+
+                        if(PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && PPU_ScanCycle == 64)
+                        {
+                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
+                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
+                            PPU_PendingOAMCorruption = true;
+                        }
+                    }
+                    else
+                    {
+                        if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
+                        {
+                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
+                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
+                            PPU_PendingOAMCorruption = true;
+                            PPU_OAMCorruptionIndex = 1; // this value will be used when rendering is re-enabled and the corruption occurs
+                        }
+                    }
                 }
             }
             else if ((PPU_ScanCycle >= 65 && PPU_ScanCycle <= 256) && PPU_Scanline < 240) // Dots 65 through 256, not on the pre-render line
             {
-
                 if (PPU_Mask_ShowBackground_Instant || PPU_Mask_ShowSprites_Instant || PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant) // if rendering is enabled, or was *just* disabled mid evaluation
                 {
 
@@ -1910,46 +1937,14 @@ namespace TriCNES
                         }
 
                         // If rendering was disabled *this* cycle (the odd cycle) then the even cycle will run normally, and the *next odd cycle* will have the OAM address increment. Presumably, that's when we record secondOAMAddr.
-                        if (PPU_OAMEvaluationCorruptionOddCycle)
+                        if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant)
                         {
                             PPU_OAMEvaluationCorruptionOddCycle = false;
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
-                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
-                            PPU_PendingOAMCorruption = true;
-                            if (!PPU_OAMEvaluationObjectInRange)
-                            {
-                                if (true) // WHAT ACTUALLY CAUSES THIS?
-                                {
-                                    PPUOAMAddress++;
-                                }
-                            }
-                           
-                            
-                            if (PPU_OAMEvaluationObjectInRange && (SecondaryOAMAddress & 3) != 0)
-                            {
-                                if (!OAMAddressOverflowedDuringSpriteEvaluation)
-                                {
-                                    SecondaryOAMAddress &= 0xFC;
-                                    SecondaryOAMAddress += 4;
-                                }
-                            }
-                           
-                            if (PPUClock == 0 || PPUClock == 3)
-                            {
-                                PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress & 0x1C); // this value will be used when rendering is re-enabled and the corruption occurs
-                            }
 
-                            if (PPUClock == 1 || PPUClock == 2)
-                            {
-                                PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress & 0x1C); // this value will be used when rendering is re-enabled and the corruption occurs
-                            }
-                        }
-                        else
-                        {
-                            if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant)
-                            {
-                                PPU_OAMEvaluationCorruptionOddCycle = true;
-                            }
+                            PPUOAMAddress++;
+                            OamCorruptedOnOddCycle = true;
+  
                         }
                     }
                     else
@@ -1962,6 +1957,7 @@ namespace TriCNES
                             {
                                 SecondaryOAM[SecondaryOAMAddress] = PPU_SpriteEvaluationTemp; // store this value at the secondary oam address.
                             }
+                            
                             if (SpriteEvaluationTick == 0) // tick 0: check if this object's y position is in range for this scanline
                             {
                                 PPU_OAMEvaluationObjectInXRange = false;
@@ -1971,7 +1967,10 @@ namespace TriCNES
                                     // if this sprite is within range.
                                     if (!SecondaryOAMFull)
                                     {
-                                        PPUOAMAddress++; // +1
+                                        if (!OamCorruptedOnOddCycle)
+                                        {
+                                            PPUOAMAddress++; // +1
+                                        }
                                         SecondaryOAMAddress++; // increment this for the next write to secondary OAM
                                         if (!SecondaryOAMFull) // if secondary OAM is not full
                                         {
@@ -1997,22 +1996,25 @@ namespace TriCNES
                                 else
                                 {
                                     PPU_OAMEvaluationObjectInRange = false;
-                                    if (SecondaryOAMFull)
+                                    if (!OamCorruptedOnOddCycle)
                                     {
-                                        if ((PPUOAMAddress & 0x3) == 3)
+                                        if (SecondaryOAMFull)
                                         {
-                                            PPUOAMAddress++; // A real hardware bug.
+                                            if ((PPUOAMAddress & 0x3) == 3)
+                                            {
+                                                PPUOAMAddress++; // A real hardware bug.
+                                            }
+                                            else
+                                            {
+                                                PPUOAMAddress += 4; // +4
+                                                PPUOAMAddress++; // A real hardware bug.
+                                            }
                                         }
                                         else
                                         {
                                             PPUOAMAddress += 4; // +4
-                                            PPUOAMAddress++; // A real hardware bug.
+                                            PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
                                         }
-                                    }
-                                    else
-                                    {
-                                        PPUOAMAddress += 4; // +4
-                                        PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
                                     }
                                 }
                             }
@@ -2029,7 +2031,10 @@ namespace TriCNES
                                         PPU_OAMEvaluationObjectInXRange = true;
                                         if (!SecondaryOAMFull)
                                         {
-                                            PPUOAMAddress++; // +1
+                                            if (!OamCorruptedOnOddCycle)
+                                            {
+                                                PPUOAMAddress++; // +1
+                                            }
                                         }
                                     }
                                     else
@@ -2037,14 +2042,20 @@ namespace TriCNES
                                         PPU_OAMEvaluationObjectInXRange = false;
                                         if (!SecondaryOAMFull)
                                         {
-                                            PPUOAMAddress += 1; // +1 (In theory, this should be +4, though my experiments only reflect my consoles behavior if this is +1?)
-                                            PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
+                                            if (!OamCorruptedOnOddCycle)
+                                            {
+                                                PPUOAMAddress += 1; // +1 (In theory, this should be +4, though my experiments only reflect my consoles behavior if this is +1?)
+                                                PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
+                                            }
                                         }
                                     }
                                 }
                                 else // ticks 1 and 2 don't make any checks. Only increment the OAM address.
                                 {
-                                    PPUOAMAddress++; // +1
+                                    if (!OamCorruptedOnOddCycle)
+                                    {
+                                        PPUOAMAddress++; // +1
+                                    }
                                 }
                                 SpriteEvaluationTick++; // increment the tick for next even ppu cycle.
                                 SpriteEvaluationTick &= 3; // and reset the tick to 0 if it reaches 4.
@@ -2058,43 +2069,12 @@ namespace TriCNES
                                     }
                                 }
                             }
-
+                            OamCorruptedOnOddCycle = false;
 
                             if (PPUOAMAddress < PreIncVal && PPUOAMAddress < 4) // If an overflow occured
                             {
                                 OAMAddressOverflowedDuringSpriteEvaluation = true; // set this flag.
                             }
-
-                            if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && !PPU_OAMEvaluationCorruptionOddCycle) // if we just disabled rendering mid OAM evaluation, the address is incremented yet again.
-                            {
-                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
-                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
-                                PPUOAMAddress++;
-                                PPU_PendingOAMCorruption = true;
-                                if (PPU_OAMEvaluationObjectInRange || PPU_OAMEvaluationObjectInXRange) // Alright. I give up. I have no idea what actually determines if secondary OAM gets the "+4" treatment.
-                                {
-                                    SecondaryOAMAddress &= 0xFC; // TODO: Figure this junk out.
-                                    SecondaryOAMAddress += 4;    // I'm using SecondaryOAMAddress here, since the row of OAM that gets corrupt is always am ultiple of 4.
-                                }
-                                if (PPUClock == 0 || PPUClock == 3)
-                                {
-                                    PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress & 0x1C); // this value will be used when rendering is re-enabled and the corruption occurs
-                                }
-                                
-                                if (!SecondaryOAMFull) // if secondary OAM is not full
-                                {
-                                    SecondaryOAMAddress &= 0x1F; // keep the secondary OAM address in-bounds
-                                    if (SecondaryOAMAddress == 0) // If we've overflowed the secondary OAM address
-                                    {
-                                        SecondaryOAMFull = true; // secondary OAM is now full.
-                                    }
-                                }
-                                if (PPUClock == 1 || PPUClock == 2)
-                                {
-                                    PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress & 0x1C); // this value will be used when rendering is re-enabled and the corruption occurs
-                                }
-                            }
-
                         }
                         else
                         {   // OAM Address Overflowerd During Sprite Evaluation
@@ -2102,32 +2082,39 @@ namespace TriCNES
                             // boo womp.
 
                             // also update the PPUOAMAddress.
-                            PPUOAMAddress += 4; // +4
-                            PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
+                            if (!OamCorruptedOnOddCycle)
+                            {
+                                PPUOAMAddress += 4; // +4
+                                PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
+                            }
                         }
                         if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && !PPU_OAMEvaluationCorruptionOddCycle) // if we just disabled rendering mid OAM evaluation, the address is incremented yet again.
                         {
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
                             PPU_PendingOAMCorruption = true;
-                            if (true)
-                            {
-                                PPUOAMAddress++;
-                            }
-                            if(PPUClock == 0 || PPUClock == 3)
-                            {
-                                PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress); // this value will be used when rendering is re-enabled and the corruption occurs
-                            }
+
+                            
                             if ((SecondaryOAMAddress & 3) != 0 && !OAMAddressOverflowedDuringSpriteEvaluation)
                             {
                                 SecondaryOAMAddress &= 0xFC;
                                 SecondaryOAMAddress += 4;
                             }
+                            if (PPUClock == 0 || PPUClock == 3)
+                            {
+                                PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress); // this value will be used when rendering is re-enabled and the corruption occurs
+                            }
                             if (PPUClock == 1 || PPUClock == 2)
                             {
                                 PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress); // this value will be used when rendering is re-enabled and the corruption occurs
                             }
+                            if(PPU_ScanCycle == 256)
+                            {
+                                PPU_OAMCorruptionIndex = OamCorruptedOnOddCycle ? (byte)0 : (byte)1; //I have no idea.
+                            }
+
                         }
+                        PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
                     }
                 }
 
@@ -2294,6 +2281,17 @@ namespace TriCNES
                     PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
                 }
 
+            }
+            else
+            {
+                // cycles 320 to 340
+                if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank || PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant)
+                {
+                    PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
+                    PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
+                    PPU_PendingOAMCorruption = true;
+                    PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
+                }
             }
             // and that's all for sprite evaluation!
         }
@@ -3054,28 +3052,35 @@ namespace TriCNES
 
         void PPU_IncrementScrollY()
         {
-            if ((PPU_ReadWriteAddress & 0x7000) != 0x7000)
+            if (CopyV)
             {
-                PPU_ReadWriteAddress += 0x1000;
+                PPU_ReadWriteAddress = (ushort)(PPU_Update2006Value_Temp & PPU_Update2006Value); // This isn't actually accurate. More research needed.
             }
             else
             {
-                PPU_ReadWriteAddress &= 0x0FFF;
-                int y = (PPU_ReadWriteAddress & 0x03E0) >> 5;
-                if (y == 29)
+                if ((PPU_ReadWriteAddress & 0x7000) != 0x7000)
                 {
-                    y = 0; // reset the Y value and also flip some other bit in the 'v' register
-                    PPU_ReadWriteAddress ^= 0x0800;
-                }
-                else if (y == 31)
-                {
-                    y = 0; // reset the Y value
+                    PPU_ReadWriteAddress += 0x1000;
                 }
                 else
                 {
-                    y++; // increment the Y value
+                    PPU_ReadWriteAddress &= 0x0FFF;
+                    int y = (PPU_ReadWriteAddress & 0x03E0) >> 5;
+                    if (y == 29)
+                    {
+                        y = 0; // reset the Y value and also flip some other bit in the 'v' register
+                        PPU_ReadWriteAddress ^= 0x0800;
+                    }
+                    else if (y == 31)
+                    {
+                        y = 0; // reset the Y value
+                    }
+                    else
+                    {
+                        y++; // increment the Y value
+                    }
+                    PPU_ReadWriteAddress = (ushort)((PPU_ReadWriteAddress & 0xFC1F) | (y << 5));
                 }
-                PPU_ReadWriteAddress = (ushort)((PPU_ReadWriteAddress & 0xFC1F) | (y << 5));
             }
         }
 
@@ -3224,6 +3229,20 @@ namespace TriCNES
                 DoNMI = true;
             }
             DoIRQ = IRQLine && !flag_Interrupt;
+        }
+
+        void PollInterrupts_CantDisableIRQ()
+        {
+            NMI_PreviousPinsSignal = NMI_PinsSignal;
+            NMI_PinsSignal = NMILine;
+            if (NMI_PinsSignal && !NMI_PreviousPinsSignal)
+            {
+                DoNMI = true;
+            }
+            if(!DoIRQ)
+            {
+                DoIRQ = IRQLine && !flag_Interrupt;
+            }
         }
 
         public void _6502()
@@ -3399,14 +3418,12 @@ namespace TriCNES
                                 else
                                 {
                                     GetImmediate(); //dummy fetch and PC increment
-                                    PollInterrupts(); // check for NMI
                                 }
                                 break;
                             case 2:
                                 if (!DoReset)
                                 {
                                     Push((byte)(programCounter >> 8));
-                                    PollInterrupts(); // check for NMI
                                 }
                                 else
                                 {
@@ -3417,7 +3434,6 @@ namespace TriCNES
                                 if (!DoReset)
                                 {
                                     Push((byte)programCounter);
-                                    PollInterrupts(); // check for NMI
                                 }
                                 else
                                 {
@@ -3436,12 +3452,12 @@ namespace TriCNES
                                     status |= flag_Overflow ? (byte)0x40 : (byte)0;
                                     status |= flag_Negative ? (byte)0x80 : (byte)0;
                                     Push(status);
-                                    PollInterrupts(); // check for NMI?
                                 }
                                 else
                                 {
                                     ResetReadPush();
                                 }
+                                PollInterrupts(); // check for NMI?
                                 break;
                             case 5:
                                 if (DoNMI)
@@ -3771,7 +3787,7 @@ namespace TriCNES
                                 }
                                 break;
                             case 3: // read from address
-                                PollInterrupts();
+                                PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
                                 operationComplete = true;
@@ -4376,7 +4392,7 @@ namespace TriCNES
                                 }
                                 break;
                             case 3: // read from address
-                                PollInterrupts();
+                                PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
                                 operationComplete = true;
@@ -4965,7 +4981,7 @@ namespace TriCNES
                                 }
                                 break;
                             case 3: // read from address
-                                PollInterrupts();
+                                PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
                                 operationComplete = true;
@@ -5565,7 +5581,7 @@ namespace TriCNES
                                 }
                                 break;
                             case 3: // read from address
-                                PollInterrupts();
+                                PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
                                 operationComplete = true;
@@ -6076,7 +6092,7 @@ namespace TriCNES
                                 }
                                 break;
                             case 3: // read from address
-                                PollInterrupts();
+                                PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
                                 operationComplete = true;
@@ -6640,7 +6656,7 @@ namespace TriCNES
                                 }
                                 break;
                             case 3: // read from address
-                                PollInterrupts();
+                                PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
                                 operationComplete = true;
@@ -7189,7 +7205,7 @@ namespace TriCNES
                                 }
                                 break;
                             case 3: // read from address
-                                PollInterrupts();
+                                PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
                                 operationComplete = true;
@@ -7730,7 +7746,7 @@ namespace TriCNES
                                 }
                                 break;
                             case 3: // read from address
-                                PollInterrupts();
+                                PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
                                 operationComplete = true;
@@ -8066,6 +8082,8 @@ namespace TriCNES
         byte PPU_Update2001Value;   // The value written to $2001, for use when the delay has ended.
         byte PPU_Update2000Delay;   // The number of PPU cycles to wait between writing to $2000 and the ppu from updating
         byte PPU_Update2000Value;   // The value written to $2000, for use when the delay has ended.
+        ushort PPU_Update2006Value;   // The value written to $2006, for use when the delay has ended.
+        ushort PPU_Update2006Value_Temp;
 
         bool PPU_WasRenderingBefore2001Write; // Were we rendering before writing to $2001? (used for OAM corruption)
 
@@ -8278,6 +8296,8 @@ namespace TriCNES
                     else
                     {
                         PPU_TempVRAMAddress = (ushort)((PPU_TempVRAMAddress & 0b0111111100000000) | (In));
+                        PPU_Update2006Value = PPU_TempVRAMAddress;
+                        PPU_Update2006Value_Temp = PPU_ReadWriteAddress;
                         switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
                         {
                             case 0: PPU_Update2006Delay = 4; break;
@@ -9077,7 +9097,7 @@ namespace TriCNES
                         APU_Status_Pulse2 = (Input & 0x02) != 0;
                         APU_Status_Pulse1 = (Input & 0x01) != 0;
 
-                        APU_DelayedDMC4015 = (byte)(APU_EvenCycle ? 3 : 4); // Enable in 1.5 APU cycles, or 2 APU cycles.
+                        APU_DelayedDMC4015 = (byte)(APU_EvenCycle ? 3 : 4); // Enable in 1 APU cycles, or 1.5 APU cycles. (it will be decremented later this cycle, so it's really like 2 : 3.
 
                         if (APU_Status_DelayedDMC && APU_DMC_BytesRemaining == 0)
                         {
