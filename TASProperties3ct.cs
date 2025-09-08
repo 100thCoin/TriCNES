@@ -78,7 +78,7 @@ namespace TriCNES
                     // Mapper 4, MMC3
                     CartridgeArray[i].Mapper_4_8000 = 0;      // The value written to $8000 (or any even address between $8000 and $9FFE)
                     CartridgeArray[i].Mapper_4_BankA = 0;     // The PRG bank between $A000 and $BFFF
-                    CartridgeArray[i].Mapper_4_Bank8C = 0;    // The PRG bank that could either be at $8000 throuhg 9FFF, or $C000 through $DFFF
+                    CartridgeArray[i].Mapper_4_Bank8C = 0;    // The PRG bank that could either be at $8000 through 9FFF, or $C000 through $DFFF
                     CartridgeArray[i].Mapper_4_CHR_2K0 = 0;
                     CartridgeArray[i].Mapper_4_CHR_2K8 = 0;
                     CartridgeArray[i].Mapper_4_CHR_1K0 = 0;
@@ -89,7 +89,7 @@ namespace TriCNES
                     CartridgeArray[i].Mapper_4_IRQCounter=0;
                     CartridgeArray[i].Mapper_4_EnableIRQ = false;
                     CartridgeArray[i].Mapper_4_ReloadIRQCounter = false;
-                    CartridgeArray[i].Mapper_4_NametableMirroring = false; // MMC3 has it's own way of controlling how the namtables are mirrored.
+                    CartridgeArray[i].Mapper_4_NametableMirroring = false; // MMC3 has it's own way of controlling how the nametables are mirrored.
                     CartridgeArray[i].Mapper_4_PRGRAMProtect = 0;
 
                     // Mapper 7, AOROM

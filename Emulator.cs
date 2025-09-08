@@ -32,26 +32,26 @@ namespace TriCNES
         {
             ROM = File.ReadAllBytes(filepath); // Reads the file from the provided file path, and stores every byte into an array.
 
-            // The ines header isn't actually part of the physical cartridge.
-            // Rather, the values of the ines header are manually added to provide extra information to emulators.
+            // The iNES header isn't actually part of the physical cartridge.
+            // Rather, the values of the iNES header are manually added to provide extra information to emulators.
             // Info such as "what mapper chip", "how many CHR banks?" and even "how should we mirror the nametables?" are part of this header.
 
-            MemoryMapper = (byte)(ROM[7] & 0xF0);   // Parsing the ines header to determine what mapper chip this cartridge uses.
+            MemoryMapper = (byte)(ROM[7] & 0xF0);   // Parsing the iNES header to determine what mapper chip this cartridge uses.
             MemoryMapper |= (byte)(ROM[6] >> 4);    // The upper nybble of byte 6, bitwise OR with the upper nybble of byte 7.
 
-            PRG_Size = ROM[4];  // Parsing the ines header to determine how many kb of PRG data exists on this cartridge.
-            CHR_Size = ROM[5];  // Parsing the ines header to determine how many kb of CHR data exists on this cartridge.
+            PRG_Size = ROM[4];  // Parsing the iNES header to determine how many kb of PRG data exists on this cartridge.
+            CHR_Size = ROM[5];  // Parsing the iNES header to determine how many kb of CHR data exists on this cartridge.
 
             PRG_SizeMinus1 = (byte)(PRG_Size - 1); // This value is occasionally used whenever a mapper has a fixed bank from the end of the PRG data, like address $E000 in the MMC3 chip.
 
             UsingCHRRAM = CHR_Size == 0; // If CHR_Size == 0, this is using CHR RAM
 
 
-            PRGROM = new byte[PRG_Size * 0x4000]; // 0x4000 bytes of PRG ROM, multiplied by byte 4 of the ines header.
-            CHRROM = new byte[CHR_Size * 0x2000]; // 0x2000 bytes of CHR ROM, multiplied by byte 5 of the ines header.
+            PRGROM = new byte[PRG_Size * 0x4000]; // 0x4000 bytes of PRG ROM, multiplied by byte 4 of the iNES header.
+            CHRROM = new byte[CHR_Size * 0x2000]; // 0x2000 bytes of CHR ROM, multiplied by byte 5 of the iNES header.
             CHRRAM = new byte[0x2000];            // CHR RAM always has 2 kibibytes
 
-            NametableHorizontalMirroring = ((ROM[6] & 1) == 0); // The style in which the nametable is mirrored is part of the ines header.
+            NametableHorizontalMirroring = ((ROM[6] & 1) == 0); // The style in which the nametable is mirrored is part of the iNES header.
 
             Array.Copy(ROM, 0x10, PRGROM, 0, PRGROM.Length); // This sets up the PRG ROM array with the values from the .nes file
             Array.Copy(ROM, 0x10 + PRGROM.Length, CHRROM, 0, CHRROM.Length); // This sets up the CHR ROM array with the values from the .nes file
@@ -59,7 +59,7 @@ namespace TriCNES
             // at this point, the ROM byte array is no longer needed, so null it to free up its memory.
             ROM = null;
 
-            PRGRAM = new byte[0x2000]; // PRG RAM probably has different lengths depending on the mapper, but this emulator doesn't yet support any mappers in which that length isnt 2 kibibytes.
+            PRGRAM = new byte[0x2000]; // PRG RAM probably has different lengths depending on the mapper, but this emulator doesn't yet support any mappers in which that length isn't 2 kibibytes.
 
             Name = filepath; // For debugging, it's nice to see the file name sometimes.
         }
@@ -92,7 +92,7 @@ namespace TriCNES
         // Mapper 4, MMC3
         public byte Mapper_4_8000;      // The value written to $8000 (or any even address between $8000 and $9FFE)
         public byte Mapper_4_BankA;     // The PRG bank between $A000 and $BFFF
-        public byte Mapper_4_Bank8C;    // The PRG bank that could either be at $8000 throuhg 9FFF, or $C000 through $DFFF
+        public byte Mapper_4_Bank8C;    // The PRG bank that could either be at $8000 through 9FFF, or $C000 through $DFFF
         public byte Mapper_4_CHR_2K0;
         public byte Mapper_4_CHR_2K8;
         public byte Mapper_4_CHR_1K0;
@@ -103,7 +103,7 @@ namespace TriCNES
         public byte Mapper_4_IRQCounter;
         public bool Mapper_4_EnableIRQ;
         public bool Mapper_4_ReloadIRQCounter;
-        public bool Mapper_4_NametableMirroring; // MMC3 has it's own way of controlling how the namtables are mirrored.
+        public bool Mapper_4_NametableMirroring; // MMC3 has it's own way of controlling how the nametables are mirrored.
         public byte Mapper_4_PRGRAMProtect;
 
         // Mapper 7, AOROM
@@ -162,7 +162,7 @@ namespace TriCNES
         public ushort programCounter = 0;   // The PC. What address is currently being executed?
         public byte opCode = 0; // The first CPU cycle of an instruction will read the opcode. This determines how the rest of the cycles will behave.
 
-        public int totalCycles; // For debugging. This is just a count of how many CPU cycles have occured since the console booted up.
+        public int totalCycles; // For debugging. This is just a count of how many CPU cycles have occurred since the console booted up.
 
         public byte stackPointer = 0x00; // The Stack pointer is used during pushing/popping values with the stack. This determines which address will be read or written to.
 
@@ -256,8 +256,8 @@ namespace TriCNES
         static int[] NesPalInts; // initialized in the following function
         Color[] NESPal = SetupPalette(); // This runs the function.
         int chosenColor; // During screen rendering, this value is the index into the color array.
-        public DirectBitmap Screen = new DirectBitmap(256, 240); // This uses a class called "DirectBitmap". It's pretty much jsut the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
-        public DirectBitmap NTSCScreen = new DirectBitmap(256*8, 240); // This uses a class called "DirectBitmap". It's pretty much jsut the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+        public DirectBitmap Screen = new DirectBitmap(256, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+        public DirectBitmap NTSCScreen = new DirectBitmap(256*8, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
 
         //Debugging
         public bool Logging;    // If set, the tracelogger will record all instructions ran.
@@ -370,7 +370,7 @@ namespace TriCNES
             PPU_Scanline = 0;        // The PPU begins on dot 0 of scanline 0
             PPU_ScanCycle = 7;       // Shouldn't this be 0? I don't know why, but this passes all the tests if this is 7, so...?
 
-            PPU_OddFrame = true;    // And this is technically cconsidered an "odd" frame when it comes to even/odd frame timing.
+            PPU_OddFrame = true;    // And this is technically considered an "odd" frame when it comes to even/odd frame timing.
 
             APU_DMC_SampleAddress = 0xC000;
             APU_DMC_AddressCounter = 0xC000;
@@ -454,10 +454,10 @@ namespace TriCNES
         public bool CPU_Read; // DMC DMA Has some specific behavior depending on if the CPU is currently reading or writing. DMA Halting fails / DMA $2007 bug.
 
 
-        // The BRK instruction is re-used in the IRQ, NMI, and RESET logic. These bools are used both to start the instruction, and also to make sure the correct logic is used.
+        // The BRK instruction is reused in the IRQ, NMI, and RESET logic. These bools are used both to start the instruction, and also to make sure the correct logic is used.
         public bool DoBRK; // Set if the opcode is 00
-        public bool DoNMI; // Set if a Non Maskable Interrupt is occuring
-        public bool DoIRQ; // Set if an Interrupt REquest is occuring
+        public bool DoNMI; // Set if a Non Maskable Interrupt is occurring
+        public bool DoIRQ; // Set if an Interrupt Request is occurring
 
         public bool DoReset;  // Set when resetting the console, or power on.
         public bool DoOAMDMA; // If set, the Object Acctribute Memory's Direct Memory Access will occur.
@@ -493,7 +493,7 @@ namespace TriCNES
         public byte PPU_Data_StateMachine = 0x7;                   // The value of the state machine indicates what step should be taken on any given ppu cycle.
         public bool PPU_Data_SateMachine_Read;                      // If this is a read instruction, the state machine behaves differently
         public bool PPU_Data_SateMachine_Read_Delayed;              // If the read cycle happens immediately before a write cycle, there's also different behavior.
-        public bool PPU_Data_StateMachine_PerformMysteryWrite;      // This is only set during a read-modify-write instruction to $2007, if the current CPU/PPU alignment would result in "the mystery write" occuring.
+        public bool PPU_Data_StateMachine_PerformMysteryWrite;      // This is only set during a read-modify-write instruction to $2007, if the current CPU/PPU alignment would result in "the mystery write" occurring.
         public byte PPU_Data_StateMachine_InputValue;               // This is the value that was written to $2007 while interrupting the state machine.
         public bool PPU_Data_StateMachine_UpdateVRAMAddressEarly;   // During read-modify-write instructions to $2007, certain CPU/PPU alignments will update the VRAM address earlier than expected.
         public bool PPU_Data_StateMachine_UpdateVRAMBufferLate;     // During read-modify-write instructions to $2007, certain CPU/PPU alignments will update the VRAM buffer later than expected.
@@ -706,7 +706,7 @@ namespace TriCNES
         public ushort APU_DMC_SampleAddress = 0xC000;   // Where the DPCM sample is being read from.
 
         // $4013
-        public ushort APU_DMC_SampleLength = 0;  // How many bytes are being played in this DPCM smaple? (multiplied by 64, and add 1)
+        public ushort APU_DMC_SampleLength = 0;  // How many bytes are being played in this DPCM sample? (multiplied by 64, and add 1)
 
         public ushort APU_DMC_BytesRemaining = 0; // How many bytes are left in the sample. When a sample starts or loops, this is set to APU_DMC_SampleLength.
         public byte APU_DMC_Buffer = 0;  // The value that goes into the shift register.
@@ -857,7 +857,7 @@ namespace TriCNES
                 // DMC load from 4015
                 if (DMCDMADelay > 0)
                 {
-                    DMCDMADelay--; // there's a small delay beetween the write occuring and the DMA beginning
+                    DMCDMADelay--; // there's a small delay between the write occurring and the DMA beginning
                     if (DMCDMADelay == 0 && !DoDMCDMA) // if the DMA is already happening because of the timer
                     {
                         DoDMCDMA = true;
@@ -1038,12 +1038,12 @@ namespace TriCNES
 
         } // and that's it for the APU cycle
 
-        // PPU varaibles
+        // PPU variables
 
         public byte PPUBus; // The databus of the Picture Processing Unit
         public int[] PPUBusDecay = new int[8];
         public int PPUBusDecayConstant = 1786830; // 20 frames. Approximately how long it takes for the PPU bus to decay on my console.
-        public byte PPUOAMAddress; // The address unsed to index into Object Attribute Memory
+        public byte PPUOAMAddress; // The address used to index into Object Attribute Memory
         public bool PPUStatus_VBlank; // This is set during Vblank, and cleared at the end, or if $2002 is read. This value can be read in address $2002
         public bool PPUStatus_VBlank_Delayed; // when writing to $2000 to potentially start an NMI, there's a 1 ppu cycle delay on this flag
         public bool PPUStatus_SpriteZeroHit; // If a sprite zero hit occurs, this is set. This value can be read in address $2002
@@ -1079,10 +1079,10 @@ namespace TriCNES
         byte[] PPU_SpriteShiftRegisterL = new byte[8]; // 8 bit shift register for a sprite's low bit plane. Secondary OAM can have up to 8 object in it.
         byte[] PPU_SpriteShiftRegisterH = new byte[8]; // 8 bit shift register for a sprite's high bit plane. Secondary OAM can have up to 8 object in it.
 
-        byte[] PPU_SpriteAttribute = new byte[8]; // Secondary OAM attribute values. Secondary OAM can ahve up to 8 objects in it.
-        byte[] PPU_SpritePattern = new byte[8]; // Secondary OAM pattern values. Secondary OAM can ahve up to 8 objects in it.
-        byte[] PPU_SpriteXposition = new byte[8]; // Secondary OAM x positions. Secondary OAM can ahve up to 8 objects in it.
-        byte[] PPU_SpriteYposition = new byte[8]; // Secondary OAM y positions. Secondary OAM can ahve up to 8 objects in it.
+        byte[] PPU_SpriteAttribute = new byte[8]; // Secondary OAM attribute values. Secondary OAM can have up to 8 objects in it.
+        byte[] PPU_SpritePattern = new byte[8]; // Secondary OAM pattern values. Secondary OAM can have up to 8 objects in it.
+        byte[] PPU_SpriteXposition = new byte[8]; // Secondary OAM x positions. Secondary OAM can have up to 8 objects in it.
+        byte[] PPU_SpriteYposition = new byte[8]; // Secondary OAM y positions. Secondary OAM can have up to 8 objects in it.
 
         bool PPU_ScanlineContainsSpriteZero;    // If this upcoming scanline contains sprite zero
         bool PPU_PreviousScanlineContainsSpriteZero; // if the sprite evaluation for this current scanline contained sprite zero. Used for Sprite Zero Hit detection.
@@ -1107,10 +1107,10 @@ namespace TriCNES
         bool PPU_Mask_ShowBackground_Instant; // OAM evaluation will stop immediately if writing to $2001
         bool PPU_Mask_ShowSprites_Instant; // OAM evaluation will stop immediately if writing to $2001
 
-        byte PPU_LowBitPlane; // Temporary value used in background shift register preperation.
-        byte PPU_HighBitPlane;// Temporary value used in background shift register preperation.
-        byte PPU_Attribute; // Temporary value used in background shift register preperation.
-        byte PPU_NextCharacter; // Temporary value used in background shift register preperation.
+        byte PPU_LowBitPlane; // Temporary value used in background shift register preparation.
+        byte PPU_HighBitPlane;// Temporary value used in background shift register preparation.
+        byte PPU_Attribute; // Temporary value used in background shift register preparation.
+        byte PPU_NextCharacter; // Temporary value used in background shift register preparation.
 
         bool PPU_CanDetectSpriteZeroHit; // Only 1 sprite zero hit is allowed per frame. This gets set if a sprite zero hit occurs, and cleared at the end of vblank.
 
@@ -1128,7 +1128,7 @@ namespace TriCNES
         public bool NMI_PinsSignal; // I'm using this to detect the rising edge of $2000.7 and $2002.7
         public bool NMI_PreviousPinsSignal; // I'm using this to detect the rising edge of $2000.7 and $2002.7
         public bool IRQ_LevelDetector; // If set, it's time to run an IRQ whenever this is detected
-        public bool NMILine; // Set to true if $2000.7 and $2002.7 are both set. This is cehcked during the second half od a CPU cycle.
+        public bool NMILine; // Set to true if $2000.7 and $2002.7 are both set. This is checked during the second half of a CPU cycle.
         public bool IRQLine; // Set during phi2 to true if the IRQ level detector is low.
 
         bool CopyV = false; // set by writes to $2006. If it occurs on the same dot the scroll values are naturally incremented, some bugs occur.
@@ -1399,7 +1399,7 @@ namespace TriCNES
                     // If Address $2002 is read during the next ppu cycle, the PPU Status flags aren't set.
                     // These variables are used to check if Address $2002 is read during the next ppu cycle.
                     // I usually refer to this as the $2002 race condition.
-                    // The more proper term would be "Vblank/NMI flag supression".
+                    // The more proper term would be "Vblank/NMI flag suppression".
 
                     // oh- and also if we're running a fm2 TAS file, due to FCEUX's incorrect timing of the first frame, I need to prevent this from being set just a few cycles after power on.
                     if (!SyncFM2)
@@ -1476,7 +1476,7 @@ namespace TriCNES
 
             // let's establish the order of operations.
             // Sprite evaluation
-            // then calcualte the color for the next dot.
+            // then calculate the color for the next dot.
 
             //but to complicate things, the delay after writing to $2001 happens between those 2 steps, and also on a specific alignment, this delay is 1 cycle longer for sprite evaluation.
 
@@ -1527,7 +1527,7 @@ namespace TriCNES
                     {
                         if ((PPU_Scanline < 240 || PPU_Scanline == 261)) // if this is the pre-render line, or any line before vblank
                         {
-                            if (!PPU_PendingOAMCorruption) // due to OAM corruption occuring inside OAM evaluation before this even occurs, make sure OAM isn't already corrupt
+                            if (!PPU_PendingOAMCorruption) // due to OAM corruption occurring inside OAM evaluation before this even occurs, make sure OAM isn't already corrupt
                             {
                                 PPU_OAMCorruptionRenderingDisabledOutOfVBlank = true;
                             }
@@ -1551,7 +1551,7 @@ namespace TriCNES
             {
                 PrevPrevPrevDotColor = PrevPrevDotColor; // Drawing a color to the screen has a 3(?) ppu cycle delay between deciding the color, and drawing it.
                 PrevPrevDotColor = PrevDotColor;
-                PrevDotColor = DotColor; // These varaibles here just record the color, and swap them through these varaibles so it can be used 3 cycles after it was chosen.
+                PrevDotColor = DotColor; // These variables here just record the color, and swap them through these variables so it can be used 3 cycles after it was chosen.
 
                 if ((PPU_ScanCycle > 0 && PPU_ScanCycle <= 256) || (PPU_ScanCycle > 320 && PPU_ScanCycle <= 336)) // if this is a visible pixel, or preparing the start of next scanline
                 {
@@ -1572,13 +1572,13 @@ namespace TriCNES
                     chosenColor = PrevPrevPrevDotColor;
                     if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
                     {
-                        chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        chosenColor &= 0x30; //To force greyscale, bitwise AND this color with 0x30
                     }
                     // emphasis bits
                     int emphasis = 0;
-                    if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emphasizing r, add 0x40 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emphasizing g, add 0x80 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emphasizing b, add 0x100 to the index into the palette LUT.
                     if (!PPU_DecodeSignal)
                     {
                         Screen.SetPixel(PPU_ScanCycle - 4, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
@@ -1587,7 +1587,7 @@ namespace TriCNES
                     {
                         if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
                         {
-                            chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                            chosenColor &= 0x30; //To force greyscale, bitwise AND this color with 0x30
                         }
                         PPU_SignalDecode(chosenColor | emphasis);
                         PrevPrevPrevPrevDotColor = chosenColor | emphasis;
@@ -1599,13 +1599,13 @@ namespace TriCNES
                     chosenColor = PaletteRAM[0x00] & 0x3F;
                     if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
                     {
-                        chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        chosenColor &= 0x30; //To force greyscale, bitwise AND this color with 0x30
                     }
                     // emphasis bits
                     int emphasis = 0;
-                    if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emphasizing r, add 0x40 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emphasizing g, add 0x80 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emphasizing b, add 0x100 to the index into the palette LUT.
                     PrevPrevPrevPrevDotColor = chosenColor | emphasis; // set up samples for dot 1
                     PPU_SignalDecode(chosenColor | emphasis);
                 }
@@ -1873,7 +1873,7 @@ namespace TriCNES
                     {
                         SecondaryOAMAddress = 0; // if this is dot 1, reset the secondary OAM address
                         SecondaryOAMFull = false;// also reset the flag that checks of secondary OAM is full.
-                        // in preperation for the next section, let's clear these flags too
+                        // in preparation for the next section, let's clear these flags too
                         SpriteEvaluationTick = 0;
                         OAMAddressOverflowedDuringSpriteEvaluation = false;
                         PPU_ScanlineContainsSpriteZero = false;
@@ -2071,13 +2071,13 @@ namespace TriCNES
                             }
                             OamCorruptedOnOddCycle = false;
 
-                            if (PPUOAMAddress < PreIncVal && PPUOAMAddress < 4) // If an overflow occured
+                            if (PPUOAMAddress < PreIncVal && PPUOAMAddress < 4) // If an overflow occurred
                             {
                                 OAMAddressOverflowedDuringSpriteEvaluation = true; // set this flag.
                             }
                         }
                         else
-                        {   // OAM Address Overflowerd During Sprite Evaluation
+                        {   // OAM Address Overflowed During Sprite Evaluation
                             // fail to write to SecondaryOAM
                             // boo womp.
 
@@ -2423,13 +2423,13 @@ namespace TriCNES
                     {
                         if (Color != 0 && SpriteColor != 0) // if both the background and sprites are visible on this pixel
                         {
-                            if ((PPU_Mask_8PxShowSprites || PPU_ScanCycle > 8) && PPU_ScanCycle < 256) // and if this isn't on pixel 256, or in the first 8 pixels being masked away fron the nametable, if that setting is enabled...
+                            if ((PPU_Mask_8PxShowSprites || PPU_ScanCycle > 8) && PPU_ScanCycle < 256) // and if this isn't on pixel 256, or in the first 8 pixels being masked away from the nametable, if that setting is enabled...
                             {
                                 PPUStatus_SpriteZeroHit = true; // we did it! sprite zero hit achieved.
                                 PPU_CanDetectSpriteZeroHit = false; // another sprite zero hit cannot occur until the end of next vblank.
                                 if (Logging) // and for some debug logging...
                                 {
-                                    string S = DebugLog.ToString(); // let's add text to the current line letting me know a sprite zero hit occured, and on which dot
+                                    string S = DebugLog.ToString(); // let's add text to the current line letting me know a sprite zero hit occurred, and on which dot
                                     if (S.Length > 0)
                                     {
                                         S = S.Substring(0, S.Length - 2); // trim off \n
@@ -2445,15 +2445,15 @@ namespace TriCNES
                     // which do we draw, the background or the sprite?
                     if (Color == 0 && SpriteColor != 0) // Well, if the background was using color 0, and the sprite wasn't,  always draw the sprite.
                     {
-                        Color = SpriteColor; // I'm just re-using this background color variable.
-                        Palette = SpritePalette;       // I'm also just re-using the background palette variable.
+                        Color = SpriteColor; // I'm just reusing this background color variable.
+                        Palette = SpritePalette;       // I'm also just reusing the background palette variable.
                     }
                     else if (SpriteColor != 0) // the background color isn't zero...
                     {
                         if (SpritePriority) // if the sprite has priority, always draw the sprite.
                         {
-                            Color = SpriteColor; // I'm just re-using this cackground color variable.
-                            Palette = SpritePalette; // I'm also just re-using the background palette variable.
+                            Color = SpriteColor; // I'm just reusing this background color variable.
+                            Palette = SpritePalette; // I'm also just reusing the background palette variable.
                         }
                     }
                 }
@@ -2994,7 +2994,7 @@ namespace TriCNES
         void PPU_UpdateShiftRegisters()
         {
 
-            if (PPU_Mask_ShowBackground) // if rendering the backgound, update the shift registers for the background.
+            if (PPU_Mask_ShowBackground) // if rendering the background, update the shift registers for the background.
             {
                 PPU_PatternShiftRegisterL = (ushort)(PPU_PatternShiftRegisterL << 1); // shift 1 bit to the left.
                 PPU_PatternShiftRegisterH = (ushort)(PPU_PatternShiftRegisterH << 1); // shift 1 bit to the left.
@@ -3260,7 +3260,7 @@ namespace TriCNES
                     IgnoreH = true;
                 }
 
-                if (DoOAMDMA && FirstCycleOfOAMDMA) // interupt suppression. (There's probably a better way to implement this) if this is the first cycle of the OAM DMA...
+                if (DoOAMDMA && FirstCycleOfOAMDMA) // interrupt suppression. (There's probably a better way to implement this) if this is the first cycle of the OAM DMA...
                 {
                     if (!(DoNMI || DoIRQ)) // and we are NOT running an NMI or IRQ
                     {
@@ -3358,26 +3358,26 @@ namespace TriCNES
                 opCode = Fetch(addressBus); // Fetch the value at the program counter. This is the opcode.
 
 
-                if (!SuppressInterrupt) // If we are not suppressing an interrupt, check if any interrupts are occuring.
+                if (!SuppressInterrupt) // If we are not suppressing an interrupt, check if any interrupts are occurring.
                 {
-                    if (DoNMI) // If an NMI is occuring,
+                    if (DoNMI) // If an NMI is occurring,
                     {
                         opCode = 0; // replace the opcode with 0. (A BRK, which has modified behavior for NMIs)
                     }
-                    else if (DoIRQ) // If an IRQ is occuring,
+                    else if (DoIRQ) // If an IRQ is occurring,
                     {
                         opCode = 0; // replace the opcode with 0. (A BRK, which has modified behavior for IRQs)
                     }
-                    else if (DoReset) // If a RESET is occuring,
+                    else if (DoReset) // If a RESET is occurring,
                     {
                         opCode = 0; // replace the opcode with 0. (A BRK, which has modified behavior for RESETs)
                     }
-                    else if (opCode == 0) // Otherwise, if an interrupt is not occuring, and the opcode is already 0
+                    else if (opCode == 0) // Otherwise, if an interrupt is not occurring, and the opcode is already 0
                     {
                         DoBRK = true; // There's also specific behavior for the BRK instruction if it is in-fact a BRK, and not an interrupt.
                     }
                 }
-                else if (opCode == 0) // If we are suppressing an interrupt, but we're still running a BRK isntruction
+                else if (opCode == 0) // If we are suppressing an interrupt, but we're still running a BRK instruction
                 {
                     DoBRK = true; // still set this flag.
                 }
@@ -3402,7 +3402,7 @@ namespace TriCNES
                 // depending on the value of the opcode, different behavior will take place.
                 // this is how instructions work.
 
-                // All intructions are labeled. If it's an undocumented opcode, I also write "***" next to it.
+                // All instructions are labeled. If it's an undocumented opcode, I also write "***" next to it.
 
                 switch (opCode)
                 {
@@ -5489,7 +5489,7 @@ namespace TriCNES
                                 GetAddressAbsolute();
                                 break;
                             case 3:
-                                specialBus = Fetch(addressBus); // Okay, this doesn't actually use the SB register. I'm just re-using that variable.
+                                specialBus = Fetch(addressBus); // Okay, this doesn't actually use the SB register. I'm just reusing that variable.
                                 break;
                             case 4:
                                 PollInterrupts();
@@ -8078,7 +8078,7 @@ namespace TriCNES
         byte PPU_Update2005Value;   // The value written to $2005, for use when the delay has ended.
         byte PPU_Update2001Delay;   // The number of PPU cycles to wait between writing to $2001 and the ppu from updating
         byte PPU_Update2001EmphasisBitsDelay;   // The number of PPU cycles to wait between writing to $2001 and the ppu from updating the emphasis bits and greyscale
-        byte PPU_Update2001OAMCorruptionDelay;  // The number of PPU cycles to wait before OAM gets corrupted if OAM corruption is occuring.
+        byte PPU_Update2001OAMCorruptionDelay;  // The number of PPU cycles to wait before OAM gets corrupted if OAM corruption is occurring.
         byte PPU_Update2001Value;   // The value written to $2001, for use when the delay has ended.
         byte PPU_Update2000Delay;   // The number of PPU cycles to wait between writing to $2000 and the ppu from updating
         byte PPU_Update2000Value;   // The value written to $2000, for use when the delay has ended.
@@ -8317,7 +8317,7 @@ namespace TriCNES
                     PPU_Data_StateMachine_InputValue = In;
 
                     ushort Address = PPU_ReadWriteAddress;
-                    // This if statement is only relevent in an edge case. Read-Modify-Write instructions to $2007 are *complicated*.
+                    // This if statement is only relevant in an edge case. Read-Modify-Write instructions to $2007 are *complicated*.
                     if (PPU_Data_StateMachine == 3 || PPU_Data_StateMachine == 6) // This write follows another read/write cycle
                     {
                         // during Read-Modify-Write instructions to $2007, there's alignment specific side effects.
@@ -8385,7 +8385,7 @@ namespace TriCNES
             switch (Cart.MemoryMapper)
             {
                 default:
-                case 0: // NROM, just use the mirror setting from the ines header.
+                case 0: // NROM, just use the mirror setting from the iNES header.
                     if (!Cart.NametableHorizontalMirroring)
                     {
                         Address &= 0x37FF; // mask away $0800
@@ -8607,7 +8607,7 @@ namespace TriCNES
                                 }
                                 else if (PPUClock == 3)
                                 {
-                                    if (PPU_ReadWriteAddress >= 0x2000) // this is apprently different depending on where the read is? TODO: More testing required.
+                                    if (PPU_ReadWriteAddress >= 0x2000) // this is apparently different depending on where the read is? TODO: More testing required.
                                     {
                                         if (PPU_VRAMAddressBuffer != 0)
                                         {
@@ -8656,7 +8656,7 @@ namespace TriCNES
                                 }
                             }
 
-                            PPU_Data_SateMachine_Read = true; // This is a read instruction, so the state machien needs to read.
+                            PPU_Data_SateMachine_Read = true; // This is a read instruction, so the state machine needs to read.
                             PPU_Data_SateMachine_Read_Delayed = true; // This is also set, in case the state machine is interrupted.
                             PPUBus = dataBus;
                             for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
@@ -9005,7 +9005,7 @@ namespace TriCNES
             // This is used whenever writing anywhere with the CPU
             if (Address < 0x2000)
             {
-                //guarunteed to be RAM
+                //guaranteed to be RAM
 
                 RAM[Address & 0x7FF] = Input;
 
@@ -9216,7 +9216,7 @@ namespace TriCNES
                         Cart.Mapper_1_ShiftRegister >>= 1;
                         Cart.Mapper_1_ShiftRegister |= (byte)((Input & 1) << 4);
                     }
-                    if (Cart.Mapper_1_PB) // if the '1' that was initiallized in bit 4 is shifted into the bus
+                    if (Cart.Mapper_1_PB) // if the '1' that was initialized in bit 4 is shifted into the bus
                     {
                         // copy shift register to the desired internal register.
                         switch (Address & 0xE000)
@@ -9703,7 +9703,7 @@ namespace TriCNES
         // This is not every instruction!!!
         // These are just the ones that have frequently repeated logic.
         // Instructions like STA just simply `Store(A, Address);`, which doesn't need a jump somewhere to do that.
-        // Many undocumented opcodes have unique behavior that is also jsut handled in the switch statement, instead of jumping to a unique function.
+        // Many undocumented opcodes have unique behavior that is also just handled in the switch statement, instead of jumping to a unique function.
 
         void Op_ORA(byte Input)
         {
@@ -9725,7 +9725,7 @@ namespace TriCNES
 
         void Op_ASL_A()
         {
-            // Arithemtic shift left the Accumulator
+            // Arithmetic shift left the Accumulator
             flag_Carry = A >= 0x80;    // If bit 7 was set before the shift
             A <<= 1;
             flag_Negative = A >= 0x80; // if bit 7 of the result is set
