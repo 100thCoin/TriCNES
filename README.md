@@ -38,7 +38,7 @@ The first line of the file is an integer, indicating how many cartridges are bei
 
 The following 'n' lines are local file paths to the ROMs you wish to use. This will set up an array of cartridges.
 
-The remaining lines until the end of the file are in the following format: "x y" where an integer 'x' is seperated from an integer 'y' with a space.
+The remaining lines until the end of the file are in the following format: "x y" where an integer 'x' is separated from an integer 'y' with a space.
 
 When the TAS is being played back, before CPU cycle 'x', swap to the cartridge at index 'y' into the cartridge array.
 

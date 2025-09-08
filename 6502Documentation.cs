@@ -35,7 +35,7 @@ namespace TriCNES
     public static class Documentation
     {
 
-        // This class is exlusively referenced for debugging and trace logging information.
+        // This class is exclusively referenced for debugging and trace logging information.
         // It's also possible I mistyped some numbers here and there, and probably shouldn't be 100% trusted.
 
 
@@ -159,7 +159,7 @@ namespace TriCNES
             "        #   address  R/W description\r\n       --- --------- --- ------------------------------------------\r\n        1     PC      R  fetch opcode, does not increment PC\r\n        2     PC      R  fetch opcode, does not increment PC\r\n        3     PC      R  fetch opcode, does not increment PC\r\n        4     PC      R  fetch opcode, does not increment PC\r\n        5     PC      R  fetch opcode, does not increment PC\r\n        6     PC      R  fetch opcode, does not increment PC\r\n        7     PC      R  fetch opcode, does not increment PC\r\n        ...   PC      R  fetch opcode, does not increment PC\r\n\r\n       Notes: This process goes on forever."
         };
 
-        // this explains what each isntruction does by their pnuemonic
+        // this explains what each instruction does by their mnemonic
 
         static string[] InstructionDocs =
         {
@@ -179,7 +179,7 @@ namespace TriCNES
             "Arithmetic Shift Left\n\nM' = M<<1\n\nCflag' = (M>=0x80)\nZflag' = (M'==0)\nNflag' = (M'>=0x80)"
             ,
             //5 SLO
-            "Arithemtic Shift Left then Bitwise OR with Accumulator\n\nM' = M<<1\nA' = A|M'\n\nCflag' = (M>=0x80)\nZflag' = (A'==0)\nNflag' = (A'>=0x80)"
+            "Arithmetic Shift Left then Bitwise OR with Accumulator\n\nM' = M<<1\nA' = A|M'\n\nCflag' = (M>=0x80)\nZflag' = (A'==0)\nNflag' = (A'>=0x80)"
             ,
             //6 PHP
             "Push Processor\n\nPushes processor status to the stack.\n\nSP' = SP-1"
