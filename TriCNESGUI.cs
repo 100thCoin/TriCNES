@@ -266,7 +266,7 @@ namespace TriCNES
                             // FCEUX incorrectly starts at the beginning of scanline 240, and cycle 0 is *after* the reset instruction.
                             // However, I think there's some other incorrect timing going on with FCEUX, and in order to sync TASes, I need to start at scanline 239, dot 312
                             EMU.PPU_Scanline = 239;
-                            EMU.PPU_ScanCycle = 312;
+                            EMU.PPU_Dot = 312;
                             // but of course, by starting here, the VBlank flag will be incorrectly set early.
                             EMU.SyncFM2 = true; // so this bool prevents that.
                             EMU.TAS_InputSequenceIndex--; // since this runs an extra vblank, this needs to be offset by 1
@@ -274,7 +274,7 @@ namespace TriCNES
                         else
                         {
                             EMU.TAS_InputSequenceIndex++;
-                            EMU.PPU_ScanCycle = 0;
+                            EMU.PPU_Dot = 0;
                         }
                         // FCEUX also starts with this RAM pattern
                         int i = 0;

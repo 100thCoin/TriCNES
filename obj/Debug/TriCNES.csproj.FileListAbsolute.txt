@@ -10,3 +10,4 @@ C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Debug\TriCNES.pdb
 C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Debug\TriCNES.TriCNESGUI.resources
 C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Debug\TriCNES.TASProperties.resources
 C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Debug\TriCNES.TASProperties3ct.resources
+C:\Users\100th_Coin\Documents\VisualStudioProjects\TriCNES\obj\Debug\TriCNES.exe.config

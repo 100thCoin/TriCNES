@@ -143,7 +143,7 @@ namespace TriCNES
         public int APUClock;    // Counts down from 12. Technically an APU cycle is 24 master clock cycles, but certain actions happen when this clock goes low and when it goes high.
         public int MasterClock; // Counts up every master clock cycle. Resets at 24.
 
-        public bool APU_EvenCycle = false; // The APU needs to know if this is a "get" or "put" cycle.
+        public bool APU_PutCycle = false; // The APU needs to know if this is a "get" or "put" cycle.
 
         public byte[] OAM = new byte[0x100];         // Object Attribute Memory is 256 bytes.
         public byte[] SecondaryOAM = new byte[32];   // Secondary OAM is specifically the 8 objects being rendered on the current scanline.
@@ -368,7 +368,7 @@ namespace TriCNES
 
             programCounter = 0xFFFF; // Technically, this value is nondeterministic. It also doesn't matter where it is, as it will be initialized in the RESET instruction.
             PPU_Scanline = 0;        // The PPU begins on dot 0 of scanline 0
-            PPU_ScanCycle = 7;       // Shouldn't this be 0? I don't know why, but this passes all the tests if this is 7, so...?
+            PPU_Dot = 7;       // Shouldn't this be 0? I don't know why, but this passes all the tests if this is 7, so...?
 
             PPU_OddFrame = true;    // And this is technically cconsidered an "odd" frame when it comes to even/odd frame timing.
 
@@ -439,7 +439,7 @@ namespace TriCNES
             PPU_VRAMAddressBuffer = 0;
             PPU_OddFrame = false;
 
-            PPU_ScanCycle = 0;
+            PPU_Dot = 0;
             PPU_Scanline = 0;
 
             DoDMCDMA = false;
@@ -596,7 +596,7 @@ namespace TriCNES
 
             if (APUClock == 0)
             {
-                APU_EvenCycle = !APU_EvenCycle;
+                APU_PutCycle = !APU_PutCycle;
 
                 _EmulateAPU();
 
@@ -740,7 +740,7 @@ namespace TriCNES
                 }
             }
 
-            if (APU_EvenCycle)
+            if (APU_PutCycle)
             {
 
                 // controller reading is handled here in the APU chip.
@@ -1052,7 +1052,7 @@ namespace TriCNES
         bool PPU_Spritex16; // Are sprites using 8x8 mode, or 8x16 mode? Set by writing to $2000
 
         public int PPU_Scanline; // Which scanline is the PPU currently on
-        public int PPU_ScanCycle; // Which dot of the scanline is the PPU currently on
+        public int PPU_Dot; // Which dot of the scanline is the PPU currently on
         public int NMIDelay; // When a NMI is about to occur, there's a small delay depending on the alignment with the CPU clock.
 
         public bool PPU_VRegisterChangedOutOfVBlank;    // when changing the v register (Read write address) out of vblank, palettes can become corrupted
@@ -1152,7 +1152,7 @@ namespace TriCNES
                     PPU_AddressBus = PPU_ReadWriteAddress; // This value is the same thing.
                     if ((temp_Prev_V & 0x3FFF) >= 0x3F00 && (PPU_AddressBus & 0x3FFF) < 0x3F00) // Palette corruption check. Are we leaving Palette ram?
                     {
-                        if ((PPU_Scanline < 240) && PPU_ScanCycle <= 256) // if this dot is visible
+                        if ((PPU_Scanline < 240) && PPU_Dot <= 256) // if this dot is visible
                         {
                             if ((temp_Prev_V & 0xF) != 0)  // also, Palette corruption only happens if the previous address did not end in a 0
                             {
@@ -1362,15 +1362,15 @@ namespace TriCNES
             {
                 if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
                 {
-                    if (PPU_ScanCycle == 256) //The Y scroll is incremented on dot 256.
+                    if (PPU_Dot == 256) //The Y scroll is incremented on dot 256.
                     {
                         PPU_IncrementScrollY();
                     }
-                    else if (PPU_ScanCycle == 257) //The X scroll is reset on dot 257.
+                    else if (PPU_Dot == 257) //The X scroll is reset on dot 257.
                     {
                         PPU_ResetXScroll();
                     }
-                    if (PPU_ScanCycle >= 280 && PPU_ScanCycle <= 304 && PPU_Scanline == 261) //numbers from the nesdev wiki
+                    if (PPU_Dot >= 280 && PPU_Dot <= 304 && PPU_Scanline == 261) //numbers from the nesdev wiki
                     {
                         PPU_ResetYScroll(); //The Y scroll is reset on every dot from 280 through 304 on the pre-render scanline.
                     }
@@ -1378,10 +1378,10 @@ namespace TriCNES
             }
 
             // Increment the PPU dot
-            PPU_ScanCycle++;
-            if (PPU_ScanCycle > 340) // There are only 341 dots per scanline
+            PPU_Dot++;
+            if (PPU_Dot > 340) // There are only 341 dots per scanline
             {
-                PPU_ScanCycle = 0;  // reset the dot back to 0
+                PPU_Dot = 0;  // reset the dot back to 0
                 PPU_Scanline++;     // and increment the scanline
                 // Sprite zero hits rely on the previous scanline's sprite evaluation.
                 PPU_PreviousScanlineContainsSpriteZero = PPU_ScanlineContainsSpriteZero;
@@ -1394,7 +1394,7 @@ namespace TriCNES
 
             if (PPU_Scanline == 241) // If this is the first scanline of VBLank
             {
-                if (PPU_ScanCycle == 0)
+                if (PPU_Dot == 0)
                 {
                     // If Address $2002 is read during the next ppu cycle, the PPU Status flags aren't set.
                     // These variables are used to check if Address $2002 is read during the next ppu cycle.
@@ -1412,7 +1412,7 @@ namespace TriCNES
                         SyncFM2 = false;
                     }
                 }
-                if (PPU_ScanCycle == 1)
+                if (PPU_Dot == 1)
                 {
                     if (PPU_PendingVBlank) // If a read to $2002 did not happen this cycle. (Reading $2002 sets PPU_PendingVBlank to false)
                     {
@@ -1437,23 +1437,23 @@ namespace TriCNES
                 }
 
             }
-            else if (PPU_Scanline == 260 && PPU_ScanCycle == 340)
+            else if (PPU_Scanline == 260 && PPU_Dot == 340)
             {
                 PPU_OddFrame = !PPU_OddFrame; // I guess this could happen on pretty much any cycle?
             }
-            else if (PPU_Scanline == 261 && PPU_ScanCycle == 0)
+            else if (PPU_Scanline == 261 && PPU_Dot == 0)
             {
                 PPUStatus_SpriteZeroHit = false;
                 // this contradicts the information on the nesdev wiki, but I think I'm going to go mad if this really is cleared on dot 1.
             }
-            else if (PPU_Scanline == 261 && PPU_ScanCycle == 1)
+            else if (PPU_Scanline == 261 && PPU_Dot == 1)
             {
                 // On the dot 1 of the pre-render scanline, all of these flags are cleared.
                 PPUStatus_VBlank = false;
                 PPUStatus_SpriteOverflow = false;
                 PPU_CanDetectSpriteZeroHit = true;
             }
-            else if (PPU_Scanline == 261 && PPU_ScanCycle == 10)
+            else if (PPU_Scanline == 261 && PPU_Dot == 10)
             {
                 // And then a few cycles later, the CPU notices that this flag was cleared.
                 PPUStatus_VBlank_Delayed = false;
@@ -1464,12 +1464,12 @@ namespace TriCNES
             PPU_ADDR_Prev = PPU_AddressBus; // Record the value of the ppu address bus. This is used in the PPU_MapperSpecificFunctions(), so if this changes between here and next ppu cycle, we'll know.
             if (PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
             {
-                if (PPU_Scanline == 261 && PPU_ScanCycle == 340)
+                if (PPU_Scanline == 261 && PPU_Dot == 340)
                 {
                     // On every other frame, dot 0 of scanline 0 is skipped.
                     // this cycle is technically (0,0), but this still makes the Nametable fetch during the last cycle of the pre-render line
                     PPU_Scanline = 0;
-                    PPU_ScanCycle = 0;
+                    PPU_Dot = 0;
                 }
             }
             // Okay, now that we're updated all those flags, let's render stuff to the screen!
@@ -1553,7 +1553,7 @@ namespace TriCNES
                 PrevPrevDotColor = PrevDotColor;
                 PrevDotColor = DotColor; // These varaibles here just record the color, and swap them through these varaibles so it can be used 3 cycles after it was chosen.
 
-                if ((PPU_ScanCycle > 0 && PPU_ScanCycle <= 256) || (PPU_ScanCycle > 320 && PPU_ScanCycle <= 336)) // if this is a visible pixel, or preparing the start of next scanline
+                if ((PPU_Dot > 0 && PPU_Dot <= 256) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
                 {
                     if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
                     {
@@ -1566,7 +1566,7 @@ namespace TriCNES
                     }
 
                 }
-                if (PPU_ScanCycle > 3 && PPU_ScanCycle <= 259 && PPU_Scanline < 241) // the process of drawing a dot to the screen actually has a 2 ppu cycle delay, which the emphasis bits happen after
+                if (PPU_Dot > 3 && PPU_Dot <= 259 && PPU_Scanline < 241) // the process of drawing a dot to the screen actually has a 2 ppu cycle delay, which the emphasis bits happen after
                 {
                     // in other words, the geryscale/emphasis bits can affect the color that was decided 2 ppu cycles ago.
                     chosenColor = PrevPrevPrevDotColor;
@@ -1581,7 +1581,7 @@ namespace TriCNES
                     if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
                     if (!PPU_DecodeSignal)
                     {
-                        Screen.SetPixel(PPU_ScanCycle - 4, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
+                        Screen.SetPixel(PPU_Dot - 4, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
                     }
                     else
                     {
@@ -1593,7 +1593,7 @@ namespace TriCNES
                         PrevPrevPrevPrevDotColor = chosenColor | emphasis;
                     }
                 }
-                if(PPU_DecodeSignal && (PPU_ScanCycle == 0) && PPU_Scanline < 241)
+                if(PPU_DecodeSignal && (PPU_Dot == 0) && PPU_Scanline < 241)
                 {
                     ntsc_signal_of_dot_0 = ntsc_signal;
                     chosenColor = PaletteRAM[0x00] & 0x3F;
@@ -1609,11 +1609,11 @@ namespace TriCNES
                     PrevPrevPrevPrevDotColor = chosenColor | emphasis; // set up samples for dot 1
                     PPU_SignalDecode(chosenColor | emphasis);
                 }
-                if (PPU_DecodeSignal && (PPU_ScanCycle == 260) && PPU_Scanline < 241)
+                if (PPU_DecodeSignal && (PPU_Dot == 260) && PPU_Scanline < 241)
                 {
                     PPU_SignalDecode(PrevPrevPrevPrevDotColor);
                 }
-                else if (PPU_DecodeSignal && (PPU_ScanCycle == 261) && PPU_Scanline < 241)
+                else if (PPU_DecodeSignal && (PPU_Dot == 261) && PPU_Scanline < 241)
                 {
                     RenderNTSCScanline();
                 }
@@ -1713,13 +1713,13 @@ namespace TriCNES
                 if (colInd == 0) { low = high; } // For color 0, only high level is emitted
                 if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
                 float sample = InColorPhase(colInd, phase) ? high : low;
-                if (PPU_ScanCycle == 0)
+                if (PPU_Dot == 0)
                 {
                     NTSC_Samples[i] = sample;
                 }
                 else
                 {
-                    NTSC_Samples[(PPU_ScanCycle - 3) * 8 + i] = sample;
+                    NTSC_Samples[(PPU_Dot - 3) * 8 + i] = sample;
                 }
                 phase++;
                 phase %= 12;
@@ -1863,13 +1863,13 @@ namespace TriCNES
                 }
             }
 
-            if ((PPU_ScanCycle >= 0 && PPU_ScanCycle <= 64) && PPU_Scanline < 240) // Dots 1 through 64, not on the pre-render line. (and also dot 0 for OAM corruption purposes)
+            if ((PPU_Dot >= 0 && PPU_Dot <= 64) && PPU_Scanline < 240) // Dots 1 through 64, not on the pre-render line. (and also dot 0 for OAM corruption purposes)
             {
                 // this step is clearing secondary OAM, and writing FF to each byte in the array.
-                if ((PPU_ScanCycle & 1) == 1)
+                if ((PPU_Dot & 1) == 1)
                 { //odd cycles
                     PPU_SpriteEvaluationTemp = ReadOAM(); // During these cycles, OAM is hard-coded to read $FF.
-                    if (PPU_ScanCycle == 1)
+                    if (PPU_Dot == 1)
                     {
                         SecondaryOAMAddress = 0; // if this is dot 1, reset the secondary OAM address
                         SecondaryOAMFull = false;// also reset the flag that checks of secondary OAM is full.
@@ -1888,7 +1888,7 @@ namespace TriCNES
                 }
                 else
                 { //even cycles
-                    if (PPU_ScanCycle > 0)
+                    if (PPU_Dot > 0)
                     {
                         SecondaryOAM[SecondaryOAMAddress] = PPU_SpriteEvaluationTemp; // store FF in secondary OAM
 
@@ -1903,7 +1903,7 @@ namespace TriCNES
                         SecondaryOAMAddress++;  // increment this value so on the next even cycle, we write to the next SecondaryOAM address.
                         SecondaryOAMAddress &= 0x1F;  // keep the secondary OAM address in-bounds
 
-                        if(PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && PPU_ScanCycle == 64)
+                        if(PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && PPU_Dot == 64)
                         {
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
@@ -1922,12 +1922,12 @@ namespace TriCNES
                     }
                 }
             }
-            else if ((PPU_ScanCycle >= 65 && PPU_ScanCycle <= 256) && PPU_Scanline < 240) // Dots 65 through 256, not on the pre-render line
+            else if ((PPU_Dot >= 65 && PPU_Dot <= 256) && PPU_Scanline < 240) // Dots 65 through 256, not on the pre-render line
             {
                 if (PPU_Mask_ShowBackground_Instant || PPU_Mask_ShowSprites_Instant || PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant) // if rendering is enabled, or was *just* disabled mid evaluation
                 {
 
-                    if ((PPU_ScanCycle & 1) == 1)
+                    if ((PPU_Dot & 1) == 1)
                     { //odd cycles
                         byte PrevSpriteEvalTemp = PPU_SpriteEvaluationTemp;
                         PPU_SpriteEvaluationTemp = OAM[PPUOAMAddress]; // read from OAM
@@ -1982,7 +1982,7 @@ namespace TriCNES
                                         }
                                         // Sprite zero hits actually have nothing to do with reading the object at OAM index 0. Rather, if an object is within range of the scanline on dot 66.
                                         // typically, the object processed on dot 66 is OAM[0], though it's possible using precisely timed writes to $2003 to have PPUOAMAddress start processing here from a different value.
-                                        if (PPU_ScanCycle == 66)
+                                        if (PPU_Dot == 66)
                                         {
                                             PPU_ScanlineContainsSpriteZero = true; // this value will be transferred to PPU_PreviousScanlineContainsSpriteZero at the end of the scanline, and that variable is used in sp 0 hit detection.
                                         }
@@ -2108,7 +2108,7 @@ namespace TriCNES
                             {
                                 PPU_OAMCorruptionIndex = (byte)(SecondaryOAMAddress); // this value will be used when rendering is re-enabled and the corruption occurs
                             }
-                            if(PPU_ScanCycle == 256)
+                            if(PPU_Dot == 256)
                             {
                                 PPU_OAMCorruptionIndex = OamCorruptedOnOddCycle ? (byte)0 : (byte)1; //I have no idea.
                             }
@@ -2119,13 +2119,13 @@ namespace TriCNES
                 }
 
             }
-            else if (PPU_ScanCycle >= 257 && PPU_ScanCycle <= 320) // this also happens on the pre-render line.
+            else if (PPU_Dot >= 257 && PPU_Dot <= 320) // this also happens on the pre-render line.
             {
                 if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                 {
                     PPUOAMAddress = 0; // this is reset during every one of these cycles, 257 through 320
                 }
-                if (PPU_ScanCycle == 257)
+                if (PPU_Dot == 257)
                 {
                     // reset these flags for this section.
                     if (SecondaryOAMFull)
@@ -2358,14 +2358,14 @@ namespace TriCNES
         void PPU_Render_CalculatePixel()
         {
             // dots 1 through 256
-            if (PPU_ScanCycle <= 256)
+            if (PPU_Dot <= 256)
             {
                 // there are 8 palettes in the PPU
                 // 4 are for the background, and the other 4 are for sprites.
                 byte Palette = 0;
                 // each of these palettes have 4 colors
                 byte Color = 0;
-                if (PPU_Mask_ShowBackground && (PPU_ScanCycle > 8 || PPU_Mask_8PxShowBackground)) // if rendering is enables for this pixel
+                if (PPU_Mask_ShowBackground && (PPU_Dot > 8 || PPU_Mask_8PxShowBackground)) // if rendering is enables for this pixel
                 {
                     byte col0 = (byte)(((PPU_PatternShiftRegisterL >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern low bit plane
                     byte col1 = (byte)(((PPU_PatternShiftRegisterH >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern high bit plane
@@ -2386,7 +2386,7 @@ namespace TriCNES
                 byte SpriteColor = 0;
                 bool SpritePriority = false; // if set, this sprite will be in front of background tiles. Otherwise, it will only take priority if the background is using color 0.
 
-                if (PPU_Mask_ShowSprites && (PPU_ScanCycle > 8 || PPU_Mask_8PxShowSprites))
+                if (PPU_Mask_ShowSprites && (PPU_Dot > 8 || PPU_Mask_8PxShowSprites))
                 {
                     int i = 0;
                     // check all 8 objects in secondary OAM
@@ -2423,7 +2423,7 @@ namespace TriCNES
                     {
                         if (Color != 0 && SpriteColor != 0) // if both the background and sprites are visible on this pixel
                         {
-                            if ((PPU_Mask_8PxShowSprites || PPU_ScanCycle > 8) && PPU_ScanCycle < 256) // and if this isn't on pixel 256, or in the first 8 pixels being masked away fron the nametable, if that setting is enabled...
+                            if ((PPU_Mask_8PxShowSprites || PPU_Dot > 8) && PPU_Dot < 256) // and if this isn't on pixel 256, or in the first 8 pixels being masked away fron the nametable, if that setting is enabled...
                             {
                                 PPUStatus_SpriteZeroHit = true; // we did it! sprite zero hit achieved.
                                 PPU_CanDetectSpriteZeroHit = false; // another sprite zero hit cannot occur until the end of next vblank.
@@ -2434,7 +2434,7 @@ namespace TriCNES
                                     {
                                         S = S.Substring(0, S.Length - 2); // trim off \n
                                         DebugLog = new StringBuilder(S);
-                                        DebugLog.Append(" ! Sprite Zero Hit ! (Dot " + PPU_ScanCycle + ")\r\n");
+                                        DebugLog.Append(" ! Sprite Zero Hit ! (Dot " + PPU_Dot + ")\r\n");
 
                                     }
                                 }
@@ -2826,7 +2826,7 @@ namespace TriCNES
         void PPU_Render_ShiftRegistersAndBitPlanes()
         {
             byte cycleTick; // for the switch statement below, this checks which case to run on a given ppu cycle.
-            cycleTick = (byte)((PPU_ScanCycle - 1) & 7);
+            cycleTick = (byte)((PPU_Dot - 1) & 7);
 
             PPU_UpdateShiftRegisters(); // shift all the shift registers 1 bit
             // the shift registers are used in the CalculatePixel() function.
@@ -3001,7 +3001,7 @@ namespace TriCNES
                 PPU_AttributeShiftRegisterL = (ushort)(PPU_AttributeShiftRegisterL << 1); // shift 1 bit to the left.
                 PPU_AttributeShiftRegisterH = (ushort)(PPU_AttributeShiftRegisterH << 1); // shift 1 bit to the left.
             }
-            if (PPU_ScanCycle > 1 && PPU_ScanCycle <= 257) // the shift registers for sprites have a 1 dot delay
+            if (PPU_Dot > 1 && PPU_Dot <= 257) // the shift registers for sprites have a 1 dot delay
             {
 
                 if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground)) // this happens if rendering either sprites or background.
@@ -3247,7 +3247,8 @@ namespace TriCNES
 
         public void _6502()
         {
-            if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || DoOAMDMA) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
+
+            if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || (DoOAMDMA && CPU_Read)) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
             {
                 if (
                     (opCode == 0x93 && operationCycle == 4) ||
@@ -3267,9 +3268,13 @@ namespace TriCNES
                         SuppressInterrupt = true; // Suppress one if it starts before the next instruction
                     }
                     FirstCycleOfOAMDMA = false; // disable this flag.
+                    if (!APU_PutCycle)
+                    {
+                        OAMDMA_Halt = true;
+                    }
                 }
 
-                if (APU_EvenCycle) // even cycles are puts, odd cycles are gets.
+                if (APU_PutCycle) // even cycles are puts, odd cycles are gets.
                 {
                     // Put cycle (write)
                     if (DoDMCDMA && DoOAMDMA) // if we're running both a DMC and OAM DMA.
@@ -3356,7 +3361,6 @@ namespace TriCNES
                 // cycle 0. fetch opcode:
                 addressBus = programCounter;
                 opCode = Fetch(addressBus); // Fetch the value at the program counter. This is the opcode.
-
 
                 if (!SuppressInterrupt) // If we are not suppressing an interrupt, check if any interrupts are occuring.
                 {
@@ -5475,8 +5479,7 @@ namespace TriCNES
                         Op_ROR_A();
                         flag_Zero = A == 0;
                         flag_Carry = ((A & 0x40) >> 6) == 1;
-                        flag_Overflow = ((A & 0x20) >> 5) == 1;
-                        if (flag_Carry) { flag_Overflow = !flag_Overflow; }
+                        flag_Overflow = (((A & 0x20) >> 5) ^ ((A & 0x40) >> 6)) == 1;
                         flag_Negative = A >= 0x80;
                         operationComplete = true;
                         break;
@@ -6558,7 +6561,7 @@ namespace TriCNES
                     case 0xAB: //LXA ***
                         PollInterrupts();
                         GetImmediate();
-                        A = (byte)((A | 0xEE) & dl); // 0xEE is also known as "MAGIC", and can supposedly be different depending on the CPU's temperature.
+                        A = (byte)((A | 0xFF) & dl); // 0xEE is also known as "MAGIC", and can supposedly be different depending on the CPU's temperature.
                         X = A;  // this instruction is basically XAA but using LAX behavior, so X is also affected..
                         flag_Negative = X >= 0x80;
                         flag_Zero = X == 0x00;
@@ -7094,10 +7097,9 @@ namespace TriCNES
                         PollInterrupts();
                         GetImmediate();
                         X = (byte)(X & A);
-                        int alu_int = X - dl;
+                        flag_Carry = X >= dl;
                         X -= dl;
                         flag_Zero = X == 0;
-                        flag_Carry = alu_int >= 0;
                         flag_Negative = (X >= 0x80);
 
                         operationComplete = true;
@@ -7685,6 +7687,10 @@ namespace TriCNES
                             case 1:
                             case 2:
                                 GetAddressAbsolute();
+                                if(addressBus == 0x4014)
+                                {
+
+                                }
                                 break;
                             case 3: // read from address
                                 dl = Fetch(addressBus);
@@ -8173,7 +8179,7 @@ namespace TriCNES
                         if (PPU_Scanline < 241 || PPU_Scanline == 261)
                         {
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = true; // used in the next cycle of sprite evaluation
-                            if ((PPU_ScanCycle & 7) < 2 && PPU_ScanCycle <= 250)
+                            if ((PPU_Dot & 7) < 2 && PPU_Dot <= 250)
                             {
                                 // Palette corruption only occurs if rendering was disabled during the first 2 dots of a nametable fetch
                                 if ((PPU_ReadWriteAddress & 0x3FFF) >= 0x3C00) // palette corruption only appears to occur when disabling rendering if the VRAM address is currently greater than 3C00
@@ -8549,7 +8555,7 @@ namespace TriCNES
                             PPUAddrLatch = false;
                             PPUStatus_VBlank = false;
                             PPUStatus_VBlank_Delayed = false;
-                            if (PPU_ScanCycle < 3) // If $2002 is written to within 3 cycles of PPU_PendingNMI
+                            if (PPU_Dot < 3) // If $2002 is written to within 3 cycles of PPU_PendingNMI
                             {
                                 PPU_PendingNMI = false;
                             }
@@ -8975,15 +8981,15 @@ namespace TriCNES
         {
             if((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline < 240)
             {
-                if (PPU_ScanCycle >0 && PPU_ScanCycle <= 64)
+                if (PPU_Dot >0 && PPU_Dot <= 64)
                 {
                     return 0xFF;
                 }
-                else if (PPU_ScanCycle <= 256)
+                else if (PPU_Dot <= 256)
                 {
                     return OAM[PPUOAMAddress];
                 }
-                else if (PPU_ScanCycle <= 320)
+                else if (PPU_Dot <= 320)
                 {
                     return 0xFF;
                 }
@@ -9083,11 +9089,7 @@ namespace TriCNES
                         DoOAMDMA = true;
                         FirstCycleOfOAMDMA = true;
                         DMAAddress = 0; // the starting address for the OAM DMC is always page aligned.
-                        DMAPage = Input;
-                        if (APU_EvenCycle)
-                        {
-                            OAMDMA_Halt = true;
-                        }
+                        DMAPage = Input;                        
                         break;
                     case 0x4015:    //DMC DMA (and other audio channels)
 
@@ -9097,7 +9099,7 @@ namespace TriCNES
                         APU_Status_Pulse2 = (Input & 0x02) != 0;
                         APU_Status_Pulse1 = (Input & 0x01) != 0;
 
-                        APU_DelayedDMC4015 = (byte)(APU_EvenCycle ? 3 : 4); // Enable in 1 APU cycles, or 1.5 APU cycles. (it will be decremented later this cycle, so it's really like 2 : 3.
+                        APU_DelayedDMC4015 = (byte)(APU_PutCycle ? 3 : 4); // Enable in 1 APU cycles, or 1.5 APU cycles. (it will be decremented later this cycle, so it's really like 2 : 3.
 
                         if (APU_Status_DelayedDMC && APU_DMC_BytesRemaining == 0)
                         {
@@ -9118,14 +9120,14 @@ namespace TriCNES
                         IRQ_LevelDetector = false;
 
                         // Explicit abort stuff.
-                        if (!APU_Status_DelayedDMC && ((APU_ChannelTimer_DMC == 2 && !APU_EvenCycle) || (APU_ChannelTimer_DMC == APU_DMC_Rate && APU_EvenCycle))) // this will be the APU cycle that fires a DMC DMA
+                        if (!APU_Status_DelayedDMC && ((APU_ChannelTimer_DMC == 2 && !APU_PutCycle) || (APU_ChannelTimer_DMC == APU_DMC_Rate && APU_PutCycle))) // this will be the APU cycle that fires a DMC DMA
                         {
-                            APU_DelayedDMC4015 = (byte)(APU_EvenCycle ? 5 : 6); // Disable in 2.5 APU cycles, or 3 APU cycles.
+                            APU_DelayedDMC4015 = (byte)(APU_PutCycle ? 5 : 6); // Disable in 2.5 APU cycles, or 3 APU cycles.
                             // basically, if the DMA has already begun, don't abort it for *this* edge case.
                         }
 
                         // Implicit abort stuff.
-                        if (APU_Status_DelayedDMC && ((APU_ChannelTimer_DMC == 10 && !APU_EvenCycle) || (APU_ChannelTimer_DMC == 8 && APU_EvenCycle)))
+                        if (APU_Status_DelayedDMC && ((APU_ChannelTimer_DMC == 10 && !APU_PutCycle) || (APU_ChannelTimer_DMC == 8 && APU_PutCycle)))
                         {
                             // okay, so the series of events is as follows:
                             // the Load DMA will occur
@@ -9163,7 +9165,7 @@ namespace TriCNES
                     APU_Status_FrameInterrupt = false;
                     IRQ_LevelDetector = false;
                 }
-                APU_FrameCounterReset = (byte)((APU_EvenCycle ? 3 : 4));
+                APU_FrameCounterReset = (byte)((APU_PutCycle ? 3 : 4));
             }
             else if (Address >= 0x6000)
             {
@@ -9959,8 +9961,7 @@ namespace TriCNES
             string Flags = "";
             Flags += flag_Negative ? "N" : "n";
             Flags += flag_Overflow ? "V" : "v";
-            Flags += flag_T ? "T" : "t";
-            Flags += flag_B ? "B" : "b";
+            Flags += "--";
             Flags += flag_Decimal ? "D" : "d";
             Flags += flag_Interrupt ? "I" : "i";
             Flags += flag_Zero ? "Z" : "z";
@@ -9979,14 +9980,19 @@ namespace TriCNES
                 if (DoReset)
                 {
                     instruction = "RESET";
+                    bytes = "--\t";
                 }
                 else if (DoNMI)
                 {
                     instruction = "NMI";
+                    bytes = "--\t";
+
                 }
                 else if (DoIRQ)
                 {
                     instruction = "IRQ";
+                    bytes = "--\t";
+
                 }
             }
 
@@ -10040,23 +10046,23 @@ namespace TriCNES
             }
 
             int PPUCycle = 0;
-            String PPUPos = "(" + PPU_Scanline + ", " + PPU_ScanCycle + ")";
+            String PPUPos = "(" + PPU_Scanline + ", " + PPU_Dot + ")";
 
  
 
             if (totalCycles < 27395)
             {
-                PPUCycle = PPU_Scanline * 341 + PPU_ScanCycle;
+                PPUCycle = PPU_Scanline * 341 + PPU_Dot;
             }
             else
             {
                 if (PPU_Scanline >= 241)
                 {
-                    PPUCycle = (PPU_Scanline - 241) * 341 + PPU_ScanCycle;
+                    PPUCycle = (PPU_Scanline - 241) * 341 + PPU_Dot;
                 }
                 else
                 {
-                    PPUCycle = (PPU_Scanline + 21) * 341 + PPU_ScanCycle;
+                    PPUCycle = (PPU_Scanline + 21) * 341 + PPU_Dot;
                 }
             }
 
@@ -10067,28 +10073,30 @@ namespace TriCNES
 
             //PPUCycle++;
 
-            string LogLine = "$" + addr + "\t" + bytes + "\t" + instruction + "\tA:" + sA + "\tX:" + sX + "\tY:" + sY + "\tSP:" + sS + "\t" + Flags + "\tCycle: " + totalCycles + "\tPPU_cycle: " + PPUCycle + " " + PPUPos;
+            string LogLine = "$" + addr + "\t" + bytes + "\t" + instruction + "\tA:" + sA + "\tX:" + sX + "\tY:" + sY + "\tSP:" + sS + "\t" + Flags + "\tCycle: " + totalCycles;
 
-            bool LogExtra = true;
+            bool LogExtra = false;
             if (LogExtra)
             {
-                string TempLine_APU_Full = LogLine + "\t" + "DMC :: S_Addr: $" + APU_DMC_SampleAddress.ToString("X4") + "\t S_Length:" + APU_DMC_SampleLength.ToString() + "\t AddrCounter: $" + APU_DMC_AddressCounter.ToString("X4") + "\t BytesLeft:" + APU_DMC_BytesRemaining.ToString() + "\t Shifter:" + APU_DMC_Shifter.ToString() + ":" + APU_DMC_ShifterBitsRemaining.ToString() + "\tDMC_Timer:" + (APU_EvenCycle ? APU_ChannelTimer_DMC : (APU_ChannelTimer_DMC - 1)).ToString();
+                string TempLine_APU_Full = LogLine + "\t" + "DMC :: S_Addr: $" + APU_DMC_SampleAddress.ToString("X4") + "\t S_Length:" + APU_DMC_SampleLength.ToString() + "\t AddrCounter: $" + APU_DMC_AddressCounter.ToString("X4") + "\t BytesLeft:" + APU_DMC_BytesRemaining.ToString() + "\t Shifter:" + APU_DMC_Shifter.ToString() + ":" + APU_DMC_ShifterBitsRemaining.ToString() + "\tDMC_Timer:" + (APU_PutCycle ? APU_ChannelTimer_DMC : (APU_ChannelTimer_DMC - 1)).ToString();
 
 
-                string TempLine_APUFrameCounter_IRQs = LogLine + " \t$4015: " + Observe(0x4015).ToString("X2") + "\t APU_FrameCounter: " + APU_Framecounter.ToString() + " \tEvenCycle = : " + APU_EvenCycle + " \tDoIRQ = " + DoIRQ;
+                string TempLine_APUFrameCounter_IRQs = LogLine + " \t$4015: " + Observe(0x4015).ToString("X2") + "\t APU_FrameCounter: " + APU_Framecounter.ToString() + " \tEvenCycle = : " + APU_PutCycle + " \tDoIRQ = " + DoIRQ;
 
 
                 string TempLine_PPU = LogLine + "\t$2000:" + Observe(0x2000).ToString("X2") + "\t$2001:" + Observe(0x2001).ToString("X2") + "\t$2002:" + Observe(0x2002).ToString("X2") + "\tR/W Addr:" + PPU_ReadWriteAddress.ToString("X4") + "\tPPUAddrLatch:" + PPUAddrLatch + "\tPPU AddressBus: " + PPU_AddressBus.ToString("X4");
+                string TempLine_PPU2 = LogLine + "\tVRAMAddress:" + PPU_ReadWriteAddress.ToString("X4") + "\tPPUReadBuffer:" + PPU_VRAMAddressBuffer.ToString("X2");
 
                 string TempLine_MMC3IRQ = LogLine + "\tIRQTimer:" + Cart.Mapper_4_IRQCounter + "\tIRQLatch: " + Cart.Mapper_4_IRQLatch + "\tIRQEnabled: " + Cart.Mapper_4_EnableIRQ + "\tDoIRQ: " + DoIRQ + "\tPPU_ADDR_Prev: " + PPU_ADDR_Prev.ToString("X4");
 
 
-                DebugLog.AppendLine(TempLine_APUFrameCounter_IRQs);
+                DebugLog.AppendLine(TempLine_PPU2);
             }
             else
             {
                 DebugLog.AppendLine(LogLine);
             }
+
 
         }
     }
