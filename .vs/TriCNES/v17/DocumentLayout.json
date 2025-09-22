@@ -3,12 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|c:\\users\\100th_coin\\documents\\visualstudioprojects\\tricnes\\emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:tricnesgui.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|c:\\users\\100th_coin\\documents\\visualstudioprojects\\tricnes\\emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|solutionrelative:emulator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{B53C8A3B-8F4F-4837-99A0-47D7D9FE757F}|TriCNES.csproj|C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -54,7 +54,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 9,
           "Children": [
             {
               "$type": "Document",
@@ -75,7 +75,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "Emulator.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\Emulator.cs",
               "RelativeDocumentMoniker": "Emulator.cs",
@@ -154,19 +154,21 @@
               "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TriCNESGUI.cs [Design]",
               "RelativeToolTip": "TriCNESGUI.cs [Design]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-06-23T19:57:33.698Z"
+              "WhenOpened": "2025-06-23T19:57:33.698Z",
+              "EditorCaption": " [Design]"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "TriCNESGUI.cs",
               "DocumentMoniker": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TriCNESGUI.cs",
               "RelativeDocumentMoniker": "TriCNESGUI.cs",
               "ToolTip": "C:\\Users\\100th_Coin\\Documents\\VisualStudioProjects\\TriCNES\\TriCNESGUI.cs",
               "RelativeToolTip": "TriCNESGUI.cs",
-              "ViewState": "AgIAAHABAAAAAAAAAAASwHsBAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAB4AAAAAAAAAAAAqwEEAAAA2AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-11-26T17:43:37.777Z"
+              "WhenOpened": "2024-11-26T17:43:37.777Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",

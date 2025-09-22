@@ -3304,19 +3304,27 @@ namespace TriCNES
                             {
                                 DMCDMA_Halted();
                             }
-                            else { DMCDMA_Put(); }
+                            else 
+                            { 
+                                DMCDMA_Put(); 
+                            }
                         }
                         else // only running OAM DMA
                         {
                             if (OAMDMA_Halt)
-                            { OAMDMA_Halted(); }
-                            else { OAMDMA_Put(); }
+                            { 
+                                OAMDMA_Halted();
+                            }
+                            else 
+                            { 
+                                OAMDMA_Put(); 
+                            }
                         }
                     }
                 }
                 else
                 {
-                    // Get cycle (write)
+                    // Get cycle (read)
                     if (DoDMCDMA && DoOAMDMA) // if we're running both a DMC and OAM DMA.
                     {
                         if (DMCDMA_Halt && OAMDMA_Halt) // both halt cycles
@@ -3341,17 +3349,29 @@ namespace TriCNES
                         // only performing a single DMA
                         if (DoDMCDMA) // only running DMC DMA
                         {
-                            if (DMCDMA_Halt) { DMCDMA_Halted(); }
-                            else { DMCDMA_Get(); }
+                            if (DMCDMA_Halt) 
+                            { 
+                                DMCDMA_Halted(); 
+                            }
+                            else 
+                            { 
+                                DMCDMA_Get(); 
+                            }
                         }
                         else // only running OAM DMA
                         {
-                            if (OAMDMA_Halt) { OAMDMA_Halted(); }
-                            else { OAMDMA_Get(); }
+                            if (OAMDMA_Halt) 
+                            { 
+                                OAMDMA_Halted(); 
+                            }
+                            else 
+                            { 
+                                OAMDMA_Get();
+                            }
                         }
                     }
 
-                    DMCDMA_Halt = false; // both halt cycles happen at the same time
+                    DMCDMA_Halt = false; // both halt cycles get cleared after a get cycle.
                     OAMDMA_Halt = false;
                 }
 
