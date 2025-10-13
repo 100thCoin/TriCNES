@@ -1080,12 +1080,15 @@ namespace TriCNES
         byte[] PPU_SpriteShiftRegisterH = new byte[8]; // 8 bit shift register for a sprite's high bit plane. Secondary OAM can have up to 8 object in it.
 
         byte[] PPU_SpriteAttribute = new byte[8]; // Secondary OAM attribute values. Secondary OAM can ahve up to 8 objects in it.
-        byte[] PPU_SpritePattern = new byte[8]; // Secondary OAM pattern values. Secondary OAM can ahve up to 8 objects in it.
-        byte[] PPU_SpriteXposition = new byte[8]; // Secondary OAM x positions. Secondary OAM can ahve up to 8 objects in it.
-        byte[] PPU_SpriteYposition = new byte[8]; // Secondary OAM y positions. Secondary OAM can ahve up to 8 objects in it.
+        byte[] PPU_SpritePattern = new byte[8]; // Secondary OAM pattern values. Secondary OAM can have up to 8 objects in it.
+        byte[] PPU_SpriteXposition = new byte[8]; // Secondary OAM x positions. Secondary OAM can have up to 8 objects in it.
+        byte[] PPU_SpriteYposition = new byte[8]; // Secondary OAM y positions. Secondary OAM can have up to 8 objects in it.
 
-        bool PPU_ScanlineContainsSpriteZero;    // If this upcoming scanline contains sprite zero
-        bool PPU_PreviousScanlineContainsSpriteZero; // if the sprite evaluation for this current scanline contained sprite zero. Used for Sprite Zero Hit detection.
+        byte[] PPU_SpriteShifterCounter = new byte[8]; // This counter tracks how long until the objects are drawn.
+
+
+        bool PPU_NextScanlineContainsSpriteZero;    // If this upcoming scanline contains sprite zero
+        bool PPU_CurrentScanlineContainsSpriteZero; // if the sprite evaluation for this current scanline contained sprite zero. Used for Sprite Zero Hit detection.
 
         public byte PPU_SpritePatternL; // Temporary value used in sprite evaluation.
         public byte PPU_SpritePatternH; // Temporary value used in sprite evaluation.
@@ -1132,6 +1135,7 @@ namespace TriCNES
         public bool IRQLine; // Set during phi2 to true if the IRQ level detector is low.
 
         bool CopyV = false; // set by writes to $2006. If it occurs on the same dot the scroll values are naturally incremented, some bugs occur.
+        bool SkippedPreRenderDot341 = false;
 
         void _EmulatePPU()
         {
@@ -1384,7 +1388,6 @@ namespace TriCNES
                 PPU_Dot = 0;  // reset the dot back to 0
                 PPU_Scanline++;     // and increment the scanline
                 // Sprite zero hits rely on the previous scanline's sprite evaluation.
-                PPU_PreviousScanlineContainsSpriteZero = PPU_ScanlineContainsSpriteZero;
 
                 if (PPU_Scanline > 261) // There are 262 scanlines in a frame.
                 {
@@ -1470,7 +1473,12 @@ namespace TriCNES
                     // this cycle is technically (0,0), but this still makes the Nametable fetch during the last cycle of the pre-render line
                     PPU_Scanline = 0;
                     PPU_Dot = 0;
+                    SkippedPreRenderDot341 = true;
                 }
+            }
+            if(PPU_OddFrame && PPU_Scanline == 0 && PPU_Dot == 2)
+            {
+                SkippedPreRenderDot341 = false; // This varialbe is used for some esoteric business on dot 1 of scanline 0.
             }
             // Okay, now that we're updated all those flags, let's render stuff to the screen!
 
@@ -1553,7 +1561,7 @@ namespace TriCNES
                 PrevPrevDotColor = PrevDotColor;
                 PrevDotColor = DotColor; // These varaibles here just record the color, and swap them through these varaibles so it can be used 3 cycles after it was chosen.
 
-                if ((PPU_Dot > 0 && PPU_Dot <= 256) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
+                if ((PPU_Dot > 0 && PPU_Dot <= 257) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
                 {
                     if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
                     {
@@ -1565,6 +1573,9 @@ namespace TriCNES
                         PPU_Render_CalculatePixel(); // this determines the color of the pixel being drawn.
                     }
 
+                    
+                    UpdateSpriteShiftRegisters(); // update shift registers for the sprites.
+                    
                 }
                 if (PPU_Dot > 3 && PPU_Dot <= 259 && PPU_Scanline < 241) // the process of drawing a dot to the screen actually has a 2 ppu cycle delay, which the emphasis bits happen after
                 {
@@ -1850,6 +1861,11 @@ namespace TriCNES
         public byte PPU_SpriteEvaluationTemp; // is this just the ppubus?
         void PPU_Render_SpriteEvaluation()
         {
+            bool SpriteEval_ReadOnly = false;
+            if(PPU_Scanline == 261)
+            {
+                SpriteEval_ReadOnly = true;
+            }
             if ((PPU_Mask_ShowBackground_Instant || PPU_Mask_ShowSprites_Instant))
             {
                 if (PPU_PendingOAMCorruption) // OAM corruption occurs on the visible dot after rendering was enabled. It also can happen on the pre-render line.
@@ -1863,35 +1879,30 @@ namespace TriCNES
                 }
             }
 
-            if ((PPU_Dot >= 0 && PPU_Dot <= 64) && PPU_Scanline < 240) // Dots 1 through 64, not on the pre-render line. (and also dot 0 for OAM corruption purposes)
+            if ((PPU_Dot >= 0 && PPU_Dot <= 64)) // Dots 1 through 64, not on the pre-render line. (and also dot 0 for OAM corruption purposes)
             {
+                
                 // this step is clearing secondary OAM, and writing FF to each byte in the array.
                 if ((PPU_Dot & 1) == 1)
                 { //odd cycles
-                    PPU_SpriteEvaluationTemp = ReadOAM(); // During these cycles, OAM is hard-coded to read $FF.
-                    if (PPU_Dot == 1)
+                    if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                     {
-                        SecondaryOAMAddress = 0; // if this is dot 1, reset the secondary OAM address
-                        SecondaryOAMFull = false;// also reset the flag that checks of secondary OAM is full.
-                        // in preperation for the next section, let's clear these flags too
-                        SpriteEvaluationTick = 0;
-                        OAMAddressOverflowedDuringSpriteEvaluation = false;
-                        PPU_ScanlineContainsSpriteZero = false;
-                    }
-                    if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
-                    {
-                        PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
-                        PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
-                        PPU_PendingOAMCorruption = true;
-                        PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
-                    }
-                }
-                else
-                { //even cycles
-                    if (PPU_Dot > 0)
-                    {
-                        SecondaryOAM[SecondaryOAMAddress] = PPU_SpriteEvaluationTemp; // store FF in secondary OAM
-
+                        if (SpriteEval_ReadOnly)
+                        {
+                            PPU_SpriteEvaluationTemp = SecondaryOAM[SecondaryOAMAddress];
+                        }
+                        else
+                        {
+                            PPU_SpriteEvaluationTemp = ReadOAM(); // During these cycles, OAM is hard-coded to read $FF.
+                        }
+                        if (PPU_Dot == 1)
+                        {
+                            SecondaryOAMAddress = 0; // if this is dot 1, reset the secondary OAM address
+                            SecondaryOAMFull = false;// also reset the flag that checks of secondary OAM is full.
+                                                     // in preperation for the next section, let's clear these flags too
+                            SpriteEvaluationTick = 0;
+                            OAMAddressOverflowedDuringSpriteEvaluation = false;
+                        }
                         if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
                         {
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
@@ -1899,34 +1910,58 @@ namespace TriCNES
                             PPU_PendingOAMCorruption = true;
                             PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
                         }
-
-                        SecondaryOAMAddress++;  // increment this value so on the next even cycle, we write to the next SecondaryOAM address.
-                        SecondaryOAMAddress &= 0x1F;  // keep the secondary OAM address in-bounds
-
-                        if(PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && PPU_Dot == 64)
+                    }
+                }
+                else
+                { //even cycles
+                    if (PPU_Dot > 0)
+                    {
+                        if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                         {
-                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
-                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
-                            PPU_PendingOAMCorruption = true;
+                            if (!SpriteEval_ReadOnly)
+                            {
+                                SecondaryOAM[SecondaryOAMAddress] = PPU_SpriteEvaluationTemp; // store FF in secondary OAM
+                            }
+                            if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
+                            {
+                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
+                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
+                                PPU_PendingOAMCorruption = true;
+                                PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
+                            }
+
+                            SecondaryOAMAddress++;  // increment this value so on the next even cycle, we write to the next SecondaryOAM address.
+                            SecondaryOAMAddress &= 0x1F;  // keep the secondary OAM address in-bounds
+
+                            if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && PPU_Dot == 64)
+                            {
+                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
+                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
+                                PPU_PendingOAMCorruption = true;
+                            }
+                        }
+                        else
+                        {
+                            if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
+                            {
+                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
+                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
+                                PPU_PendingOAMCorruption = true;
+                                PPU_OAMCorruptionIndex = 1; // this value will be used when rendering is re-enabled and the corruption occurs
+                            }
                         }
                     }
                     else
                     {
-                        if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
-                        {
-                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
-                            PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
-                            PPU_PendingOAMCorruption = true;
-                            PPU_OAMCorruptionIndex = 1; // this value will be used when rendering is re-enabled and the corruption occurs
-                        }
-                    }
+                        SecondaryOAMAddress++;  // increment this value so on the next even cycle, we write to the next SecondaryOAM address.
+                        SecondaryOAMAddress &= 0x1F;  // keep the secondary OAM address in-bounds
+                    }                    
                 }
             }
-            else if ((PPU_Dot >= 65 && PPU_Dot <= 256) && PPU_Scanline < 240) // Dots 65 through 256, not on the pre-render line
+            else if ((PPU_Dot >= 65 && PPU_Dot <= 256)) // Dots 65 through 256, not on the pre-render line
             {
                 if (PPU_Mask_ShowBackground_Instant || PPU_Mask_ShowSprites_Instant || PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant) // if rendering is enabled, or was *just* disabled mid evaluation
                 {
-
                     if ((PPU_Dot & 1) == 1)
                     { //odd cycles
                         byte PrevSpriteEvalTemp = PPU_SpriteEvaluationTemp;
@@ -1941,8 +1976,10 @@ namespace TriCNES
                         {
                             PPU_OAMEvaluationCorruptionOddCycle = false;
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
-
-                            PPUOAMAddress++;
+                            if (!SpriteEval_ReadOnly)
+                            {
+                                PPUOAMAddress++;
+                            }
                             OamCorruptedOnOddCycle = true;
   
                         }
@@ -1953,7 +1990,7 @@ namespace TriCNES
                         if (!OAMAddressOverflowedDuringSpriteEvaluation)
                         {
                             byte PreIncVal = PPUOAMAddress; // for checking if PPUOAMAddress overflows
-                            if (!SecondaryOAMFull) // If secondary OAM is not yet full,
+                            if (!SecondaryOAMFull && !SpriteEval_ReadOnly) // If secondary OAM is not yet full,
                             {
                                 SecondaryOAM[SecondaryOAMAddress] = PPU_SpriteEvaluationTemp; // store this value at the secondary oam address.
                             }
@@ -1961,7 +1998,7 @@ namespace TriCNES
                             if (SpriteEvaluationTick == 0) // tick 0: check if this object's y position is in range for this scanline
                             {
                                 PPU_OAMEvaluationObjectInXRange = false;
-                                if (PPU_Scanline - PPU_SpriteEvaluationTemp >= 0 && PPU_Scanline - PPU_SpriteEvaluationTemp < (PPU_Spritex16 ? 16 : 8))
+                                if (!SpriteEval_ReadOnly && (PPU_Scanline & 0xFF) - PPU_SpriteEvaluationTemp >= 0 && (PPU_Scanline & 0xFF) - PPU_SpriteEvaluationTemp < (PPU_Spritex16 ? 16 : 8))
                                 {
                                     PPU_OAMEvaluationObjectInRange = true;
                                     // if this sprite is within range.
@@ -1969,9 +2006,12 @@ namespace TriCNES
                                     {
                                         if (!OamCorruptedOnOddCycle)
                                         {
-                                            PPUOAMAddress++; // +1
+                                            if (!SpriteEval_ReadOnly)
+                                            {
+                                                PPUOAMAddress++; // +1
+                                            }
+                                            SecondaryOAMAddress++; // increment this for the next write to secondary OAM
                                         }
-                                        SecondaryOAMAddress++; // increment this for the next write to secondary OAM
                                         if (!SecondaryOAMFull) // if secondary OAM is not full
                                         {
                                             SecondaryOAMAddress &= 0x1F; // keep the secondary OAM address in-bounds
@@ -1984,19 +2024,26 @@ namespace TriCNES
                                         // typically, the object processed on dot 66 is OAM[0], though it's possible using precisely timed writes to $2003 to have PPUOAMAddress start processing here from a different value.
                                         if (PPU_Dot == 66)
                                         {
-                                            PPU_ScanlineContainsSpriteZero = true; // this value will be transferred to PPU_PreviousScanlineContainsSpriteZero at the end of the scanline, and that variable is used in sp 0 hit detection.
+                                            PPU_NextScanlineContainsSpriteZero = true; // this value will be transferred to PPU_PreviousScanlineContainsSpriteZero at the end of the scanline, and that variable is used in sp 0 hit detection.
                                         }
                                     }
                                     else // if secondary OAM is full, yet another object is on this scanline
                                     {
                                         PPUStatus_SpriteOverflow = true; // set the sprite overflow flag
                                     }
-                                    SpriteEvaluationTick++; // increment the tick for next even ppu cycle.
+                                    if (!SpriteEval_ReadOnly)
+                                    {
+                                        SpriteEvaluationTick++; // increment the tick for next even ppu cycle.
+                                    }
                                 }
                                 else
                                 {
+                                    if (PPU_Dot == 66)
+                                    {
+                                        PPU_NextScanlineContainsSpriteZero = false; // this value will be transferred to PPU_PreviousScanlineContainsSpriteZero at the end of the scanline, and that variable is used in sp 0 hit detection.
+                                    }
                                     PPU_OAMEvaluationObjectInRange = false;
-                                    if (!OamCorruptedOnOddCycle)
+                                    if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
                                     {
                                         if (SecondaryOAMFull)
                                         {
@@ -2031,7 +2078,7 @@ namespace TriCNES
                                         PPU_OAMEvaluationObjectInXRange = true;
                                         if (!SecondaryOAMFull)
                                         {
-                                            if (!OamCorruptedOnOddCycle)
+                                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
                                             {
                                                 PPUOAMAddress++; // +1
                                             }
@@ -2042,7 +2089,7 @@ namespace TriCNES
                                         PPU_OAMEvaluationObjectInXRange = false;
                                         if (!SecondaryOAMFull)
                                         {
-                                            if (!OamCorruptedOnOddCycle)
+                                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
                                             {
                                                 PPUOAMAddress += 1; // +1 (In theory, this should be +4, though my experiments only reflect my consoles behavior if this is +1?)
                                                 PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
@@ -2052,14 +2099,14 @@ namespace TriCNES
                                 }
                                 else // ticks 1 and 2 don't make any checks. Only increment the OAM address.
                                 {
-                                    if (!OamCorruptedOnOddCycle)
+                                    if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
                                     {
                                         PPUOAMAddress++; // +1
                                     }
                                 }
                                 SpriteEvaluationTick++; // increment the tick for next even ppu cycle.
                                 SpriteEvaluationTick &= 3; // and reset the tick to 0 if it reaches 4.
-                                if (!SecondaryOAMFull) // if secondary OAM is not full
+                                if (!SecondaryOAMFull && !SpriteEval_ReadOnly) // if secondary OAM is not full
                                 {
                                     SecondaryOAMAddress++; // increment the secondary OAM address.
                                     SecondaryOAMAddress &= 0x1F; // keep the secondary OAM address in-bounds
@@ -2082,7 +2129,7 @@ namespace TriCNES
                             // boo womp.
 
                             // also update the PPUOAMAddress.
-                            if (!OamCorruptedOnOddCycle)
+                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
                             {
                                 PPUOAMAddress += 4; // +4
                                 PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
@@ -2094,8 +2141,7 @@ namespace TriCNES
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
                             PPU_PendingOAMCorruption = true;
 
-                            
-                            if ((SecondaryOAMAddress & 3) != 0 && !OAMAddressOverflowedDuringSpriteEvaluation)
+                            if ((SecondaryOAMAddress & 3) != 0 && !OAMAddressOverflowedDuringSpriteEvaluation && !SpriteEval_ReadOnly)
                             {
                                 SecondaryOAMAddress &= 0xFC;
                                 SecondaryOAMAddress += 4;
@@ -2121,6 +2167,8 @@ namespace TriCNES
             }
             else if (PPU_Dot >= 257 && PPU_Dot <= 320) // this also happens on the pre-render line.
             {
+                PPU_CurrentScanlineContainsSpriteZero = PPU_NextScanlineContainsSpriteZero;
+
                 if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                 {
                     PPUOAMAddress = 0; // this is reset during every one of these cycles, 257 through 320
@@ -2128,14 +2176,6 @@ namespace TriCNES
                 if (PPU_Dot == 257)
                 {
                     // reset these flags for this section.
-                    if (SecondaryOAMFull)
-                    {
-                        SecondaryOAMSize = 32;
-                    }
-                    else
-                    {
-                        SecondaryOAMSize = SecondaryOAMAddress;
-                    }
                     SecondaryOAMAddress = 0;
                     SpriteEvaluationTick = 0;
                 }
@@ -2215,19 +2255,18 @@ namespace TriCNES
                             PPU_SpriteXposition[SecondaryOAMAddress / 4] = SecondaryOAM[SecondaryOAMAddress];
                             // but also: set up the bit plane shift register.
                             PPU_SpritePatternL = FetchPPU(PPU_AddressBus);
-                            if (PPU_Scanline == 261)
-                            {
-                                PPU_SpritePatternL = 0; // clear this if this is the pre-render line
-                            }
                             if (((PPU_SpriteAttribute[SecondaryOAMAddress / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
                             {
                                 PPU_SpritePatternL = Flip(PPU_SpritePatternL);
                             }
                             PPU_SpriteShiftRegisterL[SecondaryOAMAddress / 4] = PPU_SpritePatternL;
                         }
-                        else // if rendering is disabled
+
+
+                        // in-range check. (The pre-render line ends up checking scanline 5 due to the `& 0xFF`.
+                        if(!((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondaryOAMAddress / 4] >= 0 && (PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondaryOAMAddress / 4] < (PPU_Spritex16 ? 16 : 8)))
                         {
-                            PPU_SpriteShiftRegisterL[SecondaryOAMAddress / 4] = 0; // clear the value in this shift register.
+                            PPU_SpriteShiftRegisterL[SecondaryOAMAddress / 4] = 0; // clear the value in this shift register if this object isn't in range.
                         }
 
                         break;
@@ -2243,25 +2282,27 @@ namespace TriCNES
                         break;
 
                     case 7: // X position (again)  dot 264, (+8), (+16) ...
+                        if (PPU_Scanline > 256)
+                        {
+
+                        }
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                         {
                             // set this object's X position in the array... again.
                             PPU_SpriteXposition[SecondaryOAMAddress / 4] = SecondaryOAM[SecondaryOAMAddress]; // read X pos again
                             // but also: set up the second bit plane
                             PPU_SpritePatternH = FetchPPU(PPU_AddressBus);
-                            if (PPU_Scanline == 261)
-                            {
-                                PPU_SpritePatternH = 0; // clear this if this is the pre-render line
-                            }
                             if (((PPU_SpriteAttribute[SecondaryOAMAddress / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
                             {
                                 PPU_SpritePatternH = Flip(PPU_SpritePatternH);
                             }
                             PPU_SpriteShiftRegisterH[SecondaryOAMAddress / 4] = PPU_SpritePatternH;
                         }
-                        else // if rendering is disabled
+
+                        // in-range check. (The pre-render line ends up checking scanline 5 due to the `& 0xFF`.
+                        if (!((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondaryOAMAddress / 4] >= 0 && (PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondaryOAMAddress / 4] < (PPU_Spritex16 ? 16 : 8)))
                         {
-                            PPU_SpriteShiftRegisterH[SecondaryOAMAddress / 4] = 0; // clear the value in this shift register.
+                            PPU_SpriteShiftRegisterH[SecondaryOAMAddress / 4] = 0; // clear the value in this shift register if this object isn't in range.
                         }
 
                         SecondaryOAMAddress++; // and increment the Secondary OAM address for next cycle
@@ -2292,6 +2333,14 @@ namespace TriCNES
                     PPU_PendingOAMCorruption = true;
                     PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
                 }
+
+                if(PPU_Dot == 339)
+                {
+                    for (int i = 0; i < 8; i++)
+                    {
+                        PPU_SpriteShifterCounter[i] = PPU_SpriteXposition[i];
+                    }
+                }
             }
             // and that's all for sprite evaluation!
         }
@@ -2308,11 +2357,11 @@ namespace TriCNES
                 // if the attributes are set to flip Y, it's 7 - the number of scanlines from the top of the object.
                 if (((PPU_SpriteAttribute[SecondOAMSlot] >> 7) & 1) == 0) // Attributes are not set up to flip Y
                 {
-                    PPU_AddressBus = (ushort)((PPU_PatternSelect_Sprites ? 0x1000 : 0) + (PPU_SpritePattern[SecondOAMSlot] << 4) + (PPU_Scanline - PPU_SpriteYposition[SecondOAMSlot]));
+                    PPU_AddressBus = (ushort)((PPU_PatternSelect_Sprites ? 0x1000 : 0) + (PPU_SpritePattern[SecondOAMSlot] << 4) + ((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondOAMSlot]));
                 }
                 else  // Attributes are set up to flip Y
                 {
-                    PPU_AddressBus = (ushort)((PPU_PatternSelect_Sprites ? 0x1000 : 0) + (PPU_SpritePattern[SecondOAMSlot] << 4) + ((7 - (PPU_Scanline - PPU_SpriteYposition[SecondOAMSlot])) & 7));
+                    PPU_AddressBus = (ushort)((PPU_PatternSelect_Sprites ? 0x1000 : 0) + (PPU_SpritePattern[SecondOAMSlot] << 4) + ((7 - ((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondOAMSlot])) & 7));
                 }
             }
             else //8x16 sprites
@@ -2328,24 +2377,24 @@ namespace TriCNES
                 // if we're drawing the bottom half of the sprite, add 16.
                 if (((PPU_SpriteAttribute[SecondOAMSlot] >> 7) & 1) == 0) // Attributes are not set up to flip Y
                 {
-                    if (PPU_Scanline - PPU_SpriteYposition[SecondOAMSlot] < 8)
+                    if ((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondOAMSlot] < 8)
                     {
-                        PPU_AddressBus = (ushort)((((PPU_SpritePattern[SecondOAMSlot] & 1) == 1) ? 0x1000 : 0) | ((PPU_SpritePattern[SecondOAMSlot] & 0xFE) << 4) + (PPU_Scanline - PPU_SpriteYposition[SecondOAMSlot]));
+                        PPU_AddressBus = (ushort)((((PPU_SpritePattern[SecondOAMSlot] & 1) == 1) ? 0x1000 : 0) | ((PPU_SpritePattern[SecondOAMSlot] & 0xFE) << 4) + ((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondOAMSlot]));
                     }
                     else
                     {
-                        PPU_AddressBus = (ushort)((((PPU_SpritePattern[SecondOAMSlot] & 1) == 1) ? 0x1000 : 0) | (((PPU_SpritePattern[SecondOAMSlot] & 0xFE) << 4) + 16) + ((PPU_Scanline - PPU_SpriteYposition[SecondOAMSlot]) & 7));
+                        PPU_AddressBus = (ushort)((((PPU_SpritePattern[SecondOAMSlot] & 1) == 1) ? 0x1000 : 0) | (((PPU_SpritePattern[SecondOAMSlot] & 0xFE) << 4) + 16) + (((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondOAMSlot]) & 7));
                     }
                 }
                 else // Attributes are set up to flip Y
                 {
-                    if (PPU_Scanline - PPU_SpriteYposition[SecondOAMSlot] < 8)
+                    if ((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondOAMSlot] < 8)
                     {
-                        PPU_AddressBus = (ushort)((((PPU_SpritePattern[SecondOAMSlot] & 1) == 1) ? 0x1000 : 0) | (((PPU_SpritePattern[SecondOAMSlot] & 0xFE) << 4) + 16) - ((PPU_Scanline - PPU_SpriteYposition[SecondOAMSlot]) & 7) + 7);
+                        PPU_AddressBus = (ushort)((((PPU_SpritePattern[SecondOAMSlot] & 1) == 1) ? 0x1000 : 0) | (((PPU_SpritePattern[SecondOAMSlot] & 0xFE) << 4) + 16) - (((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondOAMSlot]) & 7) + 7);
                     }
                     else
                     {
-                        PPU_AddressBus = (ushort)((((PPU_SpritePattern[SecondOAMSlot] & 1) == 1) ? 0x1000 : 0) | (((PPU_SpritePattern[SecondOAMSlot] & 0xFE) << 4) + 7) - ((PPU_Scanline - PPU_SpriteYposition[SecondOAMSlot]) & 7));
+                        PPU_AddressBus = (ushort)((((PPU_SpritePattern[SecondOAMSlot] & 1) == 1) ? 0x1000 : 0) | (((PPU_SpritePattern[SecondOAMSlot] & 0xFE) << 4) + 7) - (((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondOAMSlot]) & 7));
                     }
                 }
             }
@@ -2389,10 +2438,18 @@ namespace TriCNES
                 if (PPU_Mask_ShowSprites && (PPU_Dot > 8 || PPU_Mask_8PxShowSprites))
                 {
                     int i = 0;
+                    if (PPU_Scanline == 0)
+                    {
+
+                    }
+                    if (PPU_Dot == 0x78)
+                    {
+
+                    }
                     // check all 8 objects in secondary OAM
                     while (i < 8)
                     {
-                        if (PPU_SpriteXposition[i] == 0 && i < (SecondaryOAMSize / 4)) // if the sprite X position == 0 (the X position is decremented each ppu cycle)
+                        if (PPU_SpriteShifterCounter[i] == 0 || SkippedPreRenderDot341) // if the shifter counter == 0 (the shifter counter is decremented each ppu cycle)
                         {
                             bool SpixelL = ((PPU_SpriteShiftRegisterL[i]) & 0x80) != 0; // take the bit from the shift register for the pattern low bit plane
                             bool SpixelH = ((PPU_SpriteShiftRegisterH[i]) & 0x80) != 0; // take the bit from the shift register for the pattern high bit plane
@@ -2419,7 +2476,7 @@ namespace TriCNES
                     }
 
                     // if we hit sprite zero and both rendering background and sprites are enabled...
-                    if (PPU_CanDetectSpriteZeroHit && i == 0 && PPU_PreviousScanlineContainsSpriteZero && PPU_Mask_ShowBackground && PPU_Mask_ShowSprites)
+                    if (PPU_CanDetectSpriteZeroHit && i == 0 && PPU_CurrentScanlineContainsSpriteZero && PPU_Mask_ShowBackground && PPU_Mask_ShowSprites)
                     {
                         if (Color != 0 && SpriteColor != 0) // if both the background and sprites are visible on this pixel
                         {
@@ -3000,29 +3057,33 @@ namespace TriCNES
                 PPU_PatternShiftRegisterH = (ushort)(PPU_PatternShiftRegisterH << 1); // shift 1 bit to the left.
                 PPU_AttributeShiftRegisterL = (ushort)(PPU_AttributeShiftRegisterL << 1); // shift 1 bit to the left.
                 PPU_AttributeShiftRegisterH = (ushort)(PPU_AttributeShiftRegisterH << 1); // shift 1 bit to the left.
-            }
-            if (PPU_Dot > 1 && PPU_Dot <= 257) // the shift registers for sprites have a 1 dot delay
-            {
+            }            
+        }
 
-                if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground)) // this happens if rendering either sprites or background.
+        void UpdateSpriteShiftRegisters()
+        {
+            if (PPU_Dot <= 256) // the shift registers for sprites are shifter after the rendering process.
+            {               
+                // shift all 8 sprite shift registers.
+                int i = 0;
+                while (i < 8)
                 {
-                    // shift all 8 sprite shift registers.
-                    int i = 0;
-                    while (i < 8)
+                    if (PPU_SpriteShifterCounter[i] > 0 && !SkippedPreRenderDot341)
                     {
-                        if (PPU_SpriteXposition[i] > 0)
-                        {
-                            PPU_SpriteXposition[i]--; // decrement the X position of all objects in secondary OAM. When this is zero, the ppu can draw it.
-                        }
-                        else
+                        PPU_SpriteShifterCounter[i]--; // decrement the X position of all objects in secondary OAM. When this is zero, the ppu can draw it.
+                    }
+                    else
+                    {
+                        if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground)) // this happens if rendering either sprites or background.
                         {
                             PPU_SpriteShiftRegisterL[i] = (byte)(PPU_SpriteShiftRegisterL[i] << 1); // shift 1 bit to the left.
                             PPU_SpriteShiftRegisterH[i] = (byte)(PPU_SpriteShiftRegisterH[i] << 1); // shift 1 bit to the left.
                         }
-
-                        i++;
                     }
+
+                    i++;
                 }
+                
             }
         }
 
@@ -3247,7 +3308,6 @@ namespace TriCNES
 
         public void _6502()
         {
-
             if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || (DoOAMDMA && CPU_Read)) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
             {
                 if (
@@ -3261,7 +3321,7 @@ namespace TriCNES
                     IgnoreH = true;
                 }
 
-                if (DoOAMDMA && FirstCycleOfOAMDMA) // interupt suppression. (There's probably a better way to implement this) if this is the first cycle of the OAM DMA...
+                if (DoOAMDMA && FirstCycleOfOAMDMA) // interrupt suppression. (There's probably a better way to implement this) if this is the first cycle of the OAM DMA...
                 {
                     if (!(DoNMI || DoIRQ)) // and we are NOT running an NMI or IRQ
                     {
@@ -8569,6 +8629,10 @@ namespace TriCNES
                         break;
                     case 0x2002:
                         // PPU Flags.
+                        if(programCounter == 0xEA6D)
+                        {
+
+                        }
                         dataBus = (byte)((((PPUStatus_VBlank ? 0x80 : 0) | (PPUStatus_SpriteZeroHit ? 0x40 : 0) | (PPUStatus_SpriteOverflow ? 0x20 : 0)) & 0xE0) + (PPUBus & 0x1F));
                         if (!DebugObserve)
                         {
@@ -9410,7 +9474,7 @@ namespace TriCNES
 
         void GetImmediate()
         {
-            // Fetch the value at the program counter, store it in the PreDecode register, and increment the Program Counter.
+            // Fetch the value at the program counter, store it in the DataLatch, and increment the Program Counter.
             dl = Fetch(programCounter);
             programCounter++;
             addressBus = programCounter;
