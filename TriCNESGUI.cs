@@ -34,6 +34,7 @@ namespace TriCNES
         string filePath;
         TASProperties TASPropertiesForm;
         TASProperties3ct TASPropertiesForm3ct;
+        TriCTraceLogger TraceLogger;
         private object LockObject = new object();
         void ClockEmulator()
         {
@@ -64,6 +65,14 @@ namespace TriCNES
                     if (Keyboard.IsKeyDown(Key.Left)) { controller1 |= 0x02; }
                     if (Keyboard.IsKeyDown(Key.Right)) { controller1 |= 0x01; }
                     EMU.ControllerPort1 = controller1;
+                    if (TraceLogger != null)
+                    {
+                        EMU.Logging = TraceLogger.Logging;
+                        if (EMU.DebugLog == null)
+                        {
+                            EMU.DebugLog = new StringBuilder();
+                        }
+                    }
                     EMU._CoreFrameAdvance();
                     if (pb_Screen.InvokeRequired)
                     {
@@ -91,7 +100,14 @@ namespace TriCNES
                             pb_Screen.Image = EMU.Screen.Bitmap;
                         }
                     }
-
+                    if(TraceLogger != null)
+                    {
+                        if(TraceLogger.Logging)
+                        {
+                            TraceLogger.Update();
+                            EMU.DebugLog = new StringBuilder();
+                        }
+                    }
                 }
             }
         }
@@ -428,6 +444,10 @@ namespace TriCNES
             {
                 TASPropertiesForm3ct.Dispose();
             }
+            if(TraceLogger != null)
+            {
+                TraceLogger.Dispose();
+            }
         }
 
         private void phase0ToolStripMenuItem_Click(object sender, EventArgs e)
@@ -542,6 +562,15 @@ namespace TriCNES
         private void xToolStripMenuItem7_Click(object sender, EventArgs e)
         {
             ResizeWindow(8);
+        }
+
+        private void traceLoggerToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            TraceLogger = new TriCTraceLogger();
+            TraceLogger.MainGUI = this;
+            TraceLogger.Init();
+            TraceLogger.Show();
+            TraceLogger.Location = Location;
         }
     }
 }

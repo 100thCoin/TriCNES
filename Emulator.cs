@@ -9523,7 +9523,7 @@ namespace TriCNES
                                 case 10: Cart.Mapper_69_Bank_A = (byte)(Input & 0x3F); break;
                                 case 11: Cart.Mapper_69_Bank_C = (byte)(Input & 0x3F); break;
                                 case 12: Cart.Mapper_69_NametableMirroring = (byte)(Input & 0x3); break;
-                                case 13: Cart.Mapper_69_EnableIRQ = (Input & 0x1) != 0; Cart.Mapper_69_EnableIRQCounterDecrement = (Input & 0x80) != 0; break;
+                                case 13: Cart.Mapper_69_EnableIRQ = (Input & 0x1) != 0; Cart.Mapper_69_EnableIRQCounterDecrement = (Input & 0x80) != 0; IRQ_LevelDetector = false; break;
                                 case 14: Cart.Mapper_69_IRQCounter = (ushort)((Cart.Mapper_69_IRQCounter & 0xFF00) | Input); break;
                                 case 15: Cart.Mapper_69_IRQCounter = (ushort)((Cart.Mapper_69_IRQCounter & 0xFF) | (Input << 8)); break;
                             }
