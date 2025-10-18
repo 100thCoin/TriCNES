@@ -417,6 +417,8 @@ namespace TriCNES
             if (EmuClock != null)
             {
                 EmuClock.Abort();
+                // I need to wait until this thread has absolutely finished being aborted.
+                Thread.Sleep(100);
             }
             if (TASPropertiesForm != null)
             {
@@ -426,7 +428,6 @@ namespace TriCNES
             {
                 TASPropertiesForm3ct.Dispose();
             }
-            Application.Exit();
         }
 
         private void phase0ToolStripMenuItem_Click(object sender, EventArgs e)

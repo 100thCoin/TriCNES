@@ -620,7 +620,7 @@ namespace TriCNES
                 if (Cart.Mapper_69_EnableIRQCounterDecrement)
                 {
                     ushort temp = Cart.Mapper_69_IRQCounter;
-                    Cart.Mapper_69_IRQCounter--; ;
+                    Cart.Mapper_69_IRQCounter--;
                     if (Cart.Mapper_69_EnableIRQ && temp < Cart.Mapper_69_IRQCounter)
                     {
                         IRQ_LevelDetector = true;
@@ -1577,34 +1577,10 @@ namespace TriCNES
                     UpdateSpriteShiftRegisters(); // update shift registers for the sprites.
                     
                 }
-                if (PPU_Dot > 3 && PPU_Dot <= 259 && PPU_Scanline < 241) // the process of drawing a dot to the screen actually has a 2 ppu cycle delay, which the emphasis bits happen after
-                {
-                    // in other words, the geryscale/emphasis bits can affect the color that was decided 2 ppu cycles ago.
-                    chosenColor = PrevPrevPrevDotColor;
-                    if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
-                    {
-                        chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
-                    }
-                    // emphasis bits
-                    int emphasis = 0;
-                    if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
-                    if (!PPU_DecodeSignal)
-                    {
-                        Screen.SetPixel(PPU_Dot - 4, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
-                    }
-                    else
-                    {
-                        if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
-                        {
-                            chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
-                        }
-                        PPU_SignalDecode(chosenColor | emphasis);
-                        PrevPrevPrevPrevDotColor = chosenColor | emphasis;
-                    }
-                }
-                if(PPU_DecodeSignal && (PPU_Dot == 0) && PPU_Scanline < 241)
+                DrawToScreen();
+
+
+                if (PPU_DecodeSignal && (PPU_Dot == 0) && PPU_Scanline < 241)
                 {
                     ntsc_signal_of_dot_0 = ntsc_signal;
                     chosenColor = PaletteRAM[0x00] & 0x3F;
@@ -1636,7 +1612,83 @@ namespace TriCNES
                 ntsc_signal %= 12;
             }
         } // and that's all for the PPU cycle!
+
+        void DrawToScreen()
+        {
+            if (PPU_Dot > 3 && PPU_Dot <= 259 && PPU_Scanline < 241) // the process of drawing a dot to the screen actually has a 2 ppu cycle delay, which the emphasis bits happen after
+            {
+                // in other words, the geryscale/emphasis bits can affect the color that was decided 2 ppu cycles ago.
+                chosenColor = PrevPrevPrevDotColor;
+                if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                {
+                    chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                }
+                // emphasis bits
+                int emphasis = 0;
+                if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
+                if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
+                if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                int scanline0OddFrameOffset = 0;
+                if (PPU_Scanline == 0 && PPU_OddFrame)
+                {
+                    scanline0OddFrameOffset = 1;
+                }
+                if (!PPU_DecodeSignal)
+                {
+                    if (!PPU_ShowScreenBoarders)
+                    {
+                        if (scanline0OddFrameOffset == 1 && PPU_Dot == 4)
+                        {
+                            // do nothing. This would be off screen.
+                        }
+                        else
+                        {
+                            Screen.SetPixel(PPU_Dot - 4 - scanline0OddFrameOffset, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
+                        }
+                    }
+                    else
+                    {
+                        Screen.SetPixel(PPU_Dot - 4 - scanline0OddFrameOffset, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
+                    }
+                }
+                else
+                {
+                    if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                    {
+                        chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                    }
+                    PPU_SignalDecode(chosenColor | emphasis);
+                    PrevPrevPrevPrevDotColor = chosenColor | emphasis;
+                }
+            }
+            if (PPU_Scanline == 0 && PPU_OddFrame && PPU_Dot == 259)
+            {
+                // draw the backdrop.
+                chosenColor = PaletteRAM[0];
+                // emphasis bits
+                int emphasis = 0;
+                if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
+                if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
+                if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                if (!PPU_DecodeSignal)
+                {
+                    Screen.SetPixel(255, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
+                }
+                else
+                {
+                    if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                    {
+                        chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                    }
+                    PPU_SignalDecode(chosenColor | emphasis);
+                    PrevPrevPrevPrevDotColor = chosenColor | emphasis;
+                }
+            }
+        }
+
+
         public bool PPU_DecodeSignal;
+        public bool PPU_ShowScreenBoarders;
         static float chroma_saturation_correction = 2.4f;
         static float[] Voltages =
             { 0.228f, 0.312f, 0.552f, 0.880f, // Signal low
@@ -1646,7 +1698,7 @@ namespace TriCNES
 		        };
         public byte ntsc_signal;
         public byte ntsc_signal_of_dot_0;
-        public float[] NTSC_Samples = new float[257*8 + 16];
+        public float[] NTSC_Samples = new float[257*8 + 24];
         static float[] Levels =
             {
             (Voltages[0] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
@@ -1741,8 +1793,14 @@ namespace TriCNES
         {
             byte phase = ntsc_signal_of_dot_0;
 
+            int scanline0OddFrameOffset = 0;
+            if (PPU_Scanline == 0 && PPU_OddFrame)
+            {
+                scanline0OddFrameOffset = 8;
+            }
+
             int i = 0;
-            while(i < NTSCScreen.Width)
+            while(i < NTSCScreen.Width + scanline0OddFrameOffset)
             {
                 int center = i+8;
                 int begin = center - 6;
@@ -1773,8 +1831,17 @@ namespace TriCNES
                 if (B < 0) { B = 0; }
                 if (B > 1) { B = 1; }
 
+                if (scanline0OddFrameOffset == 0)
+                {
                     NTSCScreen.SetPixel(i, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
-
+                }
+                else
+                {
+                    if (i >= 8)
+                    {
+                        NTSCScreen.SetPixel(i - 8, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
+                    }
+                }
                 i++;
             }
         }
