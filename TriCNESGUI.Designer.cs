@@ -61,7 +61,7 @@ namespace TriCNES
             this.xToolStripMenuItem7 = new System.Windows.Forms.ToolStripMenuItem();
             this.toolsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.traceLoggerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.pb_Screen = new PictureBoxWithInterpolationMode();
+            this.pb_Screen = new TriCNES.PictureBoxWithInterpolationMode();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pb_Screen)).BeginInit();
             this.SuspendLayout();
@@ -168,7 +168,7 @@ namespace TriCNES
             this.phase0ToolStripMenuItem.CheckOnClick = true;
             this.phase0ToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
             this.phase0ToolStripMenuItem.Name = "phase0ToolStripMenuItem";
-            this.phase0ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase0ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
             this.phase0ToolStripMenuItem.Text = "Phase 0";
             this.phase0ToolStripMenuItem.Click += new System.EventHandler(this.phase0ToolStripMenuItem_Click);
             // 
@@ -176,7 +176,7 @@ namespace TriCNES
             // 
             this.phase1ToolStripMenuItem.CheckOnClick = true;
             this.phase1ToolStripMenuItem.Name = "phase1ToolStripMenuItem";
-            this.phase1ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase1ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
             this.phase1ToolStripMenuItem.Text = "Phase 1";
             this.phase1ToolStripMenuItem.Click += new System.EventHandler(this.phase1ToolStripMenuItem_Click);
             // 
@@ -184,7 +184,7 @@ namespace TriCNES
             // 
             this.phase2ToolStripMenuItem.CheckOnClick = true;
             this.phase2ToolStripMenuItem.Name = "phase2ToolStripMenuItem";
-            this.phase2ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase2ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
             this.phase2ToolStripMenuItem.Text = "Phase 2";
             this.phase2ToolStripMenuItem.Click += new System.EventHandler(this.phase2ToolStripMenuItem_Click);
             // 
@@ -192,7 +192,7 @@ namespace TriCNES
             // 
             this.phase3ToolStripMenuItem.CheckOnClick = true;
             this.phase3ToolStripMenuItem.Name = "phase3ToolStripMenuItem";
-            this.phase3ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.phase3ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
             this.phase3ToolStripMenuItem.Text = "Phase 3";
             this.phase3ToolStripMenuItem.Click += new System.EventHandler(this.phase3ToolStripMenuItem_Click);
             // 
@@ -311,13 +311,13 @@ namespace TriCNES
             // 
             this.pb_Screen.AllowDrop = true;
             this.pb_Screen.BackColor = System.Drawing.Color.Black;
+            this.pb_Screen.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
             this.pb_Screen.Location = new System.Drawing.Point(0, 27);
             this.pb_Screen.Name = "pb_Screen";
             this.pb_Screen.Size = new System.Drawing.Size(256, 240);
             this.pb_Screen.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             this.pb_Screen.TabIndex = 1;
             this.pb_Screen.TabStop = false;
-            this.pb_Screen.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
             // 
             // TriCNESGUI
             // 
