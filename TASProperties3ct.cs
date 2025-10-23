@@ -70,7 +70,7 @@ namespace TriCNES
                     CartridgeArray[i].Mapper_1_PB=false;
 
                     // Mapper 2, UxROM
-                    CartridgeArray[i].Mapper_2_Bank = 0; // any write to ROM
+                    CartridgeArray[i].Mapper_2_BankSelect = 0; // any write to ROM
 
                     // Mapper 3, CNROM
                     CartridgeArray[i].Mapper_3_CHRBank=0; // any write to ROM

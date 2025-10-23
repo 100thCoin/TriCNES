@@ -84,7 +84,7 @@ namespace TriCNES
         public bool Mapper_1_PB;
 
         // Mapper 2, UxROM
-        public byte Mapper_2_Bank; // any write to ROM
+        public byte Mapper_2_BankSelect; // any write to ROM
 
         // Mapper 3, CNROM
         public byte Mapper_3_CHRBank; // any write to ROM
@@ -108,6 +108,16 @@ namespace TriCNES
 
         // Mapper 7, AOROM
         public byte Mapper_7_BankSelect;
+
+        // Mapper 9, MMC2
+        public byte Mapper_9_BankSelect;
+        public byte Mapper_9_CHR0_FD;
+        public byte Mapper_9_CHR0_FE;
+        public byte Mapper_9_CHR1_FD;
+        public byte Mapper_9_CHR1_FE;
+        public bool Mapper_9_NametableMirroring;
+        public bool Mapper_9_Latch0_FE;
+        public bool Mapper_9_Latch1_FE;
 
         // Mapper 69, Sunsoft FME-7
         public byte Mapper_69_CMD;
@@ -1565,6 +1575,9 @@ namespace TriCNES
                 {
                     if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
                     {
+                        PPU_UpdateShiftRegisters(); // shift all the shift registers 1 bit
+                                                    // the shift registers are used in the CalculatePixel() function.
+                                                    // a single bit from the register is read at a time.
                         PPU_Render_ShiftRegistersAndBitPlanes(); // update shift registers for the background.
                     }
 
@@ -2150,6 +2163,13 @@ namespace TriCNES
                                                 PPUOAMAddress++; // +1
                                             }
                                         }
+                                        else
+                                        {
+                                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
+                                            {
+                                                PPUOAMAddress += 4; // +1 (In theory, this should be +4, though my experiments only reflect my consoles behavior if this is +1?)
+                                            }
+                                        }
                                     }
                                     else
                                     {
@@ -2278,6 +2298,7 @@ namespace TriCNES
                         {
                             // set this object's Y position in the array
                             PPU_SpriteYposition[SecondaryOAMAddress / 4] = SecondaryOAM[SecondaryOAMAddress];
+                            PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         SecondaryOAMAddress++; // and increment the Secondary OAM address for next cycle
                         break;
@@ -2286,6 +2307,7 @@ namespace TriCNES
                         {
                             // set this object's pattern in the array
                             PPU_SpritePattern[SecondaryOAMAddress / 4] = SecondaryOAM[SecondaryOAMAddress];
+                            PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         SecondaryOAMAddress++; // and increment the Secondary OAM address for next cycle
                         break;
@@ -2294,6 +2316,7 @@ namespace TriCNES
                         {
                             // set this object's attribute in the array
                             PPU_SpriteAttribute[SecondaryOAMAddress / 4] = SecondaryOAM[SecondaryOAMAddress];
+                            PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         SecondaryOAMAddress++; // and increment the Secondary OAM address for next cycle
                         break;
@@ -2302,6 +2325,7 @@ namespace TriCNES
                         {
                             // set this object's X position in the array
                             PPU_SpriteXposition[SecondaryOAMAddress / 4] = SecondaryOAM[SecondaryOAMAddress];
+                            PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         // notably, the secondary OAM address does not get incremented until case 7
                         break;
@@ -2405,7 +2429,14 @@ namespace TriCNES
                 {
                     for (int i = 0; i < 8; i++)
                     {
-                        PPU_SpriteShifterCounter[i] = PPU_SpriteXposition[i];
+                        if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground))
+                        {
+                            PPU_SpriteShifterCounter[i] = PPU_SpriteXposition[i];
+                        }
+                        else
+                        {
+                            PPU_SpriteShifterCounter[i] = 0;
+                        }
                     }
                 }
             }
@@ -2505,14 +2536,7 @@ namespace TriCNES
                 if (PPU_Mask_ShowSprites && (PPU_Dot > 8 || PPU_Mask_8PxShowSprites))
                 {
                     int i = 0;
-                    if (PPU_Scanline == 0)
-                    {
 
-                    }
-                    if (PPU_Dot == 0x78)
-                    {
-
-                    }
                     // check all 8 objects in secondary OAM
                     while (i < 8)
                     {
@@ -2952,10 +2976,6 @@ namespace TriCNES
             byte cycleTick; // for the switch statement below, this checks which case to run on a given ppu cycle.
             cycleTick = (byte)((PPU_Dot - 1) & 7);
 
-            PPU_UpdateShiftRegisters(); // shift all the shift registers 1 bit
-            // the shift registers are used in the CalculatePixel() function.
-            // a single bit from the register is read at a time.
-
             switch (cycleTick)
             {
                 case 0:
@@ -3084,6 +3104,28 @@ namespace TriCNES
                                 else if (Address < 0x1800) { Address &= 0x7FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_2K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
                                 else { Address &= 0x7FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
                             }
+                        case 9: //MMC2                            
+                            byte temp = 0;
+                            ushort Addr = Address;
+                            if (Address < 0x1000) { temp = Cart.CHRROM[(Cart.Mapper_9_Latch0_FE ? Cart.Mapper_9_CHR0_FE : Cart.Mapper_9_CHR0_FD) * 0x1000 + Addr]; }
+                            else { Addr &= 0xFFF; temp = Cart.CHRROM[(Cart.Mapper_9_Latch1_FE ? Cart.Mapper_9_CHR1_FE : Cart.Mapper_9_CHR1_FD) * 0x1000 + Addr]; }
+                            if (Address == 0x0FD8)
+                            {
+                                Cart.Mapper_9_Latch0_FE = false;
+                            }
+                            else if (Address == 0x0FE8)
+                            {
+                                Cart.Mapper_9_Latch0_FE = true;
+                            }
+                            else if (Address >= 0x1FD8 && Address <= 0x1FDF)
+                            {
+                                Cart.Mapper_9_Latch1_FE = false;
+                            }
+                            else if (Address >= 0x1FE8 && Address <= 0x1FEF)
+                            {
+                                Cart.Mapper_9_Latch1_FE = true;
+                            }
+                            return temp;
                         case 69: // Sunsoft FME-7
                             if (Address < 0x400) { return Cart.CHRROM[(Cart.Mapper_69_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
                             else if (Address < 0x800) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_69_CHR_1K1 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
@@ -3118,7 +3160,7 @@ namespace TriCNES
         void PPU_UpdateShiftRegisters()
         {
 
-            if (PPU_Mask_ShowBackground) // if rendering the backgound, update the shift registers for the background.
+            if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground)) // if rendering, update the shift registers for the background.
             {
                 PPU_PatternShiftRegisterL = (ushort)(PPU_PatternShiftRegisterL << 1); // shift 1 bit to the left.
                 PPU_PatternShiftRegisterH = (ushort)(PPU_PatternShiftRegisterH << 1); // shift 1 bit to the left.
@@ -8590,6 +8632,16 @@ namespace TriCNES
                         Address |= 0x400;
                     }
                     break;
+                case 9: // MMC2
+                    if (Cart.Mapper_9_NametableMirroring) //horizontal
+                    {
+                        Address = (ushort)((Address & 0x33FF) | ((Address & 0x0800) >> 1)); // mask away $0C00, bit 10 becomes the former bit 11
+                    }
+                    else //vertical
+                    {
+                        Address &= 0x37FF; // mask away $0800
+                    }
+                    break;
                 case 69: // Sunsoft FME-7
                     switch (Cart.Mapper_69_NametableMirroring)
                     {
@@ -8992,7 +9044,7 @@ namespace TriCNES
                         else
                         {
                             ushort tempo = (ushort)(Address & 0x3FFF);
-                            dataBus = Cart.PRGROM[0x4000 * (Cart.Mapper_2_Bank & 0x0F) + tempo];
+                            dataBus = Cart.PRGROM[0x4000 * (Cart.Mapper_2_BankSelect & 0x0F) + tempo];
                             return;
                         }
                     }
@@ -9064,6 +9116,16 @@ namespace TriCNES
                         dataBus = Cart.PRGROM[(0x8000 * (Cart.Mapper_7_BankSelect & 0x07) + tempo)&(Cart.PRGROM.Length-1)];
                     }
                     // AOROM doesn't have any PRG RAM
+                    return;
+                case 9: //MMC2
+                    if(Address >= 0xA000)
+                    {
+                        dataBus = Cart.PRGROM[((Cart.PRG_Size-2) << 14) | (Address & 0x7FFF)];
+                    }
+                    else
+                    {
+                        dataBus = Cart.PRGROM[(Cart.Mapper_9_BankSelect << 13) | (Address & 0x1FFF)];
+                    }
                     return;
                 case 69:
                     //Sunsoft FME-7 (used in Gimmick)
@@ -9400,7 +9462,7 @@ namespace TriCNES
                 case 2: //UxROM
                     if (Address >= 0x8000)
                     {
-                        Cart.Mapper_2_Bank = (byte)(Input & 0xF);
+                        Cart.Mapper_2_BankSelect = (byte)(Input & 0xF);
                     }
                     return;
                 case 3: //CNROM
@@ -9485,6 +9547,36 @@ namespace TriCNES
                     if (Address >= 0x8000)
                     {
                         Cart.Mapper_7_BankSelect = Input;
+                    }
+                    break;
+                case 9: //MMC2
+                    if (Address < 0xA000)
+                    {
+                        // nothing
+                    }
+                    else if(Address < 0xB000) // PRG Bank select
+                    {
+                        Cart.Mapper_9_BankSelect = (byte)(Input & 0x0F);
+                    }
+                    else if(Address < 0xC000) // CHR0 Bank select
+                    {
+                        Cart.Mapper_9_CHR0_FD = (byte)(Input & 0x1F);
+                    }
+                    else if (Address < 0xD000) // CHR0 Bank select
+                    {
+                        Cart.Mapper_9_CHR0_FE = (byte)(Input & 0x1F);
+                    }
+                    else if (Address < 0xE000) // CHR1 Bank select
+                    {
+                        Cart.Mapper_9_CHR1_FD = (byte)(Input & 0x1F);
+                    }
+                    else if (Address < 0xF000) // CHR1 Bank select
+                    {
+                        Cart.Mapper_9_CHR1_FE = (byte)(Input & 0x1F);
+                    }
+                    else // Nametable mirroring
+                    {
+                        Cart.Mapper_9_NametableMirroring = (Input & 0x1) == 1;
                     }
                     break;
                 case 69://Sunsoft FME-7 (used in Gimmick)

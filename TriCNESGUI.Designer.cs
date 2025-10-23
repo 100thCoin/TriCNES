@@ -59,9 +59,9 @@ namespace TriCNES
             this.xToolStripMenuItem5 = new System.Windows.Forms.ToolStripMenuItem();
             this.xToolStripMenuItem6 = new System.Windows.Forms.ToolStripMenuItem();
             this.xToolStripMenuItem7 = new System.Windows.Forms.ToolStripMenuItem();
-            this.pb_Screen = new System.Windows.Forms.PictureBox();
             this.toolsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.traceLoggerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.pb_Screen = new PictureBoxWithInterpolationMode();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pb_Screen)).BeginInit();
             this.SuspendLayout();
@@ -93,28 +93,28 @@ namespace TriCNES
             // loadROMToolStripMenuItem
             // 
             this.loadROMToolStripMenuItem.Name = "loadROMToolStripMenuItem";
-            this.loadROMToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.loadROMToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
             this.loadROMToolStripMenuItem.Text = "Load ROM";
             this.loadROMToolStripMenuItem.Click += new System.EventHandler(this.loadROMToolStripMenuItem_Click);
             // 
             // resetToolStripMenuItem
             // 
             this.resetToolStripMenuItem.Name = "resetToolStripMenuItem";
-            this.resetToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.resetToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
             this.resetToolStripMenuItem.Text = "Reset";
             this.resetToolStripMenuItem.Click += new System.EventHandler(this.resetToolStripMenuItem_Click);
             // 
             // powerCycleToolStripMenuItem
             // 
             this.powerCycleToolStripMenuItem.Name = "powerCycleToolStripMenuItem";
-            this.powerCycleToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.powerCycleToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
             this.powerCycleToolStripMenuItem.Text = "Power Cycle";
             this.powerCycleToolStripMenuItem.Click += new System.EventHandler(this.powerCycleToolStripMenuItem_Click);
             // 
             // screenshotToolStripMenuItem
             // 
             this.screenshotToolStripMenuItem.Name = "screenshotToolStripMenuItem";
-            this.screenshotToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.screenshotToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
             this.screenshotToolStripMenuItem.Text = "Screenshot";
             this.screenshotToolStripMenuItem.Click += new System.EventHandler(this.screenshotToolStripMenuItem_Click);
             // 
@@ -168,7 +168,7 @@ namespace TriCNES
             this.phase0ToolStripMenuItem.CheckOnClick = true;
             this.phase0ToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
             this.phase0ToolStripMenuItem.Name = "phase0ToolStripMenuItem";
-            this.phase0ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
+            this.phase0ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.phase0ToolStripMenuItem.Text = "Phase 0";
             this.phase0ToolStripMenuItem.Click += new System.EventHandler(this.phase0ToolStripMenuItem_Click);
             // 
@@ -176,7 +176,7 @@ namespace TriCNES
             // 
             this.phase1ToolStripMenuItem.CheckOnClick = true;
             this.phase1ToolStripMenuItem.Name = "phase1ToolStripMenuItem";
-            this.phase1ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
+            this.phase1ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.phase1ToolStripMenuItem.Text = "Phase 1";
             this.phase1ToolStripMenuItem.Click += new System.EventHandler(this.phase1ToolStripMenuItem_Click);
             // 
@@ -184,7 +184,7 @@ namespace TriCNES
             // 
             this.phase2ToolStripMenuItem.CheckOnClick = true;
             this.phase2ToolStripMenuItem.Name = "phase2ToolStripMenuItem";
-            this.phase2ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
+            this.phase2ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.phase2ToolStripMenuItem.Text = "Phase 2";
             this.phase2ToolStripMenuItem.Click += new System.EventHandler(this.phase2ToolStripMenuItem_Click);
             // 
@@ -192,7 +192,7 @@ namespace TriCNES
             // 
             this.phase3ToolStripMenuItem.CheckOnClick = true;
             this.phase3ToolStripMenuItem.Name = "phase3ToolStripMenuItem";
-            this.phase3ToolStripMenuItem.Size = new System.Drawing.Size(114, 22);
+            this.phase3ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.phase3ToolStripMenuItem.Text = "Phase 3";
             this.phase3ToolStripMenuItem.Click += new System.EventHandler(this.phase3ToolStripMenuItem_Click);
             // 
@@ -292,17 +292,6 @@ namespace TriCNES
             this.xToolStripMenuItem7.Text = "8x";
             this.xToolStripMenuItem7.Click += new System.EventHandler(this.xToolStripMenuItem7_Click);
             // 
-            // pb_Screen
-            // 
-            this.pb_Screen.AllowDrop = true;
-            this.pb_Screen.BackColor = System.Drawing.Color.Black;
-            this.pb_Screen.Location = new System.Drawing.Point(0, 27);
-            this.pb_Screen.Name = "pb_Screen";
-            this.pb_Screen.Size = new System.Drawing.Size(256, 240);
-            this.pb_Screen.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
-            this.pb_Screen.TabIndex = 1;
-            this.pb_Screen.TabStop = false;
-            // 
             // toolsToolStripMenuItem
             // 
             this.toolsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -314,9 +303,21 @@ namespace TriCNES
             // traceLoggerToolStripMenuItem
             // 
             this.traceLoggerToolStripMenuItem.Name = "traceLoggerToolStripMenuItem";
-            this.traceLoggerToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.traceLoggerToolStripMenuItem.Size = new System.Drawing.Size(138, 22);
             this.traceLoggerToolStripMenuItem.Text = "TraceLogger";
             this.traceLoggerToolStripMenuItem.Click += new System.EventHandler(this.traceLoggerToolStripMenuItem_Click);
+            // 
+            // pb_Screen
+            // 
+            this.pb_Screen.AllowDrop = true;
+            this.pb_Screen.BackColor = System.Drawing.Color.Black;
+            this.pb_Screen.Location = new System.Drawing.Point(0, 27);
+            this.pb_Screen.Name = "pb_Screen";
+            this.pb_Screen.Size = new System.Drawing.Size(256, 240);
+            this.pb_Screen.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
+            this.pb_Screen.TabIndex = 1;
+            this.pb_Screen.TabStop = false;
+            this.pb_Screen.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
             // 
             // TriCNESGUI
             // 
@@ -352,7 +353,7 @@ namespace TriCNES
         private System.Windows.Forms.MenuStrip menuStrip1;
         private System.Windows.Forms.ToolStripMenuItem consoleToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem tASToolStripMenuItem;
-        private System.Windows.Forms.PictureBox pb_Screen;
+        private PictureBoxWithInterpolationMode pb_Screen;
         private System.Windows.Forms.ToolStripMenuItem loadROMToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem loadTASToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem load3ctToolStripMenuItem;
