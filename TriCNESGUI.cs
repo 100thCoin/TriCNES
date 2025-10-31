@@ -26,7 +26,11 @@ namespace TriCNES
             pb_Screen.DragDrop += new DragEventHandler(pb_Screen_DragDrop);
             FormClosing += new FormClosingEventHandler(TriCNESGUI_Closing);
         }
-        
+
+        bool settings_ntsc;
+        bool settings_boarder;
+        int settings_alignment;
+
         public Emulator EMU;
         Thread EmuClock;
         string filePath;
@@ -46,11 +50,25 @@ namespace TriCNES
                         PendingScreenshot = false;
                         if (EMU.PPU_DecodeSignal)
                         {
-                            Clipboard.SetImage(EMU.NTSCScreen.Bitmap);
+                            if (EMU.PPU_ShowScreenBoarders)
+                            {
+                                Clipboard.SetImage(EMU.BoarderedNTSCScreen.Bitmap);
+                            }
+                            else
+                            {
+                                Clipboard.SetImage(EMU.NTSCScreen.Bitmap);
+                            }
                         }
                         else
                         {
-                            Clipboard.SetImage(EMU.Screen.Bitmap);
+                            if(EMU.PPU_ShowScreenBoarders)
+                            {
+                                Clipboard.SetImage(EMU.BoarderedScreen.Bitmap);
+                            }
+                            else
+                            {
+                                Clipboard.SetImage(EMU.Screen.Bitmap);
+                            }
                         }
                     }
                     byte controller1 = 0;
@@ -79,26 +97,56 @@ namespace TriCNES
                         {
                             if (EMU.PPU_DecodeSignal)
                             {
-                                pb_Screen.Image = EMU.NTSCScreen.Bitmap;
+                                if (EMU.PPU_ShowScreenBoarders)
+                                {
+                                    pb_Screen.Image = EMU.BoarderedNTSCScreen.Bitmap;
+                                }
+                                else
+                                {
+                                    pb_Screen.Image = EMU.NTSCScreen.Bitmap;
+                                }
                             }
                             else
                             {
-                                pb_Screen.Image = EMU.Screen.Bitmap;
+                                if (EMU.PPU_ShowScreenBoarders)
+                                {
+                                    pb_Screen.Image = EMU.BoarderedScreen.Bitmap;
+                                }
+                                else
+                                {
+                                    pb_Screen.Image = EMU.Screen.Bitmap;
+                                }
                             }
+                            pb_Screen.Update();
                         }));
                     }
                     else
                     {
                         if (EMU.PPU_DecodeSignal)
                         {
-                            pb_Screen.Image = EMU.NTSCScreen.Bitmap;
+                            if (EMU.PPU_ShowScreenBoarders)
+                            {
+                                pb_Screen.Image = EMU.BoarderedNTSCScreen.Bitmap;
+                            }
+                            else
+                            {
+                                pb_Screen.Image = EMU.NTSCScreen.Bitmap;
+                            }
                         }
                         else
                         {
-                            pb_Screen.Image = EMU.Screen.Bitmap;
+                            if (EMU.PPU_ShowScreenBoarders)
+                            {
+                                pb_Screen.Image = EMU.BoarderedScreen.Bitmap;
+                            }
+                            else
+                            {
+                                pb_Screen.Image = EMU.Screen.Bitmap;
+                            }
                         }
+                        pb_Screen.Update();
                     }
-                    if(TraceLogger != null)
+                    if (TraceLogger != null)
                     {
                         if(TraceLogger.Logging)
                         {
@@ -177,6 +225,9 @@ namespace TriCNES
                 }
                 filePath = ofd.FileName;
                 EMU = new Emulator();
+                EMU.PPU_DecodeSignal = settings_ntsc;
+                EMU.PPU_ShowScreenBoarders = settings_boarder;
+                EMU.PPUClock = settings_alignment;
                 Cartridge Cart = new Cartridge(filePath);
                 EMU.Cart = Cart;
                 EmuClock = new Thread(ClockEmulator);
@@ -244,6 +295,9 @@ namespace TriCNES
             }
 
             EMU = new Emulator();
+            EMU.PPU_DecodeSignal = settings_ntsc;
+            EMU.PPU_ShowScreenBoarders = settings_boarder;
+
             Cartridge Cart = new Cartridge(filePath);
             EMU.Cart = Cart;
             EMU.TAS_ReadingTAS = true;
@@ -350,6 +404,9 @@ namespace TriCNES
             else
             {
                 EMU = new Emulator();
+                EMU.PPU_DecodeSignal = settings_ntsc;
+                EMU.PPU_ShowScreenBoarders = settings_boarder;
+                EMU.PPUClock = settings_alignment;
             }
             EmuClock = new Thread(ClockEmulator3CT);
             EmuClock.IsBackground = true;
@@ -395,6 +452,9 @@ namespace TriCNES
         private void powerCycleToolStripMenuItem_Click(object sender, EventArgs e)
         {
             Emulator Emu2 = new Emulator();
+            Emu2.PPU_DecodeSignal = settings_ntsc;
+            Emu2.PPU_ShowScreenBoarders = settings_boarder;
+            EMU.PPUClock = settings_alignment;
             Emu2.Cart = EMU.Cart;
             EMU = Emu2;
         }
@@ -418,6 +478,10 @@ namespace TriCNES
             string filename = filenames[0];
             filePath = filename;
             EMU = new Emulator();
+            EMU.PPU_DecodeSignal = settings_ntsc;
+            EMU.PPU_ShowScreenBoarders = settings_boarder;
+            EMU.PPUClock = settings_alignment;
+
             Cartridge Cart = new Cartridge(filePath);
             EMU.Cart = Cart;
             EmuClock = new Thread(ClockEmulator);
@@ -491,6 +555,7 @@ namespace TriCNES
             EMU = Emu2;
             EMU.PPUClock = Alignment;
             EMU.CPUClock = 0;
+            settings_alignment = Alignment;
         }
 
         private void trueToolStripMenuItem_Click(object sender, EventArgs e)
@@ -498,6 +563,7 @@ namespace TriCNES
             falseToolStripMenuItem.Checked = false;
             trueToolStripMenuItem.Checked = true;
             EMU.PPU_DecodeSignal = true;
+            settings_ntsc = true;
         }
 
         private void falseToolStripMenuItem_Click(object sender, EventArgs e)
@@ -505,16 +571,28 @@ namespace TriCNES
             trueToolStripMenuItem.Checked = false;
             falseToolStripMenuItem.Checked = true;
             EMU.PPU_DecodeSignal = false;
+            settings_ntsc = false;
         }
 
         public void ResizeWindow(int scale)
         {
+            int w = 256;
+            int h = 240;
+            if(EMU != null)
+            {
+                if(EMU.PPU_ShowScreenBoarders)
+                {
+                    w = 341;
+                    h = 262;
+                }
+            }
+
             Size pbs = new Size();
-            pbs.Width = 256*scale;
-            pbs.Height = 240*scale;
+            pbs.Width = w*scale;
+            pbs.Height = h*scale;
             Size ws = new Size();
-            ws.Width = 256*scale+16;
-            ws.Height = 240*scale+66;
+            ws.Width = w*scale+16;
+            ws.Height = h*scale+66;
             MinimumSize = ws;
             MaximumSize = ws;
             pb_Screen.Size = pbs;
@@ -522,43 +600,52 @@ namespace TriCNES
             Height = ws.Height;
         }
 
+        int ScreenMult = 1;
         private void xToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            ScreenMult = 1;
             ResizeWindow(1);
         }
 
         private void xToolStripMenuItem1_Click(object sender, EventArgs e)
         {
+            ScreenMult = 2;
             ResizeWindow(2);
         }
 
         private void xToolStripMenuItem2_Click(object sender, EventArgs e)
         {
+            ScreenMult = 3;
             ResizeWindow(3);
         }
 
         private void xToolStripMenuItem3_Click(object sender, EventArgs e)
         {
+            ScreenMult = 4;
             ResizeWindow(4);
         }
 
         private void xToolStripMenuItem4_Click(object sender, EventArgs e)
         {
+            ScreenMult = 5;
             ResizeWindow(5);
         }
 
         private void xToolStripMenuItem5_Click(object sender, EventArgs e)
         {
+            ScreenMult = 6;
             ResizeWindow(6);
         }
 
         private void xToolStripMenuItem6_Click(object sender, EventArgs e)
         {
+            ScreenMult = 7;
             ResizeWindow(7);
         }
 
         private void xToolStripMenuItem7_Click(object sender, EventArgs e)
         {
+            ScreenMult = 8;
             ResizeWindow(8);
         }
 
@@ -569,6 +656,24 @@ namespace TriCNES
             TraceLogger.Init();
             TraceLogger.Show();
             TraceLogger.Location = Location;
+        }
+
+        private void trueToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            toolstrip_ViewBoarders_False.Checked = false;
+            toolstrip_ViewBoarders_True.Checked = true;
+            EMU.PPU_ShowScreenBoarders = true;
+            settings_boarder = true;
+            ResizeWindow(ScreenMult);
+        }
+
+        private void falseToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            toolstrip_ViewBoarders_False.Checked = true;
+            toolstrip_ViewBoarders_True.Checked = false;
+            EMU.PPU_ShowScreenBoarders = false;
+            settings_boarder = false;
+            ResizeWindow(ScreenMult);
         }
     }
 
@@ -581,6 +686,7 @@ namespace TriCNES
 
         protected override void OnPaint(PaintEventArgs paintEventArgs)
         {
+            paintEventArgs.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
             paintEventArgs.Graphics.InterpolationMode = InterpolationMode;
             base.OnPaint(paintEventArgs);
         }

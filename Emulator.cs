@@ -188,7 +188,7 @@ namespace TriCNES
         public byte A = 0;           // The Accumulator, or "A Register"
         public byte X = 0;           // The X Register
         public byte Y = 0;           // The Y Register
-        public byte H = 0;           // The High byte of the target address. A couple undocumented instructions use this value.
+        public byte H = 0;           // The High byte of the target address. A couple unofficial instructions use this value.
         public bool IgnoreH;         // However, with a well-timed DMA, the H register isn't actually part of the equation on some of those.
         public byte dataBus = 0;     // The Data Bus.
         public ushort addressBus = 0;// The Address Bus. "Where are we reading/writing"
@@ -201,73 +201,57 @@ namespace TriCNES
 
         public ushort temporaryAddress; // I use this to temporarily modify the value of the address bus for some if statements. This is mostly for checking if the low byte under/over flows.
 
-        // This function runs when instantiating this Emulator object.
-        static Color[] SetupPalette()
-        {
-            NesPalInts = new int[512]; // the ARGB version of the colors
-            Color[] Palette = new Color[512]; // The Color version
-            byte[] Pal = { 
 
-                // each triplet of bytes represents the RGB components of a color.
-                // there's 64 colors, but this is also how I implement specific values for the PPU's emphasis bits.
-                // default palette:
-                0x65, 0x65, 0x65, 0x00, 0x2A, 0x84, 0x15, 0x13, 0xA2, 0x3A, 0x01, 0x9E, 0x59, 0x00, 0x7A, 0x6A, 0x00, 0x3E, 0x68, 0x08, 0x00, 0x53, 0x1D, 0x00, 0x32, 0x34, 0x00, 0x0D, 0x46, 0x00, 0x00, 0x4F, 0x00, 0x00, 0x4C, 0x09, 0x00, 0x3F, 0x4B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xAE, 0xAE, 0xAE, 0x17, 0x5F, 0xD6, 0x43, 0x41, 0xFF, 0x75, 0x29, 0xFA, 0x9E, 0x1D, 0xCA, 0xB4, 0x20, 0x7B, 0xB1, 0x33, 0x22, 0x96, 0x4E, 0x00, 0x6A, 0x6C, 0x00, 0x39, 0x84, 0x00, 0x0F, 0x90, 0x00, 0x00, 0x8D, 0x33, 0x00, 0x7B, 0x8C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xFE, 0xFF, 0xFF, 0x66, 0xAF, 0xFF, 0x93, 0x90, 0xFF, 0xC5, 0x78, 0xFF, 0xEE, 0x6C, 0xFF, 0xFF, 0x6F, 0xCA, 0xFF, 0x82, 0x71, 0xE6, 0x9E, 0x25, 0xBA, 0xBC, 0x00, 0x88, 0xD5, 0x01, 0x5E, 0xE1, 0x32, 0x47, 0xDD, 0x82, 0x4A, 0xCB, 0xDC, 0x4E, 0x4E, 0x4E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xFE, 0xFF, 0xFF, 0xC0, 0xDE, 0xFF, 0xD2, 0xD1, 0xFF, 0xE7, 0xC7, 0xFF, 0xF8, 0xC2, 0xFF, 0xFF, 0xC3, 0xE9, 0xFF, 0xCB, 0xC4, 0xF5, 0xD7, 0xA5, 0xE2, 0xE3, 0x94, 0xCE, 0xED, 0x96, 0xBC, 0xF2, 0xAA, 0xB3, 0xF1, 0xCB, 0xB4, 0xE9, 0xF0, 0xB6, 0xB6, 0xB6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                // emphasize red:
-                0x66, 0x42, 0x3E, 0x00, 0x0D, 0x58, 0x15, 0x00, 0x75, 0x38, 0x00, 0x75, 0x56, 0x00, 0x58, 0x67, 0x00, 0x27, 0x68, 0x00, 0x00, 0x53, 0x0D, 0x00, 0x34, 0x1E, 0x00, 0x10, 0x2B, 0x00, 0x00, 0x30, 0x00, 0x00, 0x2B, 0x00, 0x00, 0x1C, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xAF, 0x7E, 0x78, 0x19, 0x37, 0x9A, 0x43, 0x20, 0xC1, 0x72, 0x0F, 0xC1, 0x9A, 0x08, 0x9A, 0xB1, 0x0F, 0x59, 0xB2, 0x22, 0x0F, 0x96, 0x37, 0x00, 0x6C, 0x4D, 0x00, 0x3D, 0x5F, 0x00, 0x16, 0x65, 0x00, 0x00, 0x5F, 0x0C, 0x00, 0x4B, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xFF, 0xC0, 0xB8, 0x68, 0x78, 0xDB, 0x93, 0x61, 0xFF, 0xC2, 0x4F, 0xFF, 0xEA, 0x49, 0xDB, 0xFF, 0x4F, 0x99, 0xFF, 0x63, 0x4E, 0xE7, 0x78, 0x08, 0xBC, 0x8F, 0x00, 0x8D, 0xA0, 0x00, 0x65, 0xA7, 0x08, 0x4D, 0xA0, 0x4A, 0x4C, 0x8D, 0x95, 0x4F, 0x2F, 0x2B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xFF, 0xC0, 0xB8, 0xC1, 0xA2, 0xC6, 0xD3, 0x99, 0xD6, 0xE7, 0x92, 0xD6, 0xF7, 0x8F, 0xC6, 0xFF, 0x92, 0xAB, 0xFF, 0x9A, 0x8C, 0xF6, 0xA2, 0x6F, 0xE4, 0xAC, 0x5F, 0xD1, 0xB3, 0x5F, 0xC0, 0xB6, 0x6F, 0xB7, 0xB3, 0x8B, 0xB6, 0xAB, 0xA9, 0xB7, 0x85, 0x7E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                // emphasize green:
-                0x39, 0x5D, 0x2C, 0x00, 0x24, 0x52, 0x00, 0x0D, 0x6A, 0x14, 0x00, 0x64, 0x2D, 0x00, 0x41, 0x3E, 0x00, 0x10, 0x3F, 0x03, 0x00, 0x30, 0x18, 0x00, 0x16, 0x2F, 0x00, 0x00, 0x42, 0x00, 0x00, 0x4C, 0x00, 0x00, 0x47, 0x00, 0x00, 0x39, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x71, 0xA3, 0x60, 0x00, 0x56, 0x91, 0x19, 0x39, 0xB1, 0x40, 0x20, 0xA9, 0x61, 0x12, 0x7B, 0x78, 0x18, 0x3A, 0x79, 0x2C, 0x00, 0x65, 0x48, 0x00, 0x42, 0x66, 0x00, 0x1B, 0x7E, 0x00, 0x00, 0x8D, 0x00, 0x00, 0x86, 0x0A, 0x00, 0x72, 0x54, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xAE, 0xF0, 0x99, 0x32, 0xA3, 0xCB, 0x56, 0x84, 0xEB, 0x7E, 0x6B, 0xE3, 0x9E, 0x5D, 0xB5, 0xB6, 0x64, 0x72, 0xB7, 0x77, 0x28, 0xA3, 0x94, 0x00, 0x7F, 0xB2, 0x00, 0x57, 0xCB, 0x00, 0x37, 0xD9, 0x00, 0x1F, 0xD3, 0x42, 0x1E, 0xBF, 0x8D, 0x27, 0x47, 0x1C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xAE, 0xF0, 0x99, 0x7B, 0xD0, 0xAD, 0x8A, 0xC3, 0xBA, 0x9A, 0xB9, 0xB7, 0xA8, 0xB3, 0xA4, 0xB1, 0xB6, 0x89, 0xB2, 0xBE, 0x6A, 0xAA, 0xCA, 0x50, 0x9B, 0xD6, 0x43, 0x8B, 0xE1, 0x46, 0x7D, 0xE6, 0x5A, 0x74, 0xE4, 0x75, 0x73, 0xDC, 0x94, 0x77, 0xAA, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                // emphasize red + green:
-                0x3F, 0x3F, 0x25, 0x00, 0x0B, 0x46, 0x00, 0x00, 0x5D, 0x18, 0x00, 0x5A, 0x2F, 0x00, 0x3F, 0x40, 0x00, 0x0E, 0x41, 0x00, 0x00, 0x32, 0x0A, 0x00, 0x19, 0x1A, 0x00, 0x00, 0x28, 0x00, 0x00, 0x2F, 0x00, 0x00, 0x2A, 0x00, 0x00, 0x1B, 0x1C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x79, 0x7A, 0x55, 0x00, 0x35, 0x81, 0x20, 0x1F, 0x9F, 0x45, 0x0D, 0x9C, 0x64, 0x04, 0x78, 0x7B, 0x0A, 0x36, 0x7C, 0x1E, 0x00, 0x68, 0x32, 0x00, 0x47, 0x49, 0x00, 0x22, 0x5B, 0x00, 0x03, 0x64, 0x00, 0x00, 0x5D, 0x00, 0x00, 0x4A, 0x4A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xBA, 0xBB, 0x8B, 0x3E, 0x75, 0xB7, 0x60, 0x5E, 0xD6, 0x85, 0x4C, 0xD2, 0xA4, 0x43, 0xAE, 0xBB, 0x4A, 0x6C, 0xBD, 0x5D, 0x21, 0xA8, 0x72, 0x00, 0x87, 0x89, 0x00, 0x61, 0x9B, 0x00, 0x42, 0xA4, 0x00, 0x2B, 0x9D, 0x34, 0x2A, 0x8A, 0x7F, 0x2C, 0x2D, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xBA, 0xBB, 0x8B, 0x87, 0x9E, 0x9D, 0x95, 0x95, 0xAA, 0xA4, 0x8D, 0xA8, 0xB1, 0x89, 0x99, 0xBB, 0x8C, 0x7E, 0xBB, 0x94, 0x5F, 0xB3, 0x9D, 0x48, 0xA5, 0xA6, 0x3B, 0x96, 0xAE, 0x3D, 0x89, 0xB1, 0x4C, 0x7F, 0xAF, 0x67, 0x7F, 0xA6, 0x86, 0x80, 0x80, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                // emphasize blue:
-                0x47, 0x47, 0x7C, 0x00, 0x1A, 0x8C, 0x0B, 0x0A, 0xA9, 0x29, 0x00, 0xA3, 0x41, 0x00, 0x81, 0x4D, 0x00, 0x4A, 0x49, 0x00, 0x0D, 0x34, 0x04, 0x00, 0x14, 0x15, 0x00, 0x00, 0x28, 0x00, 0x00, 0x33, 0x00, 0x00, 0x33, 0x1B, 0x00, 0x2A, 0x58, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x0A,
-                0x85, 0x84, 0xCD, 0x0B, 0x49, 0xE2, 0x35, 0x33, 0xFF, 0x5D, 0x1A, 0xFF, 0x7D, 0x0C, 0xD4, 0x8D, 0x0B, 0x8B, 0x86, 0x17, 0x3A, 0x6B, 0x2C, 0x00, 0x41, 0x42, 0x00, 0x19, 0x5B, 0x00, 0x00, 0x69, 0x04, 0x00, 0x6A, 0x4C, 0x00, 0x5E, 0x9E, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x0A,
-                0xC9, 0xC8, 0xFF, 0x4E, 0x8C, 0xFF, 0x78, 0x76, 0xFF, 0xA0, 0x5C, 0xFF, 0xC1, 0x4E, 0xFF, 0xD1, 0x4D, 0xE4, 0xCB, 0x5A, 0x92, 0xAF, 0x6E, 0x4C, 0x84, 0x85, 0x25, 0x5C, 0x9E, 0x2D, 0x3B, 0xAD, 0x5B, 0x2B, 0xAD, 0xA5, 0x32, 0xA1, 0xF7, 0x34, 0x33, 0x62, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x0A,
-                0xC9, 0xC8, 0xFF, 0x96, 0xAF, 0xFF, 0xA8, 0xA6, 0xFF, 0xB8, 0x9B, 0xFF, 0xC6, 0x96, 0xFF, 0xCC, 0x95, 0xFF, 0xCA, 0x9A, 0xEA, 0xBE, 0xA3, 0xCD, 0xAC, 0xAC, 0xBD, 0x9C, 0xB7, 0xC0, 0x8F, 0xBD, 0xD3, 0x88, 0xBD, 0xF2, 0x8B, 0xB8, 0xFF, 0x8B, 0x8A, 0xD6, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x0A,
-                // emphasize red + blue:
-                0x46, 0x34, 0x4C, 0x00, 0x08, 0x5C, 0x0B, 0x00, 0x7A, 0x26, 0x00, 0x77, 0x3D, 0x00, 0x5C, 0x4A, 0x00, 0x30, 0x48, 0x00, 0x00, 0x34, 0x00, 0x00, 0x14, 0x0F, 0x00, 0x00, 0x1D, 0x00, 0x00, 0x24, 0x00, 0x00, 0x22, 0x00, 0x00, 0x18, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x84, 0x6B, 0x8C, 0x0A, 0x30, 0xA1, 0x34, 0x19, 0xC8, 0x59, 0x07, 0xC5, 0x78, 0x00, 0xA1, 0x88, 0x01, 0x66, 0x86, 0x0E, 0x23, 0x6B, 0x23, 0x00, 0x40, 0x39, 0x00, 0x1C, 0x4C, 0x00, 0x00, 0x54, 0x00, 0x00, 0x52, 0x1A, 0x00, 0x44, 0x5C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xC7, 0xA7, 0xD2, 0x4C, 0x6B, 0xE8, 0x77, 0x54, 0xFF, 0x9C, 0x42, 0xFF, 0xBB, 0x39, 0xE7, 0xCC, 0x3C, 0xAB, 0xCA, 0x49, 0x68, 0xAE, 0x5E, 0x23, 0x83, 0x75, 0x00, 0x5E, 0x87, 0x00, 0x3F, 0x90, 0x23, 0x2E, 0x8E, 0x5F, 0x30, 0x80, 0xA2, 0x33, 0x23, 0x38, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xC7, 0xA7, 0xD2, 0x94, 0x8E, 0xDB, 0xA6, 0x85, 0xEB, 0xB5, 0x7D, 0xEA, 0xC2, 0x7A, 0xDB, 0xC9, 0x7B, 0xC2, 0xC8, 0x80, 0xA7, 0xBD, 0x89, 0x8A, 0xAB, 0x92, 0x7A, 0x9C, 0x9A, 0x7B, 0x8F, 0x9D, 0x8A, 0x88, 0x9C, 0xA3, 0x89, 0x97, 0xBE, 0x8A, 0x70, 0x93, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                // emphasize green + blue:
-                0x30, 0x41, 0x44, 0x00, 0x15, 0x5A, 0x00, 0x04, 0x71, 0x11, 0x00, 0x6B, 0x2A, 0x00, 0x49, 0x36, 0x00, 0x1C, 0x35, 0x00, 0x00, 0x25, 0x03, 0x00, 0x0C, 0x13, 0x00, 0x00, 0x26, 0x00, 0x00, 0x31, 0x00, 0x00, 0x2F, 0x00, 0x00, 0x25, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x64, 0x7D, 0x80, 0x00, 0x42, 0x9E, 0x15, 0x2C, 0xBC, 0x3C, 0x13, 0xB4, 0x5C, 0x05, 0x86, 0x6D, 0x07, 0x4B, 0x6B, 0x15, 0x09, 0x57, 0x29, 0x00, 0x36, 0x40, 0x00, 0x0E, 0x59, 0x00, 0x00, 0x67, 0x00, 0x00, 0x64, 0x24, 0x00, 0x57, 0x66, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x9E, 0xBE, 0xC3, 0x2D, 0x83, 0xE1, 0x4E, 0x6C, 0xFF, 0x76, 0x53, 0xF8, 0x97, 0x45, 0xC9, 0xA7, 0x47, 0x8D, 0xA5, 0x55, 0x4A, 0x91, 0x6A, 0x12, 0x6F, 0x81, 0x00, 0x47, 0x9A, 0x00, 0x27, 0xA8, 0x2A, 0x16, 0xA5, 0x66, 0x18, 0x98, 0xA9, 0x1F, 0x2E, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x9E, 0xBE, 0xC3, 0x6F, 0xA6, 0xCF, 0x7D, 0x9C, 0xDC, 0x8E, 0x92, 0xD8, 0x9B, 0x8C, 0xC5, 0xA2, 0x8D, 0xAD, 0xA1, 0x93, 0x91, 0x99, 0x9C, 0x7A, 0x8B, 0xA5, 0x6D, 0x7A, 0xAF, 0x70, 0x6D, 0xB5, 0x84, 0x66, 0xB4, 0x9C, 0x67, 0xAE, 0xB8, 0x6A, 0x83, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                // emphasize red + green + blue:
-                0x34, 0x34, 0x34, 0x00, 0x08, 0x4B, 0x00, 0x00, 0x61, 0x14, 0x00, 0x5F, 0x2B, 0x00, 0x44, 0x38, 0x00, 0x17, 0x36, 0x00, 0x00, 0x27, 0x00, 0x00, 0x0E, 0x0F, 0x00, 0x00, 0x1D, 0x00, 0x00, 0x24, 0x00, 0x00, 0x22, 0x00, 0x00, 0x17, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x6A, 0x6A, 0x6A, 0x00, 0x30, 0x88, 0x1B, 0x19, 0xA7, 0x40, 0x07, 0xA3, 0x5F, 0x00, 0x7F, 0x6F, 0x01, 0x44, 0x6D, 0x0E, 0x02, 0x59, 0x23, 0x00, 0x38, 0x39, 0x00, 0x13, 0x4B, 0x00, 0x00, 0x54, 0x00, 0x00, 0x52, 0x0F, 0x00, 0x44, 0x51, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xA6, 0xA6, 0xA6, 0x35, 0x6B, 0xC5, 0x56, 0x54, 0xE3, 0x7B, 0x42, 0xE0, 0x9B, 0x39, 0xBB, 0xAB, 0x3C, 0x80, 0xA9, 0x49, 0x3D, 0x95, 0x5E, 0x04, 0x73, 0x75, 0x00, 0x4E, 0x87, 0x00, 0x2F, 0x90, 0x0E, 0x1E, 0x8E, 0x4A, 0x20, 0x80, 0x8D, 0x23, 0x23, 0x23, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0xA6, 0xA6, 0xA6, 0x78, 0x8E, 0xB3, 0x85, 0x85, 0xC0, 0x95, 0x7D, 0xBE, 0xA2, 0x79, 0xAF, 0xA8, 0x7A, 0x96, 0xA8, 0x80, 0x7B, 0x9F, 0x89, 0x64, 0x91, 0x92, 0x57, 0x82, 0x9A, 0x59, 0x75, 0x9D, 0x68, 0x6E, 0x9C, 0x80, 0x6F, 0x97, 0x9C, 0x70, 0x70, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        static uint[] NesPalInts = {
+            // each uint represents the ARGB components of a color.
+            // there's 64 colors, but this is also how I implement specific values for the PPU's emphasis bits.
+            // default palette:
+            0xFF656565, 0xFF002A84, 0xFF1513A2, 0xFF3A019E, 0xFF59007A, 0xFF6A003E, 0xFF680800, 0xFF531D00, 0xFF323400, 0xFF0D4600, 0xFF004F00, 0xFF004C09, 0xFF003F4B, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFFAEAEAE, 0xFF175FD6, 0xFF4341FF, 0xFF7529FA, 0xFF9E1DCA, 0xFFB4207B, 0xFFB13322, 0xFF964E00, 0xFF6A6C00, 0xFF398400, 0xFF0F9000, 0xFF008D33, 0xFF007B8C, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFFFEFFFF, 0xFF66AFFF, 0xFF9390FF, 0xFFC578FF, 0xFFEE6CFF, 0xFFFF6FCA, 0xFFFF8271, 0xFFE69E25, 0xFFBABC00, 0xFF88D501, 0xFF5EE132, 0xFF47DD82, 0xFF4ACBDC, 0xFF4E4E4E, 0xFF000000, 0xFF000000,
+            0xFFFEFFFF, 0xFFC0DEFF, 0xFFD2D1FF, 0xFFE7C7FF, 0xFFF8C2FF, 0xFFFFC3E9, 0xFFFFCBC4, 0xFFF5D7A5, 0xFFE2E394, 0xFFCEED96, 0xFFBCF2AA, 0xFFB3F1CB, 0xFFB4E9F0, 0xFFB6B6B6, 0xFF000000, 0xFF000000,
+            // emphasize red:
+            0xFF66423E, 0xFF000D58, 0xFF150075, 0xFF380075, 0xFF560058, 0xFF670027, 0xFF680000, 0xFF530D00, 0xFF341E00, 0xFF102B00, 0xFF003000, 0xFF002B00, 0xFF001C24, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFFAF7E78, 0xFF19379A, 0xFF4320C1, 0xFF720FC1, 0xFF9A089A, 0xFFB10F59, 0xFFB2220F, 0xFF963700, 0xFF6C4D00, 0xFF3D5F00, 0xFF166500, 0xFF005F0C, 0xFF004B55, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFFFFC0B8, 0xFF6878DB, 0xFF9361FF, 0xFFC24FFF, 0xFFEA49DB, 0xFFFF4F99, 0xFFFF634E, 0xFFE77808, 0xFFBC8F00, 0xFF8DA000, 0xFF65A708, 0xFF4DA04A, 0xFF4C8D95, 0xFF4F2F2B, 0xFF000000, 0xFF000000,
+            0xFFFFC0B8, 0xFFC1A2C6, 0xFFD399D6, 0xFFE792D6, 0xFFF78FC6, 0xFFFF92AB, 0xFFFF9A8C, 0xFFF6A26F, 0xFFE4AC5F, 0xFFD1B35F, 0xFFC0B66F, 0xFFB7B38B, 0xFFB6ABA9, 0xFFB7857E, 0xFF000000, 0xFF000000,
+            // emphasize green:
+            0xFF395D2C, 0xFF002452, 0xFF000D6A, 0xFF140064, 0xFF2D0041, 0xFF3E0010, 0xFF3F0300, 0xFF301800, 0xFF162F00, 0xFF004200, 0xFF004C00, 0xFF004700, 0xFF003924, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFF71A360, 0xFF005691, 0xFF1939B1, 0xFF4020A9, 0xFF61127B, 0xFF78183A, 0xFF792C00, 0xFF654800, 0xFF426600, 0xFF1B7E00, 0xFF008D00, 0xFF00860A, 0xFF007254, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFFAEF099, 0xFF32A3CB, 0xFF5684EB, 0xFF7E6BE3, 0xFF9E5DB5, 0xFFB66472, 0xFFB77728, 0xFFA39400, 0xFF7FB200, 0xFF57CB00, 0xFF37D900, 0xFF1FD342, 0xFF1EBF8D, 0xFF27471C, 0xFF000000, 0xFF000000,
+            0xFFAEF099, 0xFF7BD0AD, 0xFF8AC3BA, 0xFF9AB9B7, 0xFFA8B3A4, 0xFFB1B689, 0xFFB2BE6A, 0xFFAACA50, 0xFF9BD643, 0xFF8BE146, 0xFF7DE65A, 0xFF74E475, 0xFF73DC94, 0xFF77AA65, 0xFF000000, 0xFF000000,
+            // emphasize red + green:
+            0xFF3F3F25, 0xFF000B46, 0xFF00005D, 0xFF18005A, 0xFF2F003F, 0xFF40000E, 0xFF410000, 0xFF320A00, 0xFF191A00, 0xFF002800, 0xFF002F00, 0xFF002A00, 0xFF001B1C, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFF797A55, 0xFF003581, 0xFF201F9F, 0xFF450D9C, 0xFF640478, 0xFF7B0A36, 0xFF7C1E00, 0xFF683200, 0xFF474900, 0xFF225B00, 0xFF036400, 0xFF005D00, 0xFF004A4A, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFFBABB8B, 0xFF3E75B7, 0xFF605ED6, 0xFF854CD2, 0xFFA443AE, 0xFFBB4A6C, 0xFFBD5D21, 0xFFA87200, 0xFF878900, 0xFF619B00, 0xFF42A400, 0xFF2B9D34, 0xFF2A8A7F, 0xFF2C2D15, 0xFF000000, 0xFF000000,
+            0xFFBABB8B, 0xFF879E9D, 0xFF9595AA, 0xFFA48DA8, 0xFFB18999, 0xFFBB8C7E, 0xFFBB945F, 0xFFB39D48, 0xFFA5A63B, 0xFF96AE3D, 0xFF89B14C, 0xFF7FAF67, 0xFF7FA686, 0xFF80805A, 0xFF000000, 0xFF000000,
+            // emphasize blue:
+            0xFF47477C, 0xFF001A8C, 0xFF0B0AA9, 0xFF2900A3, 0xFF410081, 0xFF4D004A, 0xFF49000D, 0xFF340400, 0xFF141500, 0xFF002800, 0xFF003300, 0xFF00331B, 0xFF002A58, 0xFF000000, 0xFF00000A, 0xFF00000A,
+            0xFF8584CD, 0xFF0B49E2, 0xFF3533FF, 0xFF5D1AFF, 0xFF7D0CD4, 0xFF8D0B8B, 0xFF86173A, 0xFF6B2C00, 0xFF414200, 0xFF195B00, 0xFF006904, 0xFF006A4C, 0xFF005E9E, 0xFF00000A, 0xFF00000A, 0xFF00000A,
+            0xFFC9C8FF, 0xFF4E8CFF, 0xFF7876FF, 0xFFA05CFF, 0xFFC14EFF, 0xFFD14DE4, 0xFFCB5A92, 0xFFAF6E4C, 0xFF848525, 0xFF5C9E2D, 0xFF3BAD5B, 0xFF2BADA5, 0xFF32A1F7, 0xFF343362, 0xFF00000A, 0xFF00000A,
+            0xFFC9C8FF, 0xFF96AFFF, 0xFFA8A6FF, 0xFFB89BFF, 0xFFC696FF, 0xFFCC95FF, 0xFFCA9AEA, 0xFFBEA3CD, 0xFFACACBD, 0xFF9CB7C0, 0xFF8FBDD3, 0xFF88BDF2, 0xFF8BB8FF, 0xFF8B8AD6, 0xFF00000A, 0xFF00000A,
+            // emphasize red + blue:
+            0xFF46344C, 0xFF00085C, 0xFF0B007A, 0xFF260077, 0xFF3D005C, 0xFF4A0030, 0xFF480000, 0xFF340000, 0xFF140F00, 0xFF001D00, 0xFF002400, 0xFF002200, 0xFF001829, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFF846B8C, 0xFF0A30A1, 0xFF3419C8, 0xFF5907C5, 0xFF7800A1, 0xFF880166, 0xFF860E23, 0xFF6B2300, 0xFF403900, 0xFF1C4C00, 0xFF005400, 0xFF00521A, 0xFF00445C, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFFC7A7D2, 0xFF4C6BE8, 0xFF7754FF, 0xFF9C42FF, 0xFFBB39E7, 0xFFCC3CAB, 0xFFCA4968, 0xFFAE5E23, 0xFF837500, 0xFF5E8700, 0xFF3F9023, 0xFF2E8E5F, 0xFF3080A2, 0xFF332338, 0xFF000000, 0xFF000000,
+            0xFFC7A7D2, 0xFF948EDB, 0xFFA685EB, 0xFFB57DEA, 0xFFC27ADB, 0xFFC97BC2, 0xFFC880A7, 0xFFBD898A, 0xFFAB927A, 0xFF9C9A7B, 0xFF8F9D8A, 0xFF889CA3, 0xFF8997BE, 0xFF8A7093, 0xFF000000, 0xFF000000,
+            // emphasize green + blue:
+            0xFF304144, 0xFF00155A, 0xFF000471, 0xFF11006B, 0xFF2A0049, 0xFF36001C, 0xFF350000, 0xFF250300, 0xFF0C1300, 0xFF002600, 0xFF003100, 0xFF002F00, 0xFF002531, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFF647D80, 0xFF00429E, 0xFF152CBC, 0xFF3C13B4, 0xFF5C0586, 0xFF6D074B, 0xFF6B1509, 0xFF572900, 0xFF364000, 0xFF0E5900, 0xFF006700, 0xFF006424, 0xFF005766, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFF9EBEC3, 0xFF2D83E1, 0xFF4E6CFF, 0xFF7653F8, 0xFF9745C9, 0xFFA7478D, 0xFFA5554A, 0xFF916A12, 0xFF6F8100, 0xFF479A00, 0xFF27A82A, 0xFF16A566, 0xFF1898A9, 0xFF1F2E30, 0xFF000000, 0xFF000000,
+            0xFF9EBEC3, 0xFF6FA6CF, 0xFF7D9CDC, 0xFF8E92D8, 0xFF9B8CC5, 0xFFA28DAD, 0xFFA19391, 0xFF999C7A, 0xFF8BA56D, 0xFF7AAF70, 0xFF6DB584, 0xFF66B49C, 0xFF67AEB8, 0xFF6A8386, 0xFF000000, 0xFF000000,
+            // emphasize red + green + blue:
+            0xFF343434, 0xFF00084B, 0xFF000061, 0xFF14005F, 0xFF2B0044, 0xFF380017, 0xFF360000, 0xFF270000, 0xFF0E0F00, 0xFF001D00, 0xFF002400, 0xFF002200, 0xFF001721, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFF6A6A6A, 0xFF003088, 0xFF1B19A7, 0xFF4007A3, 0xFF5F007F, 0xFF6F0144, 0xFF6D0E02, 0xFF592300, 0xFF383900, 0xFF134B00, 0xFF005400, 0xFF00520F, 0xFF004451, 0xFF000000, 0xFF000000, 0xFF000000,
+            0xFFA6A6A6, 0xFF356BC5, 0xFF5654E3, 0xFF7B42E0, 0xFF9B39BB, 0xFFAB3C80, 0xFFA9493D, 0xFF955E04, 0xFF737500, 0xFF4E8700, 0xFF2F900E, 0xFF1E8E4A, 0xFF20808D, 0xFF232323, 0xFF000000, 0xFF000000,
+            0xFFA6A6A6, 0xFF788EB3, 0xFF8585C0, 0xFF957DBE, 0xFFA279AF, 0xFFA87A96, 0xFFA8807B, 0xFF9F8964, 0xFF919257, 0xFF829A59, 0xFF759D68, 0xFF6E9C80, 0xFF6F979C, 0xFF707070, 0xFF000000, 0xFF000000
+        };
 
-            };
-            int i = 0;
-            int j = 0;
-            while (j < 512) // This loop just sets up the colors with the values from that big array.
-            {
-                Palette[j] = Color.FromArgb(Pal[i++], Pal[i++], Pal[i++]);
-                NesPalInts[j] = Palette[j].ToArgb();
-                j++;
-            }
-            return Palette; // and the value returned from this function is the array of colors.
-        }
-
-        static int[] NesPalInts; // initialized in the following function
-        Color[] NESPal = SetupPalette(); // This runs the function.
         int chosenColor; // During screen rendering, this value is the index into the color array.
-        public DirectBitmap Screen = new DirectBitmap(256, 240); // This uses a class called "DirectBitmap". It's pretty much jsut the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
-        public DirectBitmap NTSCScreen = new DirectBitmap(256*8, 240); // This uses a class called "DirectBitmap". It's pretty much jsut the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+        public DirectBitmap Screen = new DirectBitmap(256, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+        public DirectBitmap NTSCScreen = new DirectBitmap(256*8, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+        public DirectBitmap BoarderedScreen = new DirectBitmap(341, 262); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+        public DirectBitmap BoarderedNTSCScreen = new DirectBitmap(341 * 8, 262); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
 
         //Debugging
         public bool Logging;    // If set, the tracelogger will record all instructions ran.
@@ -389,7 +373,7 @@ namespace TriCNES
             APU_DMC_ShifterBitsRemaining = 8;
             APU_ChannelTimer_DMC = APU_DMCRateLUT[0];
             DoReset = true; // This is used to force the first instruction at power on to be the RESET instruction.
-            PPU_RESET = true;
+            PPU_RESET = false; // I'm not even 100% certain my console has this behavior. I'll set it to false for now.
 
 
         }
@@ -457,7 +441,7 @@ namespace TriCNES
             operationCycle = 0;
             operationComplete = false;
             DoReset = true;
-            PPU_RESET = true;
+            PPU_RESET = false; // I'm not even 100% certain my console has this behavior. I'll set it to false for now.
             // in theory, the CPU/PPU clock would be given random values. Let's just assume no changes.
         }
 
@@ -501,8 +485,8 @@ namespace TriCNES
         // The PPU state machine:
         // In summary, the steps that are taken when writing to 2007 do not happen in a single ppu cycle.
         public byte PPU_Data_StateMachine = 0x7;                   // The value of the state machine indicates what step should be taken on any given ppu cycle.
-        public bool PPU_Data_SateMachine_Read;                      // If this is a read instruction, the state machine behaves differently
-        public bool PPU_Data_SateMachine_Read_Delayed;              // If the read cycle happens immediately before a write cycle, there's also different behavior.
+        public bool PPU_Data_StateMachine_Read;                     // If this is a read instruction, the state machine behaves differently
+        public bool PPU_Data_StateMachine_Read_Delayed;             // If the read cycle happens immediately before a write cycle, there's also different behavior.
         public bool PPU_Data_StateMachine_PerformMysteryWrite;      // This is only set during a read-modify-write instruction to $2007, if the current CPU/PPU alignment would result in "the mystery write" occuring.
         public byte PPU_Data_StateMachine_InputValue;               // This is the value that was written to $2007 while interrupting the state machine.
         public bool PPU_Data_StateMachine_UpdateVRAMAddressEarly;   // During read-modify-write instructions to $2007, certain CPU/PPU alignments will update the VRAM address earlier than expected.
@@ -550,8 +534,6 @@ namespace TriCNES
             // CPU
             // PPU
             // APU
-
-
 
             if (CPUClock == 0)
             {
@@ -602,7 +584,6 @@ namespace TriCNES
                     ResetM2Filter = true; // the filter gets reset in the function that clocks the MMC3 IRQ
                 }
             }
-
 
             if (APUClock == 0)
             {
@@ -765,7 +746,6 @@ namespace TriCNES
                         // 1.) the controllers are un-strobed. Ready for the next strobe.
                         // 2.) the controller ports are read, while still strobed. This allows data to be streamed in through the A button.
 
-
                         if (TAS_ReadingTAS) // This is specifically how I load inputs from a TAS, and has nothing to do with actual NES behavior.
                         {
                             if (TAS_InputSequenceIndex < TAS_InputLog.Length)
@@ -876,7 +856,6 @@ namespace TriCNES
                         APU_Silent = false;
                     }
                 }
-
             }
             if (APU_DelayedDMC4015 > 0)
             {
@@ -891,9 +870,7 @@ namespace TriCNES
                 }
             }
 
-
             APU_ChannelTimer_Triangle--; // every CPU cycle.
-
 
             // clock sequencer
             if ((APU_FrameCounterReset & 0x80) == 0)
@@ -960,8 +937,7 @@ namespace TriCNES
                         APU_QuarterFrameClock = true;
                         APU_Status_FrameInterrupt = true;
                         IRQ_LevelDetector |= !APU_FrameCounterInhibitIRQ;
-                        APU_HalfFrameClock = true;
-                        
+                        APU_HalfFrameClock = true;                        
                         break;
                     case 29830:
                         APU_Status_FrameInterrupt = !APU_FrameCounterInhibitIRQ;
@@ -992,8 +968,6 @@ namespace TriCNES
                 else
                 {
                     APU_Envelope_DividerClock = true;
-
-
                 }
             }
 
@@ -1137,6 +1111,8 @@ namespace TriCNES
         public byte PrevPrevPrevDotColor; // And this is from 2 cycles ago.
         public int PrevPrevPrevPrevDotColor; // This is used with NTSC signal decoding.
         public byte PaletteRAMAddress;
+        public bool ThisDotReadFromPaletteRAM;
+
 
         public bool NMI_PinsSignal; // I'm using this to detect the rising edge of $2000.7 and $2002.7
         public bool NMI_PreviousPinsSignal; // I'm using this to detect the rising edge of $2000.7 and $2002.7
@@ -1229,7 +1205,7 @@ namespace TriCNES
 
                 if (PPU_Data_StateMachine == 1) // 1 ppu cycle after the read occurs
                 {
-                    if (PPU_Data_SateMachine_Read && !PPU_Data_StateMachine_UpdateVRAMBufferLate) // if this is a read, and PPU_Data_StateMachine_UpdateVRAMBufferLate is not set: (I think this is just for alignments 2 and 3?)
+                    if (PPU_Data_StateMachine_Read && !PPU_Data_StateMachine_UpdateVRAMBufferLate) // if this is a read, and PPU_Data_StateMachine_UpdateVRAMBufferLate is not set: (I think this is just for alignments 2 and 3?)
                     {
                         if (PPU_ReadWriteAddress >= 0x3F00) // If the read/write address is where the Palette info is...
                         {
@@ -1249,7 +1225,7 @@ namespace TriCNES
                     if (PPU_Data_StateMachine_NormalWriteBehavior)
                     {
                         PPU_Data_StateMachine_NormalWriteBehavior = false;
-                        if (!PPU_Data_SateMachine_Read || !PPU_Data_SateMachine_Read_Delayed)
+                        if (!PPU_Data_StateMachine_Read || !PPU_Data_StateMachine_Read_Delayed)
                         {
                             PPU_AddressBus = PPU_ReadWriteAddress;
                             StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
@@ -1257,7 +1233,7 @@ namespace TriCNES
                     }
                     // if the state machine *is* interrupted, this runs
                     else
-                    if (!PPU_Data_SateMachine_Read && PPU_Data_StateMachine_PerformMysteryWrite)
+                    if (!PPU_Data_StateMachine_Read && PPU_Data_StateMachine_PerformMysteryWrite)
                     {
                         // the mystery write
 
@@ -1293,7 +1269,7 @@ namespace TriCNES
                 if (PPU_Data_StateMachine == 4) // 4 ppu cycles after a read or  1 ppu cycle after a write occurs
                 {
                     // This is alignment-specific behavior due to a Read-Modify-Write instruction on address $2007
-                    if (PPU_Data_SateMachine_Read && PPU_Data_StateMachine_UpdateVRAMBufferLate)
+                    if (PPU_Data_StateMachine_Read && PPU_Data_StateMachine_UpdateVRAMBufferLate)
                     {
                         if (PPU_ReadWriteAddress >= 0x3F00) // If the read/write address is where the Palette info is...
                         {
@@ -1316,7 +1292,7 @@ namespace TriCNES
                         PPU_ReadWriteAddress &= 0x3FFF; // and truncate to just 15 bits
                         PPU_AddressBus = PPU_ReadWriteAddress;
                         // Read from the new VRAM address
-                        if (PPU_Data_SateMachine_Read)
+                        if (PPU_Data_StateMachine_Read)
                         {
                             if (PPU_ReadWriteAddress >= 0x3F00) // If the read/write address is where the Palette info is...
                             {
@@ -1337,7 +1313,7 @@ namespace TriCNES
 
                     // The mystery write strikes back! (Keep in mind, this is only used during state machine shenanigans. Normal writes to $2007 happen on cycle 3 of the state machine.
                     // (at least that's how I'm emulating it? More research is needed for the actual cycle-by-cycle breakdown of this state machine.)
-                    if (!PPU_Data_SateMachine_Read || !PPU_Data_SateMachine_Read_Delayed)
+                    if (!PPU_Data_StateMachine_Read || !PPU_Data_StateMachine_Read_Delayed)
                     {
                         if (PPU_Data_StateMachine_PerformMysteryWrite)
                         {
@@ -1348,7 +1324,7 @@ namespace TriCNES
                             }
                         }
                     }
-                    PPU_Data_SateMachine_Read = PPU_Data_SateMachine_Read_Delayed;
+                    PPU_Data_StateMachine_Read = PPU_Data_StateMachine_Read_Delayed;
                     PPU_Data_StateMachine_PerformMysteryWrite = false;
                 }
                 // And that's it for the PPU $2007 State Machine.
@@ -1437,8 +1413,10 @@ namespace TriCNES
                         PPU_RESET = false;
                     }
                     // else, address $2002 was read on this ppu cycle. no VBlank flag.
-
-                    FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
+                    if(!PPU_ShowScreenBoarders)
+                    {
+                        FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
+                    }
                     if (!ClockFiltering) // specifically for TASing stuff. Increment the index for the input log.
                     {
                         // If this was using "SubFrame", TAS_InputSequenceIndex is incremented evnever the controller is strobed.
@@ -1449,6 +1427,13 @@ namespace TriCNES
 
                 }
 
+            }
+            else if(PPU_Scanline == 242 && PPU_Dot == 1)
+            {
+                if (PPU_ShowScreenBoarders) // if we're showing the boarders, we need to wait for 2 more scanlines to render.
+                {
+                    FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
+                }
             }
             else if (PPU_Scanline == 260 && PPU_Dot == 340)
             {
@@ -1486,9 +1471,9 @@ namespace TriCNES
                     SkippedPreRenderDot341 = true;
                 }
             }
-            if(PPU_OddFrame && PPU_Scanline == 0 && PPU_Dot == 2)
+            if(PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline == 0 && PPU_Dot == 2)
             {
-                SkippedPreRenderDot341 = false; // This varialbe is used for some esoteric business on dot 1 of scanline 0.
+                SkippedPreRenderDot341 = false; // This variable is used for some esoteric business on dot 1 of scanline 0.
             }
             // Okay, now that we're updated all those flags, let's render stuff to the screen!
 
@@ -1565,12 +1550,11 @@ namespace TriCNES
                 }
             }
 
+            PrevPrevPrevDotColor = PrevPrevDotColor; // Drawing a color to the screen has a 3(?) ppu cycle delay between deciding the color, and drawing it.
+            PrevPrevDotColor = PrevDotColor;
+            PrevDotColor = DotColor; // These varaibles here just record the color, and swap them through these varaibles so it can be used 3 cycles after it was chosen.
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
             {
-                PrevPrevPrevDotColor = PrevPrevDotColor; // Drawing a color to the screen has a 3(?) ppu cycle delay between deciding the color, and drawing it.
-                PrevPrevDotColor = PrevDotColor;
-                PrevDotColor = DotColor; // These varaibles here just record the color, and swap them through these varaibles so it can be used 3 cycles after it was chosen.
-
                 if ((PPU_Dot > 0 && PPU_Dot <= 257) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
                 {
                     if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
@@ -1583,41 +1567,56 @@ namespace TriCNES
 
                     if (PPU_Scanline < 241)
                     {
-                        PPU_Render_CalculatePixel(); // this determines the color of the pixel being drawn.
+                        PPU_Render_CalculatePixel(false); // this determines the color of the pixel being drawn.
                     }
 
                     
                     UpdateSpriteShiftRegisters(); // update shift registers for the sprites.
                     
                 }
-                DrawToScreen();
-
-
-                if (PPU_DecodeSignal && (PPU_Dot == 0) && PPU_Scanline < 241)
+                else if(PPU_ShowScreenBoarders)
                 {
-                    ntsc_signal_of_dot_0 = ntsc_signal;
-                    chosenColor = PaletteRAM[0x00] & 0x3F;
-                    if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                    PPU_Render_CalculatePixel(true); // this determines the color of the pixel being drawn.
+                }
+                if (!PPU_ShowScreenBoarders)
+                {
+                    DrawToScreen();
+
+                    if (PPU_DecodeSignal && (PPU_Dot == 0) && PPU_Scanline < 241)
                     {
-                        chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        ntsc_signal_of_dot_0 = ntsc_signal;
+                        chosenColor = PaletteRAM[0x00] & 0x3F;
+                        if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                        {
+                            chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        }
+                        // emphasis bits
+                        int emphasis = 0;
+                        if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
+                        if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
+                        if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                        PrevPrevPrevPrevDotColor = chosenColor | emphasis; // set up samples for dot 1
+                        PPU_SignalDecode(chosenColor | emphasis);
                     }
-                    // emphasis bits
-                    int emphasis = 0;
-                    if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
-                    if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
-                    PrevPrevPrevPrevDotColor = chosenColor | emphasis; // set up samples for dot 1
-                    PPU_SignalDecode(chosenColor | emphasis);
-                }
-                if (PPU_DecodeSignal && (PPU_Dot == 260) && PPU_Scanline < 241)
-                {
-                    PPU_SignalDecode(PrevPrevPrevPrevDotColor);
-                }
-                else if (PPU_DecodeSignal && (PPU_Dot == 261) && PPU_Scanline < 241)
-                {
-                    RenderNTSCScanline();
+                    if (PPU_DecodeSignal && (PPU_Dot == 260) && PPU_Scanline < 241)
+                    {
+                        PPU_SignalDecode(PrevPrevPrevPrevDotColor);
+                    }
+                    else if (PPU_DecodeSignal && (PPU_Dot == 261) && PPU_Scanline < 241)
+                    {
+                        RenderNTSCScanline();
+                    }
                 }
             }
+            else if (PPU_ShowScreenBoarders)
+            {
+                PPU_Render_CalculatePixel(true); // this determines the color of the pixel being drawn.
+            }
+            if (PPU_ShowScreenBoarders)
+            {
+                DrawToBoarderedScreen();
+            }
+            ThisDotReadFromPaletteRAM = false;
 
             if (PPU_DecodeSignal)
             {
@@ -1642,7 +1641,7 @@ namespace TriCNES
                 if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
                 if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
                 int scanline0OddFrameOffset = 0;
-                if (PPU_Scanline == 0 && PPU_OddFrame)
+                if (PPU_Scanline == 0 && PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
                 {
                     scanline0OddFrameOffset = 1;
                 }
@@ -1656,25 +1655,25 @@ namespace TriCNES
                         }
                         else
                         {
-                            Screen.SetPixel(PPU_Dot - 4 - scanline0OddFrameOffset, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
+                            Screen.SetPixel(PPU_Dot - 4 - scanline0OddFrameOffset, PPU_Scanline, unchecked ((int)NesPalInts[chosenColor | emphasis])); // this sets the pixel on screen to the chosen color.
                         }
                     }
                     else
                     {
-                        Screen.SetPixel(PPU_Dot - 4 - scanline0OddFrameOffset, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
+                        Screen.SetPixel(PPU_Dot - 4 - scanline0OddFrameOffset, PPU_Scanline, unchecked ((int)NesPalInts[chosenColor | emphasis])); // this sets the pixel on screen to the chosen color.
                     }
                 }
                 else
                 {
                     if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
                     {
-                        chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        chosenColor &= 0x30; //To force greyscale, bitwise AND this color with 0x30
                     }
                     PPU_SignalDecode(chosenColor | emphasis);
                     PrevPrevPrevPrevDotColor = chosenColor | emphasis;
                 }
             }
-            if (PPU_Scanline == 0 && PPU_OddFrame && PPU_Dot == 259)
+            if (PPU_Scanline == 0 && PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Dot == 259)
             {
                 // draw the backdrop.
                 chosenColor = PaletteRAM[0];
@@ -1685,17 +1684,237 @@ namespace TriCNES
                 if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
                 if (!PPU_DecodeSignal)
                 {
-                    Screen.SetPixel(255, PPU_Scanline, NesPalInts[chosenColor | emphasis]); // this sets the pixel on screen to the chosen color.
+                    Screen.SetPixel(255, PPU_Scanline, unchecked ((int)NesPalInts[chosenColor | emphasis])); // this sets the pixel on screen to the chosen color.
                 }
                 else
                 {
                     if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
                     {
-                        chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        chosenColor &= 0x30; //To force greyscale, bitwise AND this color with 0x30
                     }
                     PPU_SignalDecode(chosenColor | emphasis);
                     PrevPrevPrevPrevDotColor = chosenColor | emphasis;
                 }
+            }
+        }
+
+        void DrawToBoarderedScreen()
+        {
+
+            int dot = PPU_Dot;
+            int scanline = PPU_Scanline;
+            int emphasis = 0;
+
+            int boarderedDot = 0;
+            int boarderedScanline = scanline;
+
+            if(PPU_ShowScreenBoarders && dot == 325)
+            {
+                ntsc_signal_of_dot_0 = ntsc_signal;
+            }
+            if (PPU_DecodeSignal && dot == 277)
+            {
+                RenderNTSCScanline();
+            }
+
+            if (scanline < 241 || ((scanline == 241 && dot < 277)) || scanline == 261)
+            {
+                
+                if (dot >= 1 && dot <= 256) // visible pixels.
+                {
+                    if (scanline == 261)
+                    {
+                        chosenColor = 0x0F;
+                    }
+                    else
+                    {
+                      
+                        chosenColor = PrevPrevPrevDotColor;
+                        
+                        if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                        {
+                            chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        }
+                        // emphasis bits
+                        if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
+                        if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
+                        if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                    }
+                    boarderedDot = dot + 64;
+                    boarderedScanline = scanline;
+                }
+                else if (dot >= 257 && dot <= 267) // right boarder
+                {
+                    if (scanline == 261)
+                    {
+                        chosenColor = 0x0F;
+                    }
+                    else
+                    {
+                        // backdrop.
+                        chosenColor = PrevPrevPrevDotColor;
+                        if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                        {
+                            chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        }
+                        // emphasis bits
+                        if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
+                        if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
+                        if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                    }
+                    boarderedDot = dot + 64;
+                    boarderedScanline = scanline;
+                }
+                else if (dot >= 268 && dot <= 276) // front porch 
+                {
+                    // black.
+                    chosenColor = 0x0F;
+                    boarderedDot = dot + 64;
+                    boarderedScanline = scanline;
+                }
+                else if (dot >= 277 && dot <= 301) // horizontal sync 
+                {
+                    // black.
+                    chosenColor = 0x0F;
+                    boarderedDot = dot - 277;
+                    boarderedScanline = scanline + 1;
+                }
+                else if (dot >= 302 && dot <= 305) // back porch 
+                {
+                    // black.
+                    chosenColor = 0x0F;
+                    boarderedDot = dot - 277;
+                    boarderedScanline = scanline + 1;
+                }
+                else if (dot >= 306 && dot <= 320) // colorburst 
+                {
+                    // extremely dark olive.
+                    chosenColor = 0x08;
+                    emphasis = 0x1C0;
+                    boarderedDot = dot - 277;
+                    boarderedScanline = scanline + 1;
+                }
+                else if (dot >= 321 && dot <= 325) // back porch 
+                {
+                    // black.
+                    chosenColor = 0x0F;
+                    boarderedDot = dot - 277;
+                    boarderedScanline = scanline + 1;
+                }
+                else if (dot == 326) // pulse  
+                {
+
+                    // backdrop in greyscale
+                    if (ThisDotReadFromPaletteRAM)
+                    {
+                        chosenColor = PrevPrevPrevDotColor;
+                    }
+                    else
+                    {
+                        chosenColor = PrevPrevPrevDotColor & 0x30;
+                    }
+
+                    // emphasis bits
+                    if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
+                    if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                    
+                    boarderedDot = dot - 277;
+                    boarderedScanline = scanline + 1;
+                }
+                else // right boarder
+                {
+                    // backdrop.
+                    if (scanline == 261 && dot == 0)
+                    {
+                        chosenColor = 0x0F;
+                    }
+                    else
+                    {
+                        chosenColor = PrevPrevPrevDotColor;
+
+                        if (PPU_Mask_Greyscale) // if the ppu greyscale mode is active,
+                        {
+                            chosenColor &= 0x30; //To force greyscale, bitiwse AND this color with 0x30
+                        }
+                        // emphasis bits
+                        if (PPU_Mask_EmphasizeRed) { emphasis |= 0x40; } // if emhpasizing r, add 0x40 to the index into the palette LUT.
+                        if (PPU_Mask_EmphasizeGreen) { emphasis |= 0x80; } // if emhpasizing g, add 0x80 to the index into the palette LUT.
+                        if (PPU_Mask_EmphasizeBlue) { emphasis |= 0x100; } // if emhpasizing b, add 0x100 to the index into the palette LUT.
+                    }
+                    if (dot != 0)
+                    {
+                        boarderedDot = dot - 277;
+                        boarderedScanline = scanline + 1;
+                        
+                    }
+                    else
+                    {
+                        boarderedDot = dot + 64;
+                        boarderedScanline = scanline;
+                    }
+                }
+            }
+            else
+            {
+                if (scanline >= 245 && scanline <= 247)
+                {
+                    // black.
+                    chosenColor = 0x0F;
+                    if (dot >= 277)
+                    {
+                        boarderedDot = dot - 277;
+                        boarderedScanline = scanline + 1;
+                    }
+                    else
+                    {
+                        boarderedDot = dot + 64;
+                        boarderedScanline = scanline;
+                    }
+                }
+                else
+                {
+                    // colorburst happens on this line too.
+                    if (dot >= 306 && dot <= 320) // colorburst 
+                    {
+                        // extremely dark olive.
+                        chosenColor = 0x08;
+                        emphasis = 0x1C0;
+                        boarderedDot = dot - 277;
+                        boarderedScanline = scanline + 1;
+                    }
+                    else
+                    {
+                        // black.
+                        chosenColor = 0x0F;
+                        if (dot >= 277)
+                        {
+                            boarderedDot = dot - 277;
+                            boarderedScanline = scanline + 1;
+                        }
+                        else
+                        {
+                            boarderedDot = dot + 64;
+                            boarderedScanline = scanline;
+                        }
+                    }
+                }
+            }
+            if (PPU_Scanline == 0 && PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Dot < 277)
+            {
+                boarderedDot--;
+            }
+            if (boarderedScanline == 0x106)
+            {
+                boarderedScanline = 0;
+            }
+            if (PPU_DecodeSignal)
+            {
+                PPU_SignalDecode(chosenColor | emphasis);
+            }
+            else
+            {
+                BoarderedScreen.SetPixel(boarderedDot, boarderedScanline, unchecked((int)NesPalInts[chosenColor | emphasis])); // this sets the pixel on screen to the chosen color.
             }
         }
 
@@ -1711,7 +1930,8 @@ namespace TriCNES
 		        };
         public byte ntsc_signal;
         public byte ntsc_signal_of_dot_0;
-        public float[] NTSC_Samples = new float[257*8 + 24];
+        public float[] NTSC_Samples = new float[257 * 8 + 24];
+        public float[] Boardered_NTSC_Samples = new float[341 * 8 + 24];
         static float[] Levels =
             {
             (Voltages[0] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
@@ -1771,6 +1991,7 @@ namespace TriCNES
         static float ntsc_black = 0.312f, ntsc_white = 1.100f;
         void PPU_SignalDecode(int nesColor)
         {
+            bool boardered = PPU_ShowScreenBoarders;
             byte phase = ntsc_signal;
             int i = 0;
             while (i < 8)
@@ -1789,13 +2010,33 @@ namespace TriCNES
                 if (colInd == 0) { low = high; } // For color 0, only high level is emitted
                 if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
                 float sample = InColorPhase(colInd, phase) ? high : low;
-                if (PPU_Dot == 0)
+                if (boardered)
                 {
-                    NTSC_Samples[i] = sample;
+                    int dot = PPU_Dot;
+                    if (dot >= 277)
+                    {
+                        dot -= 277;
+                    }
+                    else
+                    {
+                        dot += 64;
+                    }
+                    if (PPU_Scanline == 0 && PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Dot < 277)
+                    {
+                        dot--;
+                    }
+                    Boardered_NTSC_Samples[dot * 8 + i] = sample;
                 }
-                else
+                else if (PPU_Dot <= 256+3)
                 {
-                    NTSC_Samples[(PPU_Dot - 3) * 8 + i] = sample;
+                    if (PPU_Dot == 0)
+                    {
+                        NTSC_Samples[i] = sample;
+                    }
+                    else
+                    {
+                        NTSC_Samples[(PPU_Dot - 3) * 8 + i] = sample;
+                    }
                 }
                 phase++;
                 phase %= 12;
@@ -1805,17 +2046,20 @@ namespace TriCNES
         void RenderNTSCScanline()
         {
             byte phase = ntsc_signal_of_dot_0;
+            bool boardered = PPU_ShowScreenBoarders; // this value could change at any moment, so it would be nice to avoid errors due to array lengths.
 
             int scanline0OddFrameOffset = 0;
-            if (PPU_Scanline == 0 && PPU_OddFrame)
+            if (PPU_Scanline == 0 && PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && !boardered)
             {
                 scanline0OddFrameOffset = 8;
             }
 
+            int width = boardered ? BoarderedNTSCScreen.Width : NTSCScreen.Width;
+
             int i = 0;
-            while(i < NTSCScreen.Width + scanline0OddFrameOffset)
+            while (i < width + scanline0OddFrameOffset)
             {
-                int center = i+8;
+                int center = i + 8;
                 int begin = center - 6;
                 int end = center + 6;
                 double Y = 0;
@@ -1823,10 +2067,10 @@ namespace TriCNES
                 double V = 0;
                 for (int p = begin; p < end; ++p) // Collect and accumulate samples
                 {
-                    float sample = NTSC_Samples[p] / 12;
+                    float sample = boardered ? (Boardered_NTSC_Samples[p] / 12) : (NTSC_Samples[p] / 12);
                     Y += sample;
-                    U += sample * SinTable[(phase+p) % 12];
-                    V += sample * CosTable[(phase+p) % 12];
+                    U += sample * SinTable[(phase + p) % 12];
+                    V += sample * CosTable[(phase + p) % 12];
                 }
                 Y *= 12;
                 U *= 12;
@@ -1844,15 +2088,22 @@ namespace TriCNES
                 if (B < 0) { B = 0; }
                 if (B > 1) { B = 1; }
 
-                if (scanline0OddFrameOffset == 0)
+                if (PPU_ShowScreenBoarders)
                 {
-                    NTSCScreen.SetPixel(i, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
+                    BoarderedNTSCScreen.SetPixel(i, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color. 
                 }
                 else
                 {
-                    if (i >= 8)
+                    if (scanline0OddFrameOffset == 0)
                     {
-                        NTSCScreen.SetPixel(i - 8, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
+                        NTSCScreen.SetPixel(i, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
+                    }
+                    else
+                    {
+                        if (i >= 8)
+                        {
+                            NTSCScreen.SetPixel(i - 8, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
+                        }
                     }
                 }
                 i++;
@@ -2040,6 +2291,10 @@ namespace TriCNES
             }
             else if ((PPU_Dot >= 65 && PPU_Dot <= 256)) // Dots 65 through 256, not on the pre-render line
             {
+                if(PPU_Dot == 65)
+                {
+                    SecondaryOAMAddress = 0;
+                }
                 if (PPU_Mask_ShowBackground_Instant || PPU_Mask_ShowSprites_Instant || PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant) // if rendering is enabled, or was *just* disabled mid evaluation
                 {
                     if ((PPU_Dot & 1) == 1)
@@ -2275,6 +2530,7 @@ namespace TriCNES
                     PPU_OAMCorruptionIndex = SecondaryOAMAddress; // this value will be used when rendering is re-enabled and the corruption occurs
                 }
 
+
                 switch (SpriteEvaluationTick)
                 {
                     // So each scanline can only have up to 8 sprites.
@@ -2356,11 +2612,18 @@ namespace TriCNES
 
                         // in-range check. (The pre-render line ends up checking scanline 5 due to the `& 0xFF`.
                         if(!((PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondaryOAMAddress / 4] >= 0 && (PPU_Scanline & 0xFF) - PPU_SpriteYposition[SecondaryOAMAddress / 4] < (PPU_Spritex16 ? 16 : 8)))
-                        {
+                        {                            
                             PPU_SpriteShiftRegisterL[SecondaryOAMAddress / 4] = 0; // clear the value in this shift register if this object isn't in range.
                         }
+                        else
+                        {
+                            if (PPU_Scanline == 261)
+                            {
 
-                        break;
+                            }
+                        }
+
+                            break;
                     case 6: // X position (again)  dot 263, (+8), (+16) ...
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                         {
@@ -2502,111 +2765,118 @@ namespace TriCNES
 
 
 
-        void PPU_Render_CalculatePixel()
+        void PPU_Render_CalculatePixel(bool boarders)
         {
             // dots 1 through 256
-            if (PPU_Dot <= 256)
+            if(PPU_Dot > 256)
+            {
+                boarders = true;
+            }
+            if (PPU_Dot <= 256 || boarders)
             {
                 // there are 8 palettes in the PPU
                 // 4 are for the background, and the other 4 are for sprites.
                 byte Palette = 0;
                 // each of these palettes have 4 colors
                 byte Color = 0;
-                if (PPU_Mask_ShowBackground && (PPU_Dot > 8 || PPU_Mask_8PxShowBackground)) // if rendering is enables for this pixel
+                if (!boarders)
                 {
-                    byte col0 = (byte)(((PPU_PatternShiftRegisterL >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern low bit plane
-                    byte col1 = (byte)(((PPU_PatternShiftRegisterH >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern high bit plane
-                    Color = (byte)((col1 << 1) | col0);
-
-                    byte pal0 = (byte)(((PPU_AttributeShiftRegisterL) >> (15 - PPU_FineXScroll)) & 1); // take the bit from the shift register for the attribute low bit plane
-                    byte pal1 = (byte)(((PPU_AttributeShiftRegisterH) >> (15 - PPU_FineXScroll)) & 1); // take the bit from the shift register for the attribute high bit plane
-                    Palette = (byte)((pal1 << 1) | pal0);
-
-                    if (Color == 0 && Palette != 0) // color 0 of all palettes are mirrors of color 0 of palette 0
+                    if (PPU_Mask_ShowBackground && (PPU_Dot > 8 || PPU_Mask_8PxShowBackground)) // if rendering is enables for this pixel
                     {
-                        Palette = 0;
+                        byte col0 = (byte)(((PPU_PatternShiftRegisterL >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern low bit plane
+                        byte col1 = (byte)(((PPU_PatternShiftRegisterH >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern high bit plane
+                        Color = (byte)((col1 << 1) | col0);
+
+                        byte pal0 = (byte)(((PPU_AttributeShiftRegisterL) >> (15 - PPU_FineXScroll)) & 1); // take the bit from the shift register for the attribute low bit plane
+                        byte pal1 = (byte)(((PPU_AttributeShiftRegisterH) >> (15 - PPU_FineXScroll)) & 1); // take the bit from the shift register for the attribute high bit plane
+                        Palette = (byte)((pal1 << 1) | pal0);
+
+                        if (Color == 0 && Palette != 0) // color 0 of all palettes are mirrors of color 0 of palette 0
+                        {
+                            Palette = 0;
+                        }
                     }
                 }
-
                 // pretty much the same thing, but for sprites instead of background
                 byte SpritePalette = 0;
                 byte SpriteColor = 0;
                 bool SpritePriority = false; // if set, this sprite will be in front of background tiles. Otherwise, it will only take priority if the background is using color 0.
-
-                if (PPU_Mask_ShowSprites && (PPU_Dot > 8 || PPU_Mask_8PxShowSprites))
+                if (!boarders)
                 {
-                    int i = 0;
-
-                    // check all 8 objects in secondary OAM
-                    while (i < 8)
+                    if (PPU_Mask_ShowSprites && (PPU_Dot > 8 || PPU_Mask_8PxShowSprites))
                     {
-                        if (PPU_SpriteShifterCounter[i] == 0 || SkippedPreRenderDot341) // if the shifter counter == 0 (the shifter counter is decremented each ppu cycle)
+                        int i = 0;
+
+                        // check all 8 objects in secondary OAM
+                        while (i < 8)
                         {
-                            bool SpixelL = ((PPU_SpriteShiftRegisterL[i]) & 0x80) != 0; // take the bit from the shift register for the pattern low bit plane
-                            bool SpixelH = ((PPU_SpriteShiftRegisterH[i]) & 0x80) != 0; // take the bit from the shift register for the pattern high bit plane
-                            SpriteColor = 0;
-                            if (SpixelL) { SpriteColor = 1; }
-                            if (SpixelH) { SpriteColor |= 2; }
-
-                            SpritePalette = (byte)((PPU_SpriteAttribute[i] & 0x03) | 0x04); // read the palette from secondary OAM attributes.
-                            SpritePriority = ((PPU_SpriteAttribute[i] >> 5) & 1) == 0;      // read the priority from secondary OAM attributes.
-
-                        }
-                        else // if no objects are in range of this pixel...
-                        {
-                            i++; // try the next one
-                            continue;
-                        }
-
-                        if (SpriteColor != 0) // if we found an object, exit the loop. This means, objects earlier in secondary OAM hive higher priority over sprites later in secondary OAM
-                        {
-                            break;
-                        }
-
-                        i++; // This pixel wasn't a part of the previous object. Try the next slot in secondary oam.
-                    }
-
-                    // if we hit sprite zero and both rendering background and sprites are enabled...
-                    if (PPU_CanDetectSpriteZeroHit && i == 0 && PPU_CurrentScanlineContainsSpriteZero && PPU_Mask_ShowBackground && PPU_Mask_ShowSprites)
-                    {
-                        if (Color != 0 && SpriteColor != 0) // if both the background and sprites are visible on this pixel
-                        {
-                            if ((PPU_Mask_8PxShowSprites || PPU_Dot > 8) && PPU_Dot < 256) // and if this isn't on pixel 256, or in the first 8 pixels being masked away fron the nametable, if that setting is enabled...
+                            if (PPU_SpriteShifterCounter[i] == 0 || SkippedPreRenderDot341) // if the shifter counter == 0 (the shifter counter is decremented each ppu cycle)
                             {
-                                PPUStatus_SpriteZeroHit = true; // we did it! sprite zero hit achieved.
-                                PPU_CanDetectSpriteZeroHit = false; // another sprite zero hit cannot occur until the end of next vblank.
-                                if (Logging) // and for some debug logging...
-                                {
-                                    string S = DebugLog.ToString(); // let's add text to the current line letting me know a sprite zero hit occured, and on which dot
-                                    if (S.Length > 0)
-                                    {
-                                        S = S.Substring(0, S.Length - 2); // trim off \n
-                                        DebugLog = new StringBuilder(S);
-                                        DebugLog.Append(" ! Sprite Zero Hit ! (Dot " + PPU_Dot + ")\r\n");
+                                bool SpixelL = ((PPU_SpriteShiftRegisterL[i]) & 0x80) != 0; // take the bit from the shift register for the pattern low bit plane
+                                bool SpixelH = ((PPU_SpriteShiftRegisterH[i]) & 0x80) != 0; // take the bit from the shift register for the pattern high bit plane
+                                SpriteColor = 0;
+                                if (SpixelL) { SpriteColor = 1; }
+                                if (SpixelH) { SpriteColor |= 2; }
 
+                                SpritePalette = (byte)((PPU_SpriteAttribute[i] & 0x03) | 0x04); // read the palette from secondary OAM attributes.
+                                SpritePriority = ((PPU_SpriteAttribute[i] >> 5) & 1) == 0;      // read the priority from secondary OAM attributes.
+
+                            }
+                            else // if no objects are in range of this pixel...
+                            {
+                                i++; // try the next one
+                                continue;
+                            }
+
+                            if (SpriteColor != 0) // if we found an object, exit the loop. This means, objects earlier in secondary OAM hive higher priority over sprites later in secondary OAM
+                            {
+                                break;
+                            }
+
+                            i++; // This pixel wasn't a part of the previous object. Try the next slot in secondary oam.
+                        }
+
+                        // if we hit sprite zero and both rendering background and sprites are enabled...
+                        if (PPU_CanDetectSpriteZeroHit && i == 0 && PPU_CurrentScanlineContainsSpriteZero && PPU_Mask_ShowBackground && PPU_Mask_ShowSprites)
+                        {
+                            if (Color != 0 && SpriteColor != 0) // if both the background and sprites are visible on this pixel
+                            {
+                                if ((PPU_Mask_8PxShowSprites || PPU_Dot > 8) && PPU_Dot < 256) // and if this isn't on pixel 256, or in the first 8 pixels being masked away fron the nametable, if that setting is enabled...
+                                {
+                                    PPUStatus_SpriteZeroHit = true; // we did it! sprite zero hit achieved.
+                                    PPU_CanDetectSpriteZeroHit = false; // another sprite zero hit cannot occur until the end of next vblank.
+                                    if (Logging) // and for some debug logging...
+                                    {
+                                        string S = DebugLog.ToString(); // let's add text to the current line letting me know a sprite zero hit occured, and on which dot
+                                        if (S.Length > 0)
+                                        {
+                                            S = S.Substring(0, S.Length - 2); // trim off \n
+                                            DebugLog = new StringBuilder(S);
+                                            DebugLog.Append(" ! Sprite Zero Hit ! (Dot " + PPU_Dot + ")\r\n");
+
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // which do we draw, the background or the sprite?
-                    if (Color == 0 && SpriteColor != 0) // Well, if the background was using color 0, and the sprite wasn't,  always draw the sprite.
-                    {
-                        Color = SpriteColor; // I'm just re-using this background color variable.
-                        Palette = SpritePalette;       // I'm also just re-using the background palette variable.
-                    }
-                    else if (SpriteColor != 0) // the background color isn't zero...
-                    {
-                        if (SpritePriority) // if the sprite has priority, always draw the sprite.
+                        // which do we draw, the background or the sprite?
+                        if (Color == 0 && SpriteColor != 0) // Well, if the background was using color 0, and the sprite wasn't,  always draw the sprite.
                         {
-                            Color = SpriteColor; // I'm just re-using this cackground color variable.
-                            Palette = SpritePalette; // I'm also just re-using the background palette variable.
+                            Color = SpriteColor; // I'm just re-using this background color variable.
+                            Palette = SpritePalette;       // I'm also just re-using the background palette variable.
+                        }
+                        else if (SpriteColor != 0) // the background color isn't zero...
+                        {
+                            if (SpritePriority) // if the sprite has priority, always draw the sprite.
+                            {
+                                Color = SpriteColor; // I'm just re-using this cackground color variable.
+                                Palette = SpritePalette; // I'm also just re-using the background palette variable.
+                            }
                         }
                     }
                 }
-
-                if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled...
+                if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline < 240) // if rendering is enabled...
                 {
                     PaletteRAMAddress = (byte)(Palette << 2 | Color); // the Palette RAM address is determined by the palette and color we found.
                 }
@@ -3148,6 +3418,7 @@ namespace TriCNES
                 Address = PPUAddressWithMirroring(Address);
                 if (Address >= 0x3F00)
                 {
+                    ThisDotReadFromPaletteRAM = true;
                     // read from palette RAM.
                     // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
                     return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
@@ -3417,6 +3688,7 @@ namespace TriCNES
 
         public void _6502()
         {
+
             if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || (DoOAMDMA && CPU_Read)) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
             {
                 if (
@@ -8517,7 +8789,7 @@ namespace TriCNES
                     {
                         // during Read-Modify-Write instructions to $2007, there's alignment specific side effects.
                         PPU_VRAM_MysteryAddress = (ushort)(Address & 0xFF00 | In);
-                        if (!PPU_Data_SateMachine_Read)
+                        if (!PPU_Data_StateMachine_Read)
                         {
                             PPU_Data_StateMachine_PerformMysteryWrite = true;
                         }
@@ -8542,11 +8814,11 @@ namespace TriCNES
                         {
                             PPU_Data_StateMachine = 0; // otherwise, the state machine will need to go back to zero.
                         }
-                        PPU_Data_SateMachine_Read = false; // this is a write, not a read.
+                        PPU_Data_StateMachine_Read = false; // this is a write, not a read.
                     }
                     else
                     {
-                        PPU_Data_SateMachine_Read_Delayed = false; // this is a write, not a read, but we likely just cut off a read.
+                        PPU_Data_StateMachine_Read_Delayed = false; // this is a write, not a read, but we likely just cut off a read.
                     }
 
                     break;
@@ -8795,7 +9067,7 @@ namespace TriCNES
                         if (!DebugObserve)
                         {
                             // if this is 1 CPU cycle after another read, there's interesting behavior.
-                            if (PPU_Data_StateMachine == 3 && PPU_Data_SateMachine_Read)
+                            if (PPU_Data_StateMachine == 3 && PPU_Data_StateMachine_Read)
                             {
                                 //Behavior that is CPU/PPU alignment specific
                                 if (PPUClock == 0)
@@ -8865,8 +9137,8 @@ namespace TriCNES
                                 }
                             }
 
-                            PPU_Data_SateMachine_Read = true; // This is a read instruction, so the state machien needs to read.
-                            PPU_Data_SateMachine_Read_Delayed = true; // This is also set, in case the state machine is interrupted.
+                            PPU_Data_StateMachine_Read = true; // This is a read instruction, so the state machien needs to read.
+                            PPU_Data_StateMachine_Read_Delayed = true; // This is also set, in case the state machine is interrupted.
                             PPUBus = dataBus;
                             for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                         }
@@ -10318,7 +10590,7 @@ namespace TriCNES
 
             string LogLine = "$" + addr + "\t" + bytes + "\t" + instruction + "\tA:" + sA + "\tX:" + sX + "\tY:" + sY + "\tSP:" + sS + "\t" + Flags + "\tCycle: " + totalCycles;
 
-            bool LogExtra = false;
+            bool LogExtra = true;
             if (LogExtra)
             {
                 string TempLine_APU_Full = LogLine + "\t" + "DMC :: S_Addr: $" + APU_DMC_SampleAddress.ToString("X4") + "\t S_Length:" + APU_DMC_SampleLength.ToString() + "\t AddrCounter: $" + APU_DMC_AddressCounter.ToString("X4") + "\t BytesLeft:" + APU_DMC_BytesRemaining.ToString() + "\t Shifter:" + APU_DMC_Shifter.ToString() + ":" + APU_DMC_ShifterBitsRemaining.ToString() + "\tDMC_Timer:" + (APU_PutCycle ? APU_ChannelTimer_DMC : (APU_ChannelTimer_DMC - 1)).ToString();
@@ -10329,11 +10601,12 @@ namespace TriCNES
 
                 string TempLine_PPU = LogLine + "\t$2000:" + Observe(0x2000).ToString("X2") + "\t$2001:" + Observe(0x2001).ToString("X2") + "\t$2002:" + Observe(0x2002).ToString("X2") + "\tR/W Addr:" + PPU_ReadWriteAddress.ToString("X4") + "\tPPUAddrLatch:" + PPUAddrLatch + "\tPPU AddressBus: " + PPU_AddressBus.ToString("X4");
                 string TempLine_PPU2 = LogLine + "\tVRAMAddress:" + PPU_ReadWriteAddress.ToString("X4") + "\tPPUReadBuffer:" + PPU_VRAMAddressBuffer.ToString("X2");
+                string TempLine_PPU3 = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")"; 
 
                 string TempLine_MMC3IRQ = LogLine + "\tIRQTimer:" + Cart.Mapper_4_IRQCounter + "\tIRQLatch: " + Cart.Mapper_4_IRQLatch + "\tIRQEnabled: " + Cart.Mapper_4_EnableIRQ + "\tDoIRQ: " + DoIRQ + "\tPPU_ADDR_Prev: " + PPU_ADDR_Prev.ToString("X4");
 
 
-                DebugLog.AppendLine(TempLine_PPU2);
+                DebugLog.AppendLine(TempLine_PPU3);
             }
             else
             {

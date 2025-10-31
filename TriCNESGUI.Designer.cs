@@ -50,6 +50,9 @@ namespace TriCNES
             this.decodeNTSCSignalsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.trueToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.falseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.viewBoarderToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolstrip_ViewBoarders_True = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolstrip_ViewBoarders_False = new System.Windows.Forms.ToolStripMenuItem();
             this.viewScaleToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.xToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.xToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
@@ -146,6 +149,7 @@ namespace TriCNES
             this.settingsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.pPUClockToolStripMenuItem,
             this.decodeNTSCSignalsToolStripMenuItem,
+            this.viewBoarderToolStripMenuItem,
             this.viewScaleToolStripMenuItem});
             this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
             this.settingsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
@@ -208,7 +212,7 @@ namespace TriCNES
             // trueToolStripMenuItem
             // 
             this.trueToolStripMenuItem.Name = "trueToolStripMenuItem";
-            this.trueToolStripMenuItem.Size = new System.Drawing.Size(100, 22);
+            this.trueToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.trueToolStripMenuItem.Text = "True";
             this.trueToolStripMenuItem.Click += new System.EventHandler(this.trueToolStripMenuItem_Click);
             // 
@@ -217,9 +221,34 @@ namespace TriCNES
             this.falseToolStripMenuItem.Checked = true;
             this.falseToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
             this.falseToolStripMenuItem.Name = "falseToolStripMenuItem";
-            this.falseToolStripMenuItem.Size = new System.Drawing.Size(100, 22);
+            this.falseToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.falseToolStripMenuItem.Text = "False";
             this.falseToolStripMenuItem.Click += new System.EventHandler(this.falseToolStripMenuItem_Click);
+            // 
+            // viewBoarderToolStripMenuItem
+            // 
+            this.viewBoarderToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.toolstrip_ViewBoarders_True,
+            this.toolstrip_ViewBoarders_False});
+            this.viewBoarderToolStripMenuItem.Name = "viewBoarderToolStripMenuItem";
+            this.viewBoarderToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
+            this.viewBoarderToolStripMenuItem.Text = "View Boarder";
+            // 
+            // toolstrip_ViewBoarders_True
+            // 
+            this.toolstrip_ViewBoarders_True.Name = "toolstrip_ViewBoarders_True";
+            this.toolstrip_ViewBoarders_True.Size = new System.Drawing.Size(180, 22);
+            this.toolstrip_ViewBoarders_True.Text = "True";
+            this.toolstrip_ViewBoarders_True.Click += new System.EventHandler(this.trueToolStripMenuItem1_Click);
+            // 
+            // toolstrip_ViewBoarders_False
+            // 
+            this.toolstrip_ViewBoarders_False.Checked = true;
+            this.toolstrip_ViewBoarders_False.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.toolstrip_ViewBoarders_False.Name = "toolstrip_ViewBoarders_False";
+            this.toolstrip_ViewBoarders_False.Size = new System.Drawing.Size(180, 22);
+            this.toolstrip_ViewBoarders_False.Text = "False";
+            this.toolstrip_ViewBoarders_False.Click += new System.EventHandler(this.falseToolStripMenuItem1_Click);
             // 
             // viewScaleToolStripMenuItem
             // 
@@ -380,6 +409,9 @@ namespace TriCNES
         private ToolStripMenuItem xToolStripMenuItem7;
         private ToolStripMenuItem toolsToolStripMenuItem;
         private ToolStripMenuItem traceLoggerToolStripMenuItem;
+        private ToolStripMenuItem viewBoarderToolStripMenuItem;
+        private ToolStripMenuItem toolstrip_ViewBoarders_True;
+        private ToolStripMenuItem toolstrip_ViewBoarders_False;
     }
 }
 
