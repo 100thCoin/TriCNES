@@ -37,8 +37,8 @@ namespace TriCNES
         string filePath;
         TASProperties TASPropertiesForm;
         TASProperties3ct TASPropertiesForm3ct;
-        public TriCTraceLogger? TraceLogger;
-        public TriCNTViewer? NametableViewer;
+        public TriCTraceLogger TraceLogger;
+        public TriCNTViewer NametableViewer;
         private object LockObject = new object();
         void ClockEmulator()
         {
