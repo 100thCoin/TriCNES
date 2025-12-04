@@ -286,7 +286,7 @@ namespace TriCNES
             //40 TXA
             "Transfer X to A\n\nA' = X\n\nZFlag' = (A'==0)\nNFlag' = (A'>=0x80)"
             ,
-            //41 XAA
+            //41 ANE
             "Bitwise OR A with Magic then Bitwise AND with X AND with Memory\n\nA' = (A | magic) & X & M\n\n     *Note: 'Magic' depends on the chip manufacturer\n            'Magic' is usually 00, EE, EF, FE, or FF"
             ,
             //42 BCC
@@ -295,7 +295,7 @@ namespace TriCNES
             //43 TXS
             "Transfer X to Stack Pointer\n\nSP' = X"
             ,
-            //44 AHX
+            //44 SHA
             "Store Bitwise AND X with A AND the High Byte of the Operand Plus 1\n\nM' = A & X & (HIGH(Arg)+1)"
             ,
             //45 TYA
@@ -304,7 +304,7 @@ namespace TriCNES
             //46 SHY
             "Store Bitwise AND Y with The High Byte of the Operand Plus 1\n\nM' = Y & (HIGH(Arg)+1)"
             ,
-            //47 TAS
+            //47 SHS
             "Transfer Bitwise AND A with X to Stack Pointer then Store Bitwise And Stack Pointer with the High Byte of the Operand Plus 1\n\nSP' = A&X\nM' = SP'&(HIGH(Arg)+1)"
             ,
             //48 SHX

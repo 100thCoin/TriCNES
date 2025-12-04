@@ -202,7 +202,7 @@ namespace TriCNES
         public ushort temporaryAddress; // I use this to temporarily modify the value of the address bus for some if statements. This is mostly for checking if the low byte under/over flows.
 
 
-        static uint[] NesPalInts = {
+        public static uint[] NesPalInts = {
             // each uint represents the ARGB components of a color.
             // there's 64 colors, but this is also how I implement specific values for the PPU's emphasis bits.
             // default palette:
@@ -244,7 +244,9 @@ namespace TriCNES
             0xFF343434, 0xFF00084B, 0xFF000061, 0xFF14005F, 0xFF2B0044, 0xFF380017, 0xFF360000, 0xFF270000, 0xFF0E0F00, 0xFF001D00, 0xFF002400, 0xFF002200, 0xFF001721, 0xFF000000, 0xFF000000, 0xFF000000,
             0xFF6A6A6A, 0xFF003088, 0xFF1B19A7, 0xFF4007A3, 0xFF5F007F, 0xFF6F0144, 0xFF6D0E02, 0xFF592300, 0xFF383900, 0xFF134B00, 0xFF005400, 0xFF00520F, 0xFF004451, 0xFF000000, 0xFF000000, 0xFF000000,
             0xFFA6A6A6, 0xFF356BC5, 0xFF5654E3, 0xFF7B42E0, 0xFF9B39BB, 0xFFAB3C80, 0xFFA9493D, 0xFF955E04, 0xFF737500, 0xFF4E8700, 0xFF2F900E, 0xFF1E8E4A, 0xFF20808D, 0xFF232323, 0xFF000000, 0xFF000000,
-            0xFFA6A6A6, 0xFF788EB3, 0xFF8585C0, 0xFF957DBE, 0xFFA279AF, 0xFFA87A96, 0xFFA8807B, 0xFF9F8964, 0xFF919257, 0xFF829A59, 0xFF759D68, 0xFF6E9C80, 0xFF6F979C, 0xFF707070, 0xFF000000, 0xFF000000
+            0xFFA6A6A6, 0xFF788EB3, 0xFF8585C0, 0xFF957DBE, 0xFFA279AF, 0xFFA87A96, 0xFFA8807B, 0xFF9F8964, 0xFF919257, 0xFF829A59, 0xFF759D68, 0xFF6E9C80, 0xFF6F979C, 0xFF707070, 0xFF000000, 0xFF000000,
+            // colorburst
+            0xFF010900
         };
 
         int chosenColor; // During screen rendering, this value is the index into the color array.
@@ -564,6 +566,10 @@ namespace TriCNES
                     DecayPPUDataBus();
                 }
                 PPUClock = 4; // there is 1 PPU cycle for every 12 master clock cycles
+            }
+            if(PPUClock == 2)
+            {
+                _EmulateHalfPPU();
             }
             if (CPUClock == 5)
             {
@@ -1022,7 +1028,7 @@ namespace TriCNES
 
         } // and that's it for the APU cycle
 
-        // PPU varaibles
+        // PPU variables
 
         public byte PPUBus; // The databus of the Picture Processing Unit
         public int[] PPUBusDecay = new int[8];
@@ -1053,12 +1059,13 @@ namespace TriCNES
         public bool PPU_PaletteCorruptionRenderingDisabledOutOfVBlank;  // When rendering is disabled on specific dots of visible scanlines, OAM data can become corrupted
 
 
-        ushort PPU_AttributeShiftRegisterL; // 16 bit shift register for the background tile attributes low bit plane.
-        ushort PPU_AttributeShiftRegisterH; // 16 bit shift register for the background tile attributes high bit plane.
-        ushort PPU_PatternShiftRegisterL; // 16 bit shift register for the background tile pattern low bit plane.
-        ushort PPU_PatternShiftRegisterH; // 16 bit shift register for the background tile pattern high bit plane.
+        byte PPU_AttributeLatchRegister;
+        ushort PPU_BackgroundAttributeShiftRegisterL; // 8 bit latch for the background tile attributes low bit plane.
+        ushort PPU_BackgroundAttributeShiftRegisterH; // 8 bit latch register for the background tile attributes high bit plane.
+        ushort PPU_BackgroundPatternShiftRegisterL; // 16 bit shift register for the background tile pattern low bit plane.
+        ushort PPU_BackgroundPatternShiftRegisterH; // 16 bit shift register for the background tile pattern high bit plane.
         //TempPPUAddr
-        byte PPU_FineXScroll; // Set when writing to address $2005. 3 bits. This is up to a 7 pixel offset when rendering the screen.
+        public byte PPU_FineXScroll; // Set when writing to address $2005. 3 bits. This is up to a 7 pixel offset when rendering the screen.
 
         byte[] PPU_SpriteShiftRegisterL = new byte[8]; // 8 bit shift register for a sprite's low bit plane. Secondary OAM can have up to 8 object in it.
         byte[] PPU_SpriteShiftRegisterH = new byte[8]; // 8 bit shift register for a sprite's high bit plane. Secondary OAM can have up to 8 object in it.
@@ -1348,7 +1355,7 @@ namespace TriCNES
             }
 
             // Updating the scroll registers during screen rendering
-            if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
+            if (PPU_Scanline < 240 || PPU_Scanline == 261)// if this is the pre-render line, or any line before vblank
             {
                 if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
                 {
@@ -1430,7 +1437,7 @@ namespace TriCNES
             }
             else if(PPU_Scanline == 242 && PPU_Dot == 1)
             {
-                if (PPU_ShowScreenBoarders) // if we're showing the boarders, we need to wait for 2 more scanlines to render.
+                if (PPU_ShowScreenBoarders && !PPU_DecodeSignal) // if we're showing the boarders, we need to wait for 2 more scanlines to render.
                 {
                     FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
                 }
@@ -1450,6 +1457,10 @@ namespace TriCNES
                 PPUStatus_VBlank = false;
                 PPUStatus_SpriteOverflow = false;
                 PPU_CanDetectSpriteZeroHit = true;
+                if (PPU_ShowScreenBoarders && PPU_DecodeSignal) // if we're showing the boarders, we need to wait for the pre-render line.
+                {
+                    FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
+                }
             }
             else if (PPU_Scanline == 261 && PPU_Dot == 10)
             {
@@ -1509,6 +1520,10 @@ namespace TriCNES
             if (PPU_Update2001Delay > 0) // if we wrote to 2001 recently
             {
                 PPU_Update2001Delay--;
+                if(PPU_Update2001Delay == 1)
+                {
+
+                }
                 if (PPU_Update2001Delay == 0) // if we've waited enough cycles, apply the changes
                 {
                     PPU_Mask = PPU_Update2001Value; // this value is only used for debugging.
@@ -1553,31 +1568,38 @@ namespace TriCNES
             PrevPrevPrevDotColor = PrevPrevDotColor; // Drawing a color to the screen has a 3(?) ppu cycle delay between deciding the color, and drawing it.
             PrevPrevDotColor = PrevDotColor;
             PrevDotColor = DotColor; // These varaibles here just record the color, and swap them through these varaibles so it can be used 3 cycles after it was chosen.
+            PPU_Render_CommitShiftRegistersAndBitPlanes();
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
             {
-                if ((PPU_Dot > 0 && PPU_Dot <= 257) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
+                if ((PPU_Dot >= 0 && PPU_Dot < 257) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
                 {
                     if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
                     {
-                        PPU_UpdateShiftRegisters(); // shift all the shift registers 1 bit
-                                                    // the shift registers are used in the CalculatePixel() function.
-                                                    // a single bit from the register is read at a time.
                         PPU_Render_ShiftRegistersAndBitPlanes(); // update shift registers for the background.
                     }
+                }
+                else if (PPU_Dot > 336)
+                {
+                    PPU_Render_ShiftRegistersAndBitPlanes_DummyNT();
+                }
 
+                if ((PPU_Dot > 0 && PPU_Dot <= 257)) // if this is a visible pixel, or preparing the start of next scanline
+                {
                     if (PPU_Scanline < 241)
                     {
                         PPU_Render_CalculatePixel(false); // this determines the color of the pixel being drawn.
                     }
-
-                    
                     UpdateSpriteShiftRegisters(); // update shift registers for the sprites.
-                    
                 }
-                else if(PPU_ShowScreenBoarders)
+                else
                 {
-                    PPU_Render_CalculatePixel(true); // this determines the color of the pixel being drawn.
+                    if (PPU_ShowScreenBoarders) // Draw the pixels in the boarder too.
+                    {
+                        PPU_Render_CalculatePixel(true); // this determines the color of the pixel being drawn.
+                    }
                 }
+
+
                 if (!PPU_ShowScreenBoarders)
                 {
                     DrawToScreen();
@@ -1624,6 +1646,32 @@ namespace TriCNES
                 ntsc_signal %= 12;
             }
         } // and that's all for the PPU cycle!
+
+        void _EmulateHalfPPU()
+        {
+            // Oh boy, it's time for half PPU cycles.
+            if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
+            {
+                if ((PPU_Dot > 0 && PPU_Dot <= 257) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
+                {
+                    if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
+                    {
+                        PPU_UpdateShiftRegisters(); // shift all the shift registers 1 bit
+                    }
+                }
+            }
+            PPU_Render_CommitShiftRegistersAndBitPlanes_HalfDot();
+            if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
+            {
+                if ((PPU_Dot >= 0 && PPU_Dot < 257) || (PPU_Dot >= 320 && PPU_Dot < 336)) // if this is a visible pixel, or preparing the start of next scanline
+                {
+                    if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
+                    {
+                        PPU_Render_ShiftRegistersAndBitPlanes_HalfDot(); // Check if we need to reload the shift registers.
+                    }
+                }
+            }
+        }
 
         void DrawToScreen()
         {
@@ -1800,8 +1848,7 @@ namespace TriCNES
                 else if (dot >= 306 && dot <= 320) // colorburst 
                 {
                     // extremely dark olive.
-                    chosenColor = 0x08;
-                    emphasis = 0x1C0;
+                    chosenColor = Signal_COLORBURST;
                     boarderedDot = dot - 277;
                     boarderedScanline = scanline + 1;
                 }
@@ -1889,8 +1936,7 @@ namespace TriCNES
                     if (dot >= 306 && dot <= 320) // colorburst 
                     {
                         // extremely dark olive.
-                        chosenColor = 0x08;
-                        emphasis = 0x1C0;
+                        chosenColor = Signal_COLORBURST;
                         boarderedDot = dot - 277;
                         boarderedScanline = scanline + 1;
                     }
@@ -1932,7 +1978,6 @@ namespace TriCNES
 
         public bool PPU_DecodeSignal;
         public bool PPU_ShowScreenBoarders;
-        static float chroma_saturation_correction = 2.4f;
         static float[] Voltages =
             { 0.228f, 0.312f, 0.552f, 0.880f, // Signal low
 		        0.616f, 0.840f, 1.100f, 1.100f, // Signal high
@@ -1965,6 +2010,7 @@ namespace TriCNES
         float Saturation = 0.75f;
         int SignalBufferWidth = 12;
         static double hue = 0;
+        static float chroma_saturation_correction = 2.4f;
         static double[] SinTable =
             {
             Math.Sin(Math.PI* (0 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
@@ -2000,6 +2046,11 @@ namespace TriCNES
             return (col + DecodePhase) % 12 < 6;
         }
         static float ntsc_black = 0.312f, ntsc_white = 1.100f;
+        static int Signal_COLORBURST = 512;
+        static int Signal_SYNC = 513;
+        static float Colorburst_High = (0.524f - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f;
+        static float Colorburst_Low = (0.148f - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f;
+
         void PPU_SignalDecode(int nesColor)
         {
             bool boardered = PPU_ShowScreenBoarders;
@@ -2007,20 +2058,28 @@ namespace TriCNES
             int i = 0;
             while (i < 8)
             {
+                float sample = 0;
                 // Decode the NES color.
-                int colInd = (nesColor & 0x0F);   // 0..15 "cccc"
-                int level = (nesColor >> 4) & 3;  // 0..3  "ll"
-                int emphasis = (nesColor >> 6);   // 0..7  "eee"
-                if (colInd > 13) { level = 1; }   // For colors 14..15, level 1 is forced.
-                int attenuation = (
-                            (((emphasis & 1) != 0) && InColorPhase(0xC, phase)) ||
-                            (((emphasis & 2) != 0) && InColorPhase(0x4, phase)) ||
-                            (((emphasis & 4) != 0) && InColorPhase(0x8, phase)) && (colInd < 0xE)) ? 8 : 0;
-                float low = Levels[0 + level + attenuation];
-                float high = Levels[4 + level + attenuation];
-                if (colInd == 0) { low = high; } // For color 0, only high level is emitted
-                if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
-                float sample = InColorPhase(colInd, phase) ? high : low;
+                if (nesColor == Signal_COLORBURST)
+                {
+                    sample = InColorPhase(0x8, phase) ? Colorburst_High : Colorburst_Low;
+                }
+                else
+                {
+                    int colInd = (nesColor & 0x0F);   // 0..15 "cccc"
+                    int level = (nesColor >> 4) & 3;  // 0..3  "ll"
+                    int emphasis = (nesColor >> 6);   // 0..7  "eee"
+                    if (colInd > 13) { level = 1; }   // For colors 14..15, level 1 is forced.
+                    int attenuation = (
+                                (((emphasis & 1) != 0) && InColorPhase(0xC, phase)) ||
+                                (((emphasis & 2) != 0) && InColorPhase(0x4, phase)) ||
+                                (((emphasis & 4) != 0) && InColorPhase(0x8, phase)) && (colInd < 0xE)) ? 8 : 0;
+                    float low = Levels[0 + level + attenuation];
+                    float high = Levels[4 + level + attenuation];
+                    if (colInd == 0) { low = high; } // For color 0, only high level is emitted
+                    if (colInd > 12) { high = low; } // For colors 13..15, only low level is emitted
+                    sample = InColorPhase(colInd, phase) ? high : low;
+                }
                 if (boardered)
                 {
                     int dot = PPU_Dot-3;
@@ -2082,20 +2141,50 @@ namespace TriCNES
                 double V = 0;
                 for (int p = begin; p < end; ++p) // Collect and accumulate samples
                 {
-                    float sample = boardered ? (Boardered_NTSC_Samples[p] / 12) : (NTSC_Samples[p] / 12);
+                    float sample = boardered ? (Boardered_NTSC_Samples[p]) : (NTSC_Samples[p]);
                     Y += sample;
                     U += sample * SinTable[(phase + p) % 12];
                     V += sample * CosTable[(phase + p) % 12];
                 }
-                Y *= 12;
-                U *= 12;
-                V *= 12;
+
+                //U *= (0.35355339 * 2);
+                //V *= (0.35355339 * 2);
+
                 U = U * 0.5f + 0.5f;
                 V = V * 0.5f + 0.5f;
+
+                bool DebugYUV = false;
+                if(DebugYUV)
+                {
+                    Y = 0.5;
+                    U = (i + 0.0f) / width;
+                    V = 1 - (PPU_Scanline / 240f);
+
+                    U -= 0.5f;
+                    V -= 0.5f;
+
+                    U *= (0.35355339*2);
+                    V *= (0.35355339*2);
+
+                    U += 0.5f;
+                    V += 0.5f;
+                }
+
                 // convert YUV to RGB
                 double R = 1.164 * (Y - 16 / 256.0) + 1.596 * (V - 128 / 256.0);
                 double G = 1.164 * (Y - 16 / 256.0) - 0.392 * (U - 128 / 256.0) - 0.813 * (V - 128 / 256.0);
                 double B = 1.164 * (Y - 16 / 256.0) + 2.017 * (U - 128 / 256.0);
+
+                // other values ?
+                //double R = 1.164 * (Y - 16 / 256.0) + 1.14 * (V - 128 / 256.0);
+                //double G = 1.164 * (Y - 16 / 256.0) - (1 / 1.14) * (U - 128 / 256.0) - (1 / (1.14 * 1.78)) * (V - 128 / 256.0);
+                //double B = 1.164 * (Y - 16 / 256.0) + (1.14 * 1.78) * (U - 128 / 256.0);
+
+                // convert YUV to normalized RGB
+                //double R = 1.164 * (Y - 16 / 256.0) + 1 * (V - 128 / 256.0);
+                //double G = 1.164 * (Y - 16 / 256.0) - 0.31764705882 * (U - 128 / 256.0) - 0.68359375 * (V - 128 / 256.0);
+                //double B = 1.164 * (Y - 16 / 256.0) + 1 * (U - 128 / 256.0);
+
                 if (R < 0) { R = 0; }
                 if (R > 1) { R = 1; }
                 if (G < 0) { G = 0; }
@@ -2787,12 +2876,12 @@ namespace TriCNES
                 {
                     if (PPU_Mask_ShowBackground && (PPU_Dot > 8 || PPU_Mask_8PxShowBackground)) // if rendering is enables for this pixel
                     {
-                        byte col0 = (byte)(((PPU_PatternShiftRegisterL >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern low bit plane
-                        byte col1 = (byte)(((PPU_PatternShiftRegisterH >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern high bit plane
+                        byte col0 = (byte)(((PPU_BackgroundPatternShiftRegisterL >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern low bit plane
+                        byte col1 = (byte)(((PPU_BackgroundPatternShiftRegisterH >> (15 - PPU_FineXScroll))) & 1); // take the bit from the shift register for the pattern high bit plane
                         Color = (byte)((col1 << 1) | col0);
 
-                        byte pal0 = (byte)(((PPU_AttributeShiftRegisterL) >> (15 - PPU_FineXScroll)) & 1); // take the bit from the shift register for the attribute low bit plane
-                        byte pal1 = (byte)(((PPU_AttributeShiftRegisterH) >> (15 - PPU_FineXScroll)) & 1); // take the bit from the shift register for the attribute high bit plane
+                        byte pal0 = (byte)(((PPU_BackgroundAttributeShiftRegisterL) >> (7 - PPU_FineXScroll)) & 1); // take the bit from the shift register for the attribute low bit plane
+                        byte pal1 = (byte)(((PPU_BackgroundAttributeShiftRegisterH) >> (7 - PPU_FineXScroll)) & 1); // take the bit from the shift register for the attribute high bit plane
                         Palette = (byte)((pal1 << 1) | pal0);
 
                         if (Color == 0 && Palette != 0) // color 0 of all palettes are mirrors of color 0 of palette 0
@@ -3245,15 +3334,133 @@ namespace TriCNES
 
 
         byte PPU_RenderTemp; // a variable used in the following function to store information between ppu cycles.
+        bool PPU_Commit_NametableFetch;
+        bool PPU_Commit_AttributeFetch;
+        bool PPU_Commit_PatternLowFetch;
+        bool PPU_Commit_PatternHighFetch;
+
+
         void PPU_Render_ShiftRegistersAndBitPlanes()
         {
             byte cycleTick; // for the switch statement below, this checks which case to run on a given ppu cycle.
-            cycleTick = (byte)((PPU_Dot - 1) & 7);
+            cycleTick = (byte)((PPU_Dot) & 7);
+
+            switch (cycleTick)
+            {
+                case 0:                    
+                    break;
+                case 1:
+                    // fetch byte from Nametable
+                    PPU_AddressBus = (ushort)(0x2000 + (PPU_ReadWriteAddress & 0x0FFF));
+                    PPU_RenderTemp = FetchPPU(PPU_AddressBus);
+                    PPU_Commit_NametableFetch = true;
+                    break;
+                case 2:
+                   
+                    break;
+                case 3:
+                    // fetch attribute byte from attribute table
+                    PPU_AddressBus = (ushort)(0x23C0 | (PPU_ReadWriteAddress & 0x0C00) | ((PPU_ReadWriteAddress >> 4) & 0x38) | ((PPU_ReadWriteAddress >> 2) & 0x07));
+                    PPU_RenderTemp = FetchPPU(PPU_AddressBus);
+                    PPU_Commit_AttributeFetch = true;                    
+                    // now we only have the 2 bits we're looking for
+                    break;
+                case 4:
+                    
+                    break;
+                case 5:
+                    // fetch pattern bits from value read off the nametable
+                    PPU_AddressBus = (ushort)(((PPU_ReadWriteAddress & 0b0111000000000000) >> 12) | PPU_NextCharacter * 16 | (PPU_PatternSelect_Background ? 0x1000 : 0));
+                    PPU_RenderTemp = FetchPPU((ushort)(PPU_AddressBus & 0x1FFF));
+                    PPU_Commit_PatternLowFetch = true;
+                    break;
+                case 6:
+                   
+                    break;
+                case 7:
+                    // fetch pattern bits with the new address
+                    PPU_AddressBus = (ushort)(((PPU_ReadWriteAddress & 0b0111000000000000) >> 12) | PPU_NextCharacter * 16 | (PPU_PatternSelect_Background ? 0x1000 : 0) + 8);
+
+                    PPU_RenderTemp = FetchPPU((ushort)(PPU_AddressBus & 0x1FFF));
+                    PPU_Commit_PatternHighFetch = true;
+                    break;
+            }
+
+        }
+
+        bool PPU_Commit_LoadShiftRegisters;
+        void PPU_Render_ShiftRegistersAndBitPlanes_HalfDot()
+        {
+            byte cycleTick; // for the switch statement below, this checks which case to run on a given ppu cycle.
+            cycleTick = (byte)((PPU_Dot) & 7);
 
             switch (cycleTick)
             {
                 case 0:
-                    PPU_LoadShiftRegisters();
+                case 1:
+                case 2:
+                case 3:
+                case 4:
+                case 5:
+                case 6:
+                    break;
+                case 7:
+                    PPU_Commit_LoadShiftRegisters = true;
+                    break;
+            }
+        }
+
+        void PPU_Render_CommitShiftRegistersAndBitPlanes()
+        {
+            if (PPU_Commit_NametableFetch)
+            {
+                PPU_Commit_NametableFetch = false;
+                PPU_NextCharacter = PPU_RenderTemp;
+            }
+            if (PPU_Commit_AttributeFetch)
+            {
+                PPU_Commit_AttributeFetch = false;
+                PPU_Attribute = PPU_RenderTemp;
+                // 1 byte of attribute data is 4 tiles worth. determine which tile this is for.
+                if ((PPU_ReadWriteAddress & 3) >= 2) // If this is on the right tile
+                {
+                    PPU_Attribute = (byte)(PPU_Attribute >> 2);
+                }
+                if ((((PPU_ReadWriteAddress & 0b0000001111100000) >> 5) & 3) >= 2) // If this is on the bottom tile
+                {
+                    PPU_Attribute = (byte)(PPU_Attribute >> 4);
+                }
+                PPU_Attribute = (byte)(PPU_Attribute & 3);
+            }
+            if (PPU_Commit_PatternLowFetch)
+            {
+                PPU_Commit_PatternLowFetch = false;
+                PPU_LowBitPlane = PPU_RenderTemp;
+            }
+            if (PPU_Commit_PatternHighFetch)
+            {
+                PPU_Commit_PatternHighFetch = false;
+                PPU_HighBitPlane = PPU_RenderTemp;
+                PPU_IncrementScrollX();
+            }
+        }
+        void PPU_Render_CommitShiftRegistersAndBitPlanes_HalfDot()
+        {
+            if (PPU_Commit_LoadShiftRegisters)
+            {
+                PPU_Commit_LoadShiftRegisters = false;
+                PPU_LoadShiftRegisters();
+            }
+        }
+
+        void PPU_Render_ShiftRegistersAndBitPlanes_DummyNT()
+        {
+            byte cycleTick; // for the switch statement below, this checks which case to run on a given ppu cycle.
+            cycleTick = (byte)(PPU_Dot - 336);
+
+            switch (cycleTick)
+            {
+                case 0:
                     // fetch byte from Nametable
                     PPU_AddressBus = (ushort)(0x2000 + (PPU_ReadWriteAddress & 0x0FFF));
                     PPU_RenderTemp = FetchPPU(PPU_AddressBus);
@@ -3263,43 +3470,13 @@ namespace TriCNES
                     PPU_NextCharacter = PPU_RenderTemp;
                     break;
                 case 2:
-                    // fetch attribute byte from attribute table
-                    PPU_AddressBus = (ushort)(0x23C0 | (PPU_ReadWriteAddress & 0x0C00) | ((PPU_ReadWriteAddress >> 4) & 0x38) | ((PPU_ReadWriteAddress >> 2) & 0x07));
+                    // fetch byte from Nametable
+                    PPU_AddressBus = (ushort)(0x2000 + (PPU_ReadWriteAddress & 0x0FFF));
                     PPU_RenderTemp = FetchPPU(PPU_AddressBus);
                     break;
                 case 3:
-                    // store the attribute value read.
-                    PPU_Attribute = PPU_RenderTemp;
-                    // 1 byte of attribute data is 4 tiles worth. determine which tile this is for.
-                    if ((PPU_ReadWriteAddress & 3) >= 2) // If this is on the right tile
-                    {
-                        PPU_Attribute = (byte)(PPU_Attribute >> 2);
-                    }
-                    if ((((PPU_ReadWriteAddress & 0b0000001111100000) >> 5) & 3) >= 2) // If this is on the bottom tile
-                    {
-                        PPU_Attribute = (byte)(PPU_Attribute >> 4);
-                    }
-                    PPU_Attribute = (byte)(PPU_Attribute & 3);
-                    // now we only have the 2 bits we're looking for
-                    break;
-                case 4:
-                    // fetch pattern bits from value read off the nametable
-                    PPU_AddressBus = (ushort)(((PPU_ReadWriteAddress & 0b0111000000000000) >> 12) | PPU_NextCharacter * 16 | (PPU_PatternSelect_Background ? 0x1000 : 0));
-                    PPU_RenderTemp = FetchPPU(PPU_AddressBus);
-                    PPU_LowBitPlane = PPU_RenderTemp;
-                    break;
-                case 5:
-                    // update the address bus for the next fetch
-                    PPU_AddressBus += 8; // +8 
-                    break;
-                case 6:
-                    // fetch pattern bits with the new address
-                    PPU_RenderTemp = FetchPPU(PPU_AddressBus);
-                    PPU_HighBitPlane = PPU_RenderTemp;
-                    break;
-                case 7:
-                    // and update the X scroll for the next tile on the nametable
-                    PPU_IncrementScrollX();
+                    // store the character read from the nametable
+                    PPU_NextCharacter = PPU_RenderTemp;
                     break;
             }
 
@@ -3307,7 +3484,7 @@ namespace TriCNES
 
 
         // in sprite evaluation, if a sprite is horizontally mirrored, we need to flip all the order of the bits in the shift register.
-        byte Flip(byte b)
+        public byte Flip(byte b)
         {
             b = (byte)(((b & 0xF0) >> 4) | ((b & 0xF) << 4));
             b = (byte)(((b & 0xCC) >> 2) | ((b & 0x33) << 2));
@@ -3323,6 +3500,10 @@ namespace TriCNES
 
         public byte FetchPPU(ushort Address)
         {
+            if(Cart == null)
+            {
+                return 0;
+            }
             // when reading from the PPU's Video RAM, there's a lot of mapper-specific behavior to consider.
             Address &= 0x3FFF;
             if (Address < 0x2000)
@@ -3434,14 +3615,10 @@ namespace TriCNES
 
         void PPU_UpdateShiftRegisters()
         {
-
-            if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground)) // if rendering, update the shift registers for the background.
-            {
-                PPU_PatternShiftRegisterL = (ushort)(PPU_PatternShiftRegisterL << 1); // shift 1 bit to the left.
-                PPU_PatternShiftRegisterH = (ushort)(PPU_PatternShiftRegisterH << 1); // shift 1 bit to the left.
-                PPU_AttributeShiftRegisterL = (ushort)(PPU_AttributeShiftRegisterL << 1); // shift 1 bit to the left.
-                PPU_AttributeShiftRegisterH = (ushort)(PPU_AttributeShiftRegisterH << 1); // shift 1 bit to the left.
-            }            
+            PPU_BackgroundPatternShiftRegisterL = (ushort)((PPU_BackgroundPatternShiftRegisterL << 1) | 0); // shift 1 bit to the left. Bring in a 0.
+            PPU_BackgroundPatternShiftRegisterH = (ushort)((PPU_BackgroundPatternShiftRegisterH << 1) | 1); // shift 1 bit to the left. Bring in a 1.
+            PPU_BackgroundAttributeShiftRegisterL = (ushort)((PPU_BackgroundAttributeShiftRegisterL << 1) | (PPU_AttributeLatchRegister & 1)); // shift 1 bit to the left. Bring in Attribute low bit.
+            PPU_BackgroundAttributeShiftRegisterH = (ushort)((PPU_BackgroundAttributeShiftRegisterH << 1) | ((PPU_AttributeLatchRegister & 10) >> 1)); // shift 1 bit to the left. Bring in Attribute high bit.
         }
 
         void UpdateSpriteShiftRegisters()
@@ -3474,10 +3651,9 @@ namespace TriCNES
         void PPU_LoadShiftRegisters()
         {
             // this runs as the first step of PPU_Render_ShiftRegistersAndBitPlanes(), using the values determined by the previous 8 steps of PPU_Render_ShiftRegistersAndBitPlanes().
-            PPU_PatternShiftRegisterL = (ushort)((PPU_PatternShiftRegisterL & 0xFF00) | PPU_LowBitPlane);
-            PPU_PatternShiftRegisterH = (ushort)((PPU_PatternShiftRegisterH & 0xFF00) | PPU_HighBitPlane);
-            PPU_AttributeShiftRegisterL = (ushort)((PPU_AttributeShiftRegisterL & 0xFF00) | ((PPU_Attribute & 1) == 1 ? 0xFF : 0));
-            PPU_AttributeShiftRegisterH = (ushort)((PPU_AttributeShiftRegisterH & 0xFF00) | ((PPU_Attribute & 2) == 2 ? 0xFF : 0));
+            PPU_BackgroundPatternShiftRegisterL = (ushort)((PPU_BackgroundPatternShiftRegisterL & 0xFF00) | PPU_LowBitPlane);
+            PPU_BackgroundPatternShiftRegisterH = (ushort)((PPU_BackgroundPatternShiftRegisterH & 0xFF00) | PPU_HighBitPlane);
+            PPU_AttributeLatchRegister = PPU_Attribute;
         }
 
         void PPU_IncrementScrollX()
@@ -8534,8 +8710,8 @@ namespace TriCNES
 
         ushort PPU_AddressBus;  // the Address Bus of the PPU
 
-        ushort PPU_ReadWriteAddress = 0;// PPU Internal Register 'v'
-        ushort PPU_TempVRAMAddress = 0; // PPU Internal Register 't'. "can also be thought of as the address of the top left onscreen tile: https://www.nesdev.org/wiki/PPU_scrolling"
+        public ushort PPU_ReadWriteAddress = 0;// PPU Internal Register 'v'
+        public ushort PPU_TempVRAMAddress = 0; // PPU Internal Register 't'. "can also be thought of as the address of the top left onscreen tile: https://www.nesdev.org/wiki/PPU_scrolling"
         /*
         The v and t registers are 15 bits:
         yyy NN YYYYY XXXXX
@@ -8637,6 +8813,8 @@ namespace TriCNES
                     //PPU_Mask_8PxShowSprites = (dataBus & 0x04) != 0;
                     PPU_Mask_ShowBackground_Instant = (dataBus & 0x08) != 0;
                     PPU_Mask_ShowSprites_Instant = (dataBus & 0x10) != 0;
+
+
 
                     // disabling rendering can cause OAM corruption.
                     if (temp_rendering && !temp_renderingFromInput)
@@ -10450,13 +10628,20 @@ namespace TriCNES
         // this is the tracelogger.
         // I call this function during the first cycle of every instruction.
 
+        public ushort DebugRange_Low = 0x0000;
+        public ushort DebugRange_High = 0xFFFF;
+        public bool OnlyDebugInRange = false;
         void Debug()
         {
-            string addr = programCounter.ToString("X");
-            while (addr.Length < 4)
+            if(OnlyDebugInRange)
             {
-                addr = "0" + addr;
+                if(programCounter < DebugRange_Low || programCounter > DebugRange_High)
+                {
+                    return;
+                }
             }
+
+            string addr = programCounter.ToString("X4");
             string bytes = "";
             int b = 0;
             while (b < Documentation.OpDocs[opCode].length)

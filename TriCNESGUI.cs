@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Input;
+using System.Xml;
 
 namespace TriCNES
 {
@@ -36,10 +37,12 @@ namespace TriCNES
         string filePath;
         TASProperties TASPropertiesForm;
         TASProperties3ct TASPropertiesForm3ct;
-        TriCTraceLogger TraceLogger;
+        public TriCTraceLogger? TraceLogger;
+        public TriCNTViewer? NametableViewer;
         private object LockObject = new object();
         void ClockEmulator()
         {
+            int frameCount = 0;
             LockObject = pb_Screen;
             lock (LockObject)
             {
@@ -71,16 +74,19 @@ namespace TriCNES
                             }
                         }
                     }
-                    byte controller1 = 0;
-                    if (Keyboard.IsKeyDown(Key.X)) { controller1 |= 0x80; }
-                    if (Keyboard.IsKeyDown(Key.Z)) { controller1 |= 0x40; }
-                    if (Keyboard.IsKeyDown(Key.RightShift)) { controller1 |= 0x20; }
-                    if (Keyboard.IsKeyDown(Key.Enter)) { controller1 |= 0x10; }
-                    if (Keyboard.IsKeyDown(Key.Up)) { controller1 |= 0x08; }
-                    if (Keyboard.IsKeyDown(Key.Down)) { controller1 |= 0x04; }
-                    if (Keyboard.IsKeyDown(Key.Left)) { controller1 |= 0x02; }
-                    if (Keyboard.IsKeyDown(Key.Right)) { controller1 |= 0x01; }
-                    EMU.ControllerPort1 = controller1;
+                    if (Form.ActiveForm != null)
+                    {
+                        byte controller1 = 0;
+                        if (Keyboard.IsKeyDown(Key.X)) { controller1 |= 0x80; }
+                        if (Keyboard.IsKeyDown(Key.Z)) { controller1 |= 0x40; }
+                        if (Keyboard.IsKeyDown(Key.RightShift)) { controller1 |= 0x20; }
+                        if (Keyboard.IsKeyDown(Key.Enter)) { controller1 |= 0x10; }
+                        if (Keyboard.IsKeyDown(Key.Up)) { controller1 |= 0x08; }
+                        if (Keyboard.IsKeyDown(Key.Down)) { controller1 |= 0x04; }
+                        if (Keyboard.IsKeyDown(Key.Left)) { controller1 |= 0x02; }
+                        if (Keyboard.IsKeyDown(Key.Right)) { controller1 |= 0x01; }
+                        EMU.ControllerPort1 = controller1;
+                    }
                     if (TraceLogger != null)
                     {
                         EMU.Logging = TraceLogger.Logging;
@@ -88,6 +94,9 @@ namespace TriCNES
                         {
                             EMU.DebugLog = new StringBuilder();
                         }
+                        EMU.DebugRange_Low = TraceLogger.RangeLow;
+                        EMU.DebugRange_High = TraceLogger.RangeHigh;
+                        EMU.OnlyDebugInRange = TraceLogger.OnlyDebugInRange();
                     }
                     EMU._CoreFrameAdvance();
                     if (pb_Screen.InvokeRequired)
@@ -148,14 +157,147 @@ namespace TriCNES
                     }
                     if (TraceLogger != null)
                     {
-                        if(TraceLogger.Logging)
+                        if (TraceLogger.Logging)
                         {
                             TraceLogger.Update();
-                            EMU.DebugLog = new StringBuilder();
+                            if (TraceLogger.ClearEveryFrame())
+                            {
+                                EMU.DebugLog = new StringBuilder();
+                            }
                         }
+                    }
+                    if(NametableViewer != null && !NametableViewer.IsDisposed)
+                    {
+                        NametableViewer.Update(RenderNametable());
+                    }
+                    frameCount++;
+                }
+            }
+        }
+
+        DirectBitmap NametableBitmap;
+        public Bitmap RenderNametable()
+        {
+            
+
+            if (NametableBitmap != null)
+            {
+                NametableBitmap.Dispose();
+            }
+            NametableBitmap = new DirectBitmap(512, 480);
+            if (EMU.Cart == null)
+            {
+                return NametableBitmap.Bitmap;
+            }
+
+            int tx = 0;
+            int ty = 0;
+            int x = 0;
+            int y = 0;
+            int px = 0;
+            int py = 0;
+
+            int PatternTile;
+            int pal = 0;
+
+            bool ForceBackdropOnIndex0 = NametableViewer.UseBackdrop();
+
+            while (ty < 2)
+            {
+                while (tx < 2)
+                {
+                    while (y < 30)
+                    {
+                        while (x < 32)
+                        {
+                            PatternTile = EMU.FetchPPU((ushort)(0x2000 + 0x400 * tx + 0x800 * ty + x + y * 32));
+                            pal = EMU.FetchPPU((ushort)(0x2000 + 0x400 * (tx + 1) + 0x800 * ty - 0x40 + x / 4 + (y / 4) * 8));
+                            if ((x & 3) >= 2)
+                            {
+                                pal = pal >> 2;
+                            }
+                            if ((y & 3) >= 2)
+                            {
+                                pal = pal >> 4;
+                            }
+                            pal = pal & 3;
+                            while (py < 8)
+                            {
+                                while (px < 8)
+                                {
+
+                                    int k = ((EMU.FetchPPU((ushort)(py + PatternTile * 16 + (!EMU.PPU_PatternSelect_Background ? 0 : 0x1000))) >> (7 - px)) & 1) + 2 * ((EMU.FetchPPU((ushort)(py + 8 + PatternTile * 16 + (!EMU.PPU_PatternSelect_Background ? 0 : 0x1000))) >> (7 - px)) & 1);
+                                    if (k == 0 && ForceBackdropOnIndex0)
+                                    {
+                                        k = EMU.FetchPPU(0x3F00);
+                                    }
+                                    else
+                                    {
+                                        k = EMU.FetchPPU((ushort)(0x3F00 + k + pal * 4));
+                                    }
+                                    int col = unchecked((int)Emulator.NesPalInts[k & 0x3F]);
+                                    NametableBitmap.SetPixel(tx * 0x100 + x * 8 + px, ty * 0xF0 + y * 8 + py, col);
+                                    px++;
+                                }
+                                px = 0;
+                                py++;
+                            }
+                            py = 0;
+                            x++;
+                        }
+
+                        x = 0;
+                        y++;
+                    }
+                    y = 0;
+                    tx++;
+                }
+                tx = 0;
+                ty++;
+            }
+
+            bool DrawScreenBoundary = NametableViewer.DrawBoundary();
+            if(DrawScreenBoundary)
+            {
+                // convert the t register into X,Y coordinates
+                /*
+                The v and t registers are 15 bits:
+                yyy NN YYYYY XXXXX
+                ||| || ||||| +++++-- coarse X scroll
+                ||| || +++++-------- coarse Y scroll
+                ||| ++-------------- nametable select
+                +++----------------- fine Y scroll
+                */
+                int X = ((EMU.PPU_TempVRAMAddress & 0b11111) << 3) | EMU.PPU_FineXScroll | ((EMU.PPU_TempVRAMAddress & 0b10000000000) >> 2);
+                int Y = ((EMU.PPU_TempVRAMAddress & 0b1111100000) >> 2) | ((EMU.PPU_TempVRAMAddress & 0b111000000000000) >> 12) | ((EMU.PPU_TempVRAMAddress & 0b100000000000) >> 4);
+                int i = 0;
+                while(i <= 257)
+                {
+                    NametableBitmap.SetPixel((X + 511 + i) & 511, (Y + 479) % 480, Color.White);
+                    NametableBitmap.SetPixel((X + 511 + i) & 511, (Y + 240) % 480, Color.White);
+                    i++;
+                }
+                i = 0;
+                while (i <= 241)
+                {
+                    NametableBitmap.SetPixel((X + 511) & 511, (Y + 479 + i) % 480, Color.White);
+                    NametableBitmap.SetPixel((X + 256) & 511, (Y + 479 + i) % 480, Color.White);
+                    i++;
+                }                
+            }
+            if (NametableViewer.OverlayScreen())
+            {
+                int X = ((EMU.PPU_TempVRAMAddress & 0b11111) << 3) | EMU.PPU_FineXScroll | ((EMU.PPU_TempVRAMAddress & 0b10000000000) >> 2);
+                int Y = ((EMU.PPU_TempVRAMAddress & 0b1111100000) >> 2) | ((EMU.PPU_TempVRAMAddress & 0b111000000000000) >> 12) | ((EMU.PPU_TempVRAMAddress & 0b100000000000) >> 4);
+                for (int xx = 0; xx < 256; xx++)
+                {
+                    for (int yy = 0; yy < 240; yy++)
+                    {
+                        NametableBitmap.SetPixel((X + xx) & 511, (Y + yy) % 480, EMU.Screen.GetPixel(xx, yy));
                     }
                 }
             }
+            return NametableBitmap.Bitmap;
         }
 
         void ClockEmulator3CT()
@@ -362,6 +504,8 @@ namespace TriCNES
                     break;
                 case ".r08":
                     {
+                        // This following comment block can be removed if you want to set up RAM for the Bad Apple TAS's .r08 file.
+                        /*
                         string s = "0000000000000C000000000000000000E2000000001D1E000000000001000000984820BEFE68A8A5F7A6F8600000000010400000000000000000000000000000A2A58EFF07A216EA8EFD07020000000020200091318A11319131C8C430D0F14C40000000000000000101030000000000000000000000000000000000000000000000000000F000000000020000A0A000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000101000000000000000000000000000100000000000000000000000000000000000035000000008E002001008A4820BEFE68AA0C000000004C4000000001A804D9B4B4070004DAB4B4030004DBB4B4030005DCB4B4030004DDB4B4030004DEB4B4030004DFB4B4030004E0B4B4030004E1B4B4030004E2B4B4030004E3B4B4030004E4B4B4030004E5B4B4030004E6B4C886A080F5D000D00B00003F2FC7F8C8FE0024000F5200FB0400A9018D164085C04A8D1640AD16404A26C090F8A5C060A202206B0195C1CA10F8A000206B0191C2C8C4C190F6206B01F0E5206B0185C3206B0185C26CC200FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB003AFB00FB00FB00FB10D2A27DA07DF50400040004D93525D8F70000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8410000F8410000F8250000F8250000F8410000F8410000F8250000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000D900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000787A2021047F1918470000000000000000000000000000000000000000040400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000F722CC891000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001600A5";
                         int i = 0;
                         while (i < 0x800)
@@ -369,6 +513,7 @@ namespace TriCNES
                             EMU.RAM[i] = byte.Parse(s.Substring(i * 2, 2), System.Globalization.NumberStyles.HexNumber);
                             i++;
                         }
+                        */
                         break;
                     }
             }
@@ -506,10 +651,11 @@ namespace TriCNES
             {
                 TASPropertiesForm3ct.Dispose();
             }
-            if(TraceLogger != null)
+            if (TraceLogger != null)
             {
                 TraceLogger.Dispose();
             }
+            Application.Exit();
         }
 
         private void phase0ToolStripMenuItem_Click(object sender, EventArgs e)
@@ -674,6 +820,14 @@ namespace TriCNES
             EMU.PPU_ShowScreenBoarders = false;
             settings_boarder = false;
             ResizeWindow(ScreenMult);
+        }
+
+        private void nametableViewerToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            NametableViewer = new TriCNTViewer();
+            NametableViewer.MainGUI = this;
+            NametableViewer.Show();
+            NametableViewer.Location = Location;
         }
     }
 
