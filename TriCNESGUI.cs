@@ -37,8 +37,8 @@ namespace TriCNES
         string filePath;
         TASProperties TASPropertiesForm;
         TASProperties3ct TASPropertiesForm3ct;
-        public TriCTraceLogger TraceLogger;
-        public TriCNTViewer NametableViewer;
+        public TriCTraceLogger? TraceLogger;
+        public TriCNTViewer? NametableViewer;
         private object LockObject = new object();
         void ClockEmulator()
         {
@@ -97,6 +97,11 @@ namespace TriCNES
                         EMU.DebugRange_Low = TraceLogger.RangeLow;
                         EMU.DebugRange_High = TraceLogger.RangeHigh;
                         EMU.OnlyDebugInRange = TraceLogger.OnlyDebugInRange();
+                    }
+                    else
+                    {
+                        EMU.Logging = false;
+                        EMU.DebugLog = new StringBuilder();
                     }
                     EMU._CoreFrameAdvance();
                     if (pb_Screen.InvokeRequired)
