@@ -596,17 +596,23 @@ namespace TriCNES
 
         private void resetToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            EMU.Reset();
+            if (EMU != null)
+            {
+                EMU.Reset();
+            }
         }
 
         private void powerCycleToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Emulator Emu2 = new Emulator();
-            Emu2.PPU_DecodeSignal = settings_ntsc;
-            Emu2.PPU_ShowScreenBoarders = settings_boarder;
-            EMU.PPUClock = settings_alignment;
-            Emu2.Cart = EMU.Cart;
-            EMU = Emu2;
+            if (EMU != null)
+            {
+                Emulator Emu2 = new Emulator();
+                Emu2.PPU_DecodeSignal = settings_ntsc;
+                Emu2.PPU_ShowScreenBoarders = settings_boarder;
+                Emu2.PPUClock = settings_alignment;
+                Emu2.Cart = EMU.Cart;
+                EMU = Emu2;
+            }
         }
 
         bool PendingScreenshot;
@@ -701,11 +707,14 @@ namespace TriCNES
 
         private void RebootWithAlignment(int Alignment)
         {
-            Emulator Emu2 = new Emulator();
-            Emu2.Cart = EMU.Cart;
-            EMU = Emu2;
-            EMU.PPUClock = Alignment;
-            EMU.CPUClock = 0;
+            if (EMU != null)
+            {
+                Emulator Emu2 = new Emulator();
+                Emu2.Cart = EMU.Cart;
+                EMU = Emu2;
+                EMU.PPUClock = Alignment;
+                EMU.CPUClock = 0;
+            }
             settings_alignment = Alignment;
         }
 
@@ -713,7 +722,10 @@ namespace TriCNES
         {
             falseToolStripMenuItem.Checked = false;
             trueToolStripMenuItem.Checked = true;
-            EMU.PPU_DecodeSignal = true;
+            if (EMU != null)
+            {
+                EMU.PPU_DecodeSignal = true;
+            }
             settings_ntsc = true;
         }
 
@@ -721,7 +733,10 @@ namespace TriCNES
         {
             trueToolStripMenuItem.Checked = false;
             falseToolStripMenuItem.Checked = true;
-            EMU.PPU_DecodeSignal = false;
+            if (EMU != null)
+            {
+                EMU.PPU_DecodeSignal = false;
+            }
             settings_ntsc = false;
         }
 
@@ -813,7 +828,10 @@ namespace TriCNES
         {
             toolstrip_ViewBoarders_False.Checked = false;
             toolstrip_ViewBoarders_True.Checked = true;
-            EMU.PPU_ShowScreenBoarders = true;
+            if (EMU != null)
+            {
+                EMU.PPU_ShowScreenBoarders = true;
+            }
             settings_boarder = true;
             ResizeWindow(ScreenMult);
         }
@@ -822,7 +840,10 @@ namespace TriCNES
         {
             toolstrip_ViewBoarders_False.Checked = true;
             toolstrip_ViewBoarders_True.Checked = false;
-            EMU.PPU_ShowScreenBoarders = false;
+            if (EMU != null)
+            {
+                EMU.PPU_ShowScreenBoarders = false;
+            }
             settings_boarder = false;
             ResizeWindow(ScreenMult);
         }
