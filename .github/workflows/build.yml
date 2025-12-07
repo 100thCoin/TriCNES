@@ -32,8 +32,8 @@ jobs:
           copy bin\Release\TriCNES.exe upload\TriCNES.exe
           mkdir upload\tas
           mkdir upload\roms
-          echo "# this is a placeholder file to force to upload this folder" > upload\tas\README.md
-          echo "# this is a placeholder file to force to upload this folder" > upload\roms\README.md
+          echo "# This is a placeholder file to force the upload of this folder." > upload\tas\README.md
+          echo "# This is a placeholder file to force the upload of this folder." > upload\roms\README.md
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
