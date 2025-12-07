@@ -35,7 +35,8 @@ jobs:
 
       - name: Restore packages
         run: nuget restore TriCNES.sln
-      
+        shell: powershell
+
       - name: Cache msbuild
         uses: actions/cache@v3
         with:
@@ -46,14 +47,14 @@ jobs:
 
       - name: Build solution (Release)
         run: msbuild TriCNES.sln /p:Configuration=Release /p:Platform="Any CPU" /m /v:minimal
+        shell: powershell
 
       - name: Prepare upload folder
         shell: bash
         run: |
           mkdir -p upload/tas upload/roms
-          
           cp bin/Release/TriCNES${{ matrix.os == 'windows-latest' && '.exe' || '' }} upload/TriCNES${{ matrix.os == 'windows-latest' && '.exe' || '' }} || echo "Binary not found at expected location"
-          
+
           echo "Place your Tool-Assisted Speedrun (TAS) input files here." >> upload/tas/README.md
           echo "Place your NES ROM files here." >> upload/roms/README.md
 
