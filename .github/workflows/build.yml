@@ -40,7 +40,7 @@ jobs:
         with:
           name: TriCNES-Release
           path: |
-            upload\tas
-            upload\roms
+            upload\tas\.gitkeep
+            upload\roms\.gitkeep
             upload\TriCNES.exe
             
