@@ -1,5 +1,10 @@
 name: Build TriCNES
 
+permissions:
+  contents: read
+  actions: read
+  statuses: read
+
 on:
   push:
     branches: [ "main" ]
@@ -8,8 +13,16 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false # make sure all jobs run even if one fails, not to be fail the entire workflow
+      matrix:
+        os: [windows-latest] # ubuntu-latest, macos-latest # ubuntu macos is not implemented yet
 
+    defaults:
+      run:
+        shell: bash
+
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,25 +35,35 @@ jobs:
 
       - name: Restore packages
         run: nuget restore TriCNES.sln
+      
+      - name: Cache msbuild
+        uses: actions/cache@v3
+        with:
+          path: ~/.msbuild
+          key: ${{ runner.os }}-msbuild-${{ hashFiles('**/TriCNES.sln') }}
+          restore-keys: |
+            ${{ runner.os }}-msbuild-
 
       - name: Build solution (Release)
-        run: msbuild TriCNES.sln /p:Configuration=Release
+        run: msbuild TriCNES.sln /p:Configuration=Release /p:Platform="Any CPU" /m /v:minimal
 
       - name: Prepare upload folder
+        shell: bash
         run: |
-          mkdir upload
-          copy bin\Release\TriCNES.exe upload\TriCNES.exe
-          mkdir upload\tas
-          mkdir upload\roms
-          echo "# This is a placeholder file to force the upload of this folder." > upload\tas\README.md
-          echo "# This is a placeholder file to force the upload of this folder." > upload\roms\README.md
+          mkdir -p upload/tas upload/roms
+          
+          cp bin/Release/TriCNES${{ matrix.os == 'windows-latest' && '.exe' || '' }} upload/TriCNES${{ matrix.os == 'windows-latest' && '.exe' || '' }} || echo "Binary not found at expected location"
+          
+          echo "Place your Tool-Assisted Speedrun (TAS) input files here." >> upload/tas/README.md
+          echo "Place your NES ROM files here." >> upload/roms/README.md
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: TriCNES-Release
+          name: TriCNES-${{ matrix.os }}
+          retention-days: 90
+          if-no-files-found: error
           path: |
             upload\tas\README.md
             upload\roms\README.md
-            upload\TriCNES.exe
-            
+            upload\TriCNES${{ matrix.os == 'windows-latest' && '.exe' || '' }}
