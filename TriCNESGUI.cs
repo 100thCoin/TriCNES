@@ -666,6 +666,10 @@ namespace TriCNES
             {
                 TraceLogger.Dispose();
             }
+            if (NametableViewer != null)
+            {
+                NametableViewer.Dispose();
+            }
             Application.Exit();
         }
 
