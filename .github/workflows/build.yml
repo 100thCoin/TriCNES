@@ -26,14 +26,17 @@ jobs:
       - name: Build solution (Release)
         run: msbuild TriCNES.sln /p:Configuration=Release
 
-      - name: Create folders
+      - name: Prepare upload folder
         run: |
-          mkdir bin/Release/tas
-          mkdir bin/Release/roms
+          mkdir upload
+          copy bin\Release\TriCNES.exe upload\TriCNES.exe
+          mkdir upload\tas
+          mkdir upload\roms
+          echo "# this is a placeholder file to force to upload this folder" > upload\tas\.gitkeep
+          echo "# this is a placeholder file to force to upload this folder" > upload\roms\.gitkeep
 
-      - name: Upload build artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
           name: TriCNES-Release
-          path: |
-            bin/Release/**
+          path: upload/**
