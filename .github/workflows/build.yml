@@ -25,10 +25,15 @@ jobs:
 
       - name: Build solution (Release)
         run: msbuild TriCNES.sln /p:Configuration=Release
-        
-      - name: Publish artifacts
+
+      - name: Create folders
+        run: |
+          mkdir TriCNES/bin/Release/tas
+          mkdir TriCNES/bin/Release/roms
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: TriCNES-binaries
+          name: TriCNES-Release
           path: |
-            **/*.exe
+            TriCNES/bin/Release/**
