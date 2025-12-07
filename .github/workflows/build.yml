@@ -7,9 +7,9 @@ permissions:
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
@@ -33,20 +33,20 @@ jobs:
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v2
 
-      - name: Restore packages
-        run: nuget restore TriCNES.sln
-        shell: powershell
-
-      - name: Cache msbuild
+      - name: Cache NuGet packages
         uses: actions/cache@v3
         with:
-          path: ~/.msbuild
-          key: ${{ runner.os }}-msbuild-${{ hashFiles('**/TriCNES.sln') }}
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.sln') }}
           restore-keys: |
-            ${{ runner.os }}-msbuild-
+            ${{ runner.os }}-nuget-
+
+      - name: Restore packages
+        run: nuget restore TriCNES.sln -NonInteractive
+        shell: powershell
 
       - name: Build solution (Release)
-        run: msbuild TriCNES.sln /p:Configuration=Release /p:Platform="Any CPU" /m /v:minimal
+        run: msbuild TriCNES.sln /p:Configuration=Release /p:Platform="Any CPU" /m /nr:false /v:minimal
         shell: powershell
 
       - name: Prepare upload folder
