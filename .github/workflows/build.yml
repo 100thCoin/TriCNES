@@ -28,12 +28,12 @@ jobs:
 
       - name: Create folders
         run: |
-          mkdir TriCNES/bin/Release/tas
-          mkdir TriCNES/bin/Release/roms
+          mkdir bin/Release/tas
+          mkdir bin/Release/roms
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         with:
           name: TriCNES-Release
           path: |
-            TriCNES/bin/Release/**
+            bin/Release/**
