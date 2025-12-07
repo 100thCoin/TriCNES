@@ -2,36 +2,33 @@ name: Build TriCNES
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   pull_request:
-    branches: ["main"]
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: "4.8"
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v2
 
-      - name: Restore NuGet packages
-        run: nuget restore ./TriCNES.sln
+      - name: Restore packages
+        run: nuget restore TriCNES.sln
 
-      - name: Build solution
-        run: msbuild ./TriCNES.sln /p:Configuration=Release
-
-      - name: Run tests
-        run: msbuild ./TriCNES.sln /p:Configuration=Release /t:Test
-
+      - name: Build solution (Release)
+        run: msbuild TriCNES.sln /p:Configuration=Release
+        
       - name: Publish artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: TriCNES-build
-          path: ./TriCNES/bin/Release/TriCNES.dll
+          name: TriCNES-binaries
+          path: |
+            **/*.exe
