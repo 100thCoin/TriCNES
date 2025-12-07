@@ -39,4 +39,8 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: TriCNES-Release
-          path: upload/**
+          path: |
+            upload\tas
+            upload\roms
+            upload\TriCNES.exe
+            
