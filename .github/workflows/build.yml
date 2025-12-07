@@ -10,6 +10,7 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -53,18 +54,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p upload/tas upload/roms
-          cp bin/Release/TriCNES${{ matrix.os == 'windows-latest' && '.exe' || '' }} upload/TriCNES${{ matrix.os == 'windows-latest' && '.exe' || '' }} || echo "Binary not found at expected location"
-
+          cp bin/Release/TriCNES.exe upload/TriCNES.exe || echo "Binary not found at expected location"
           echo "Place your Tool-Assisted Speedrun (TAS) input files here." >> upload/tas/README.md
           echo "Place your NES ROM files here." >> upload/roms/README.md
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: TriCNES-${{ matrix.os }}
+          name: TriCNES-Release-${{ matrix.os }}
+          path: upload
           retention-days: 90
           if-no-files-found: error
-          path: |
-            upload\tas\README.md
-            upload\roms\README.md
-            upload\TriCNES${{ matrix.os == 'windows-latest' && '.exe' || '' }}
