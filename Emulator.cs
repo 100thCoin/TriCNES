@@ -10856,6 +10856,7 @@ namespace TriCNES
             State.Add(opCode);
             State.Add((byte)(operationComplete ? 1 : 0));
 
+            State.Add(dl);
             State.Add(dataBus);
             State.Add(A);
             State.Add(X);
@@ -11197,6 +11198,7 @@ namespace TriCNES
             opCode = State[p++];
             operationComplete = (State[p++] & 1) == 1;
 
+            dl = State[p++];
             dataBus = State[p++];
             A = State[p++];
             X = State[p++];
