@@ -10897,6 +10897,7 @@ namespace TriCNES
             State.Add(Controller1ShiftCounter);
             State.Add(Controller2ShiftCounter);
 
+            State.Add((byte)(APU_PutCycle ? 1 : 0));
             State.Add((byte)(APU_Status_DMCInterrupt ? 1 : 0));
             State.Add((byte)(APU_Status_FrameInterrupt ? 1 : 0));
             State.Add((byte)(APU_Status_DMC ? 1 : 0));
@@ -11238,6 +11239,7 @@ namespace TriCNES
             Controller1ShiftCounter = State[p++];
             Controller2ShiftCounter = State[p++];
 
+            APU_PutCycle = (State[p++] & 1) == 1;
             APU_Status_DMCInterrupt = (State[p++] & 1) == 1;
             APU_Status_FrameInterrupt = (State[p++] & 1) == 1;
             APU_Status_DMC = (State[p++] & 1) == 1;
