@@ -1461,7 +1461,7 @@ namespace TriCNES
                     FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
                 }
             }
-            else if (PPU_Scanline == 261 && PPU_Dot == 7)
+            else if (PPU_Scanline == 261 && PPU_Dot == 10)
             {
                 // And then a few cycles later, the CPU notices that this flag was cleared.
                 PPUStatus_VBlank_Delayed = false;
