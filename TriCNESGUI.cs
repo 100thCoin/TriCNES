@@ -29,8 +29,9 @@ namespace TriCNES
         }
 
         bool settings_ntsc;
-        bool settings_boarder;
-        int settings_alignment;
+        bool settings_ntscRaw;
+        bool settings_border;
+        byte settings_alignment;
 
         public Emulator EMU;
         Thread EmuClock;
@@ -53,9 +54,9 @@ namespace TriCNES
                         PendingScreenshot = false;
                         if (EMU.PPU_DecodeSignal)
                         {
-                            if (EMU.PPU_ShowScreenBoarders)
+                            if (EMU.PPU_ShowScreenBorders)
                             {
-                                Clipboard.SetImage(EMU.BoarderedNTSCScreen.Bitmap);
+                                Clipboard.SetImage(EMU.BorderedNTSCScreen.Bitmap);
                             }
                             else
                             {
@@ -64,7 +65,7 @@ namespace TriCNES
                         }
                         else
                         {
-                            if(EMU.PPU_ShowScreenBoarders)
+                            if(EMU.PPU_ShowScreenBorders)
                             {
                                 Clipboard.SetImage(EMU.BoarderedScreen.Bitmap);
                             }
@@ -74,6 +75,19 @@ namespace TriCNES
                             }
                         }
                     }
+                    if (Keyboard.IsKeyDown(Key.Q)) { PendingSaveState = true; }
+                    if (Keyboard.IsKeyDown(Key.W)) { PendingLoadState = true; }
+                    if (PendingSaveState)
+                    {
+                        PendingSaveState = false;
+                        Savestate = EMU.SaveState();
+                    }
+                    if(PendingLoadState && Savestate != null)
+                    {
+                        PendingLoadState = false;
+                        EMU.LoadState(Savestate);
+                    }
+
                     if (Form.ActiveForm != null)
                     {
                         byte controller1 = 0;
@@ -111,9 +125,9 @@ namespace TriCNES
                         {
                             if (EMU.PPU_DecodeSignal)
                             {
-                                if (EMU.PPU_ShowScreenBoarders)
+                                if (EMU.PPU_ShowScreenBorders)
                                 {
-                                    pb_Screen.Image = EMU.BoarderedNTSCScreen.Bitmap;
+                                    pb_Screen.Image = EMU.BorderedNTSCScreen.Bitmap;
                                 }
                                 else
                                 {
@@ -122,7 +136,7 @@ namespace TriCNES
                             }
                             else
                             {
-                                if (EMU.PPU_ShowScreenBoarders)
+                                if (EMU.PPU_ShowScreenBorders)
                                 {
                                     pb_Screen.Image = EMU.BoarderedScreen.Bitmap;
                                 }
@@ -138,9 +152,9 @@ namespace TriCNES
                     {
                         if (EMU.PPU_DecodeSignal)
                         {
-                            if (EMU.PPU_ShowScreenBoarders)
+                            if (EMU.PPU_ShowScreenBorders)
                             {
-                                pb_Screen.Image = EMU.BoarderedNTSCScreen.Bitmap;
+                                pb_Screen.Image = EMU.BorderedNTSCScreen.Bitmap;
                             }
                             else
                             {
@@ -149,7 +163,7 @@ namespace TriCNES
                         }
                         else
                         {
-                            if (EMU.PPU_ShowScreenBoarders)
+                            if (EMU.PPU_ShowScreenBorders)
                             {
                                 pb_Screen.Image = EMU.BoarderedScreen.Bitmap;
                             }
@@ -173,8 +187,10 @@ namespace TriCNES
                     }
                     if(NametableViewer != null && !NametableViewer.IsDisposed)
                     {
-                        NametableViewer.Update(RenderNametable());
+                        RenderNametable();
+                        NametableViewer.Update(NametableBitmap.Bitmap);                        
                     }
+                    EMU.Screen.Bitmap.Save(@"C:\Users\100th_Coin\Pictures\SMB3_Video\___Screenmod\miscFootage\Tetris\out_" + frameCount.ToString("D4") + ".png", System.Drawing.Imaging.ImageFormat.Png);
                     frameCount++;
                 }
             }
@@ -373,7 +389,8 @@ namespace TriCNES
                 filePath = ofd.FileName;
                 EMU = new Emulator();
                 EMU.PPU_DecodeSignal = settings_ntsc;
-                EMU.PPU_ShowScreenBoarders = settings_boarder;
+                EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
+                EMU.PPU_ShowScreenBorders = settings_border;
                 EMU.PPUClock = settings_alignment;
                 Cartridge Cart = new Cartridge(filePath);
                 EMU.Cart = Cart;
@@ -443,7 +460,8 @@ namespace TriCNES
 
             EMU = new Emulator();
             EMU.PPU_DecodeSignal = settings_ntsc;
-            EMU.PPU_ShowScreenBoarders = settings_boarder;
+            EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
+            EMU.PPU_ShowScreenBorders = settings_border;
 
             Cartridge Cart = new Cartridge(filePath);
             EMU.Cart = Cart;
@@ -555,7 +573,8 @@ namespace TriCNES
             {
                 EMU = new Emulator();
                 EMU.PPU_DecodeSignal = settings_ntsc;
-                EMU.PPU_ShowScreenBoarders = settings_boarder;
+                EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
+                EMU.PPU_ShowScreenBorders = settings_border;
                 EMU.PPUClock = settings_alignment;
             }
             EmuClock = new Thread(ClockEmulator3CT);
@@ -608,7 +627,8 @@ namespace TriCNES
             {
                 Emulator Emu2 = new Emulator();
                 Emu2.PPU_DecodeSignal = settings_ntsc;
-                Emu2.PPU_ShowScreenBoarders = settings_boarder;
+                EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
+                Emu2.PPU_ShowScreenBorders = settings_border;
                 Emu2.PPUClock = settings_alignment;
                 Emu2.Cart = EMU.Cart;
                 EMU = Emu2;
@@ -635,7 +655,8 @@ namespace TriCNES
             filePath = filename;
             EMU = new Emulator();
             EMU.PPU_DecodeSignal = settings_ntsc;
-            EMU.PPU_ShowScreenBoarders = settings_boarder;
+            EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
+            EMU.PPU_ShowScreenBorders = settings_border;
             EMU.PPUClock = settings_alignment;
 
             Cartridge Cart = new Cartridge(filePath);
@@ -709,7 +730,7 @@ namespace TriCNES
             RebootWithAlignment(3);
         }
 
-        private void RebootWithAlignment(int Alignment)
+        private void RebootWithAlignment(byte Alignment)
         {
             if (EMU != null)
             {
@@ -718,6 +739,9 @@ namespace TriCNES
                 EMU = Emu2;
                 EMU.PPUClock = Alignment;
                 EMU.CPUClock = 0;
+                EMU.PPU_DecodeSignal = settings_ntsc;
+                EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
+                EMU.PPU_ShowScreenBorders = settings_border;
             }
             settings_alignment = Alignment;
         }
@@ -725,23 +749,43 @@ namespace TriCNES
         private void trueToolStripMenuItem_Click(object sender, EventArgs e)
         {
             falseToolStripMenuItem.Checked = false;
+            showRawSignalsToolStripMenuItem.Checked = false;
             trueToolStripMenuItem.Checked = true;
             if (EMU != null)
             {
                 EMU.PPU_DecodeSignal = true;
+                EMU.PPU_ShowRawNTSCSignal = false;
             }
             settings_ntsc = true;
+            settings_ntscRaw = false;
         }
 
         private void falseToolStripMenuItem_Click(object sender, EventArgs e)
         {
             trueToolStripMenuItem.Checked = false;
+            showRawSignalsToolStripMenuItem.Checked = false;
             falseToolStripMenuItem.Checked = true;
             if (EMU != null)
             {
                 EMU.PPU_DecodeSignal = false;
+                EMU.PPU_ShowRawNTSCSignal = false;
             }
             settings_ntsc = false;
+            settings_ntscRaw = false;
+        }
+
+        private void showRawSignalsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            trueToolStripMenuItem.Checked = false;
+            showRawSignalsToolStripMenuItem.Checked = true;
+            falseToolStripMenuItem.Checked = false;
+            if (EMU != null)
+            {
+                EMU.PPU_DecodeSignal = true;
+                EMU.PPU_ShowRawNTSCSignal = true;
+            }
+            settings_ntsc = true;
+            settings_ntscRaw = true;
         }
 
         public void ResizeWindow(int scale)
@@ -750,7 +794,7 @@ namespace TriCNES
             int h = 240;
             if(EMU != null)
             {
-                if(EMU.PPU_ShowScreenBoarders)
+                if(EMU.PPU_ShowScreenBorders)
                 {
                     w = 341;
                     h = 262;
@@ -830,25 +874,25 @@ namespace TriCNES
 
         private void trueToolStripMenuItem1_Click(object sender, EventArgs e)
         {
-            toolstrip_ViewBoarders_False.Checked = false;
-            toolstrip_ViewBoarders_True.Checked = true;
+            toolstrip_ViewBorders_False.Checked = false;
+            toolstrip_ViewBorders_True.Checked = true;
             if (EMU != null)
             {
-                EMU.PPU_ShowScreenBoarders = true;
+                EMU.PPU_ShowScreenBorders = true;
             }
-            settings_boarder = true;
+            settings_border = true;
             ResizeWindow(ScreenMult);
         }
 
         private void falseToolStripMenuItem1_Click(object sender, EventArgs e)
         {
-            toolstrip_ViewBoarders_False.Checked = true;
-            toolstrip_ViewBoarders_True.Checked = false;
+            toolstrip_ViewBorders_False.Checked = true;
+            toolstrip_ViewBorders_True.Checked = false;
             if (EMU != null)
             {
-                EMU.PPU_ShowScreenBoarders = false;
+                EMU.PPU_ShowScreenBorders = false;
             }
-            settings_boarder = false;
+            settings_border = false;
             ResizeWindow(ScreenMult);
         }
 
@@ -858,6 +902,18 @@ namespace TriCNES
             NametableViewer.MainGUI = this;
             NametableViewer.Show();
             NametableViewer.Location = Location;
+        }
+
+        List<Byte> Savestate = new List<byte>();
+        bool PendingSaveState = false;
+        private void saveStateToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            PendingSaveState = true;
+        }
+        bool PendingLoadState = false;
+        private void loadStateToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            PendingLoadState = true;
         }
     }
 

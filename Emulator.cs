@@ -4,6 +4,8 @@ using System.Text;
 using System.IO;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Windows.Media.Media3D;
 
 namespace TriCNES
 {
@@ -148,25 +150,23 @@ namespace TriCNES
     {
         
         public Cartridge Cart;  // The idea behind this emulator is that this value could be changed at any time if you so desire.
-        public int PPUClock;    // Counts down from 4. When it's 0, a PPU cycle occurs.
-        public int CPUClock;    // Counts down from 12. When it's 0, a CPU cycle occurs.
-        public int APUClock;    // Counts down from 12. Technically an APU cycle is 24 master clock cycles, but certain actions happen when this clock goes low and when it goes high.
-        public int MasterClock; // Counts up every master clock cycle. Resets at 24.
+        public byte PPUClock;    // Counts down from 4. When it's 0, a PPU cycle occurs.
+        public byte CPUClock;    // Counts down from 12. When it's 0, a CPU cycle occurs.
+        public byte APUClock;    // Counts down from 12. Technically an APU cycle is 24 master clock cycles, but certain actions happen when this clock goes low and when it goes high.
+        public byte MasterClock; // Counts up every master clock cycle. Resets at 24.
 
         public bool APU_PutCycle = false; // The APU needs to know if this is a "get" or "put" cycle.
 
         public byte[] OAM = new byte[0x100];         // Object Attribute Memory is 256 bytes.
-        public byte[] SecondaryOAM = new byte[32];   // Secondary OAM is specifically the 8 objects being rendered on the current scanline.
+        public byte[] OAM2 = new byte[32];   // Secondary OAM is specifically the 8 objects being rendered on the current scanline.
         public byte SecondaryOAMSize = 0;            // This is a count of how many objects are currently in secondary OAM.
         public byte OAM2Address = 0;         // During sprite evaluation, the current SecondaryOAM Address is used to track what byte is set of a given dot.
         public bool SecondaryOAMFull = false;        // If full and another object exists in the same scanline, the PPU Sprite OVerflow flag is set.
         public byte SpriteEvaluationTick = 0;        // During sprite evaluation, there's a switch statement that determines what to do on a given dot. This determines which action to take.
-        public byte OAMScan_n = 0;                   // The name is taken from the nesdev wiki. Imagine this as the object ID in OAM.
-        public byte OAMScan_m = 0;                   // The name is taken from the nesdev wiki. Imagine this as the index into a given objects OAM bytes.
         public bool OAMAddressOverflowedDuringSpriteEvaluation = false; // If the OAM address overflows during sprite evaluation, there's a few bugs that can occur.
 
         public byte[] RAM = new byte[0x800];    // There are 0x800 bytes of RAM
-        public byte[] PPU = new byte[0x800];   // There are 0x800 bytes of VRAM
+        public byte[] VRAM = new byte[0x800];   // There are 0x800 bytes of VRAM
         public byte[] PaletteRAM = new byte[0x20]; // there are 0x20 bytes of palette RAM
 
         public ushort programCounter = 0;   // The PC. What address is currently being executed?
@@ -180,8 +180,6 @@ namespace TriCNES
         public bool flag_Zero;       // The Zero flag is used in BNE and BEQ instructions, and is set when the result of an operation is zero.
         public bool flag_Interrupt;  // The Interrupt suppression flag will suppress IRQ's. 
         public bool flag_Decimal;    // The NES doesn't use this flag.
-        public bool flag_B;          // This is set during BRK instructions
-        public bool flag_T;          // This flag has no purpose, though PLP instructions set it.
         public bool flag_Overflow;   // The Carry flag is used in BVC and BVS instructions, and is set when the result of an operation over/underflows and the sign of the result is the same as the value before the operation.
         public bool flag_Negative;   // The Zero flag is used in BPL and BMI instructions, and is set when the result of an operation is negative. (bit 7 is set)
         byte status = 0;             // This is a byte representation of all the flags.
@@ -253,7 +251,7 @@ namespace TriCNES
         public DirectBitmap Screen = new DirectBitmap(256, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
         public DirectBitmap NTSCScreen = new DirectBitmap(256*8, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
         public DirectBitmap BoarderedScreen = new DirectBitmap(341, 262); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
-        public DirectBitmap BoarderedNTSCScreen = new DirectBitmap(341 * 8, 262); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+        public DirectBitmap BorderedNTSCScreen = new DirectBitmap(341 * 8, 262); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
 
         //Debugging
         public bool Logging;    // If set, the tracelogger will record all instructions ran.
@@ -265,9 +263,9 @@ namespace TriCNES
             A = 0;  // The A, X, and Y registers are all initialized with 0 when the console boots up.
             X = 0;
             Y = 0;
-            PPU = new byte[0x800];
+            VRAM = new byte[0x800];
             OAM = new byte[0x100];
-            SecondaryOAM = new byte[32];
+            OAM2 = new byte[32];
 
             // set up RAM and PPU RAM Pattern
             int i = 0;
@@ -277,12 +275,12 @@ namespace TriCNES
                 bool swap = (i & 0x1F) >= 0x10;
                 if (j < 0x2 == !swap)
                 {
-                    PPU[i] = 0xF0;
+                    VRAM[i] = 0xF0;
                     RAM[i] = 0xF0;
                 }
                 else
                 {
-                    PPU[i] = 0x0F;
+                    VRAM[i] = 0x0F;
                     RAM[i] = 0x0F;
                 }
                 i++;
@@ -645,7 +643,7 @@ namespace TriCNES
         public bool APU_ImplicitAbortDMC4015;   // An edge case of the DMC DMA, where regardless of the buffer being empty, there will be a 1-cycle DMA that gets aborted 2 cycles after the load DMA ends
         public bool APU_SetImplicitAbortDMC4015;// This is used to make that happen.
 
-        public byte[] APU_Register = new byte[0x18]; // Instead of making a series of variables, I made an array here for some reason.
+        public byte[] APU_Register = new byte[0x10]; // Instead of making a series of variables, I made an array here for some reason.
 
         public bool APU_FrameCounterMode;       // Bit 7 of $4017 : Determines if the APU frame counter is using the 4 step or 5 step modes.
         public bool APU_FrameCounterInhibitIRQ; // Bit 6 of $4017 : If set, prevents the APU from creating IRQ's
@@ -1032,7 +1030,7 @@ namespace TriCNES
 
         public byte PPUBus; // The databus of the Picture Processing Unit
         public int[] PPUBusDecay = new int[8];
-        public int PPUBusDecayConstant = 1786830; // 20 frames. Approximately how long it takes for the PPU bus to decay on my console.
+        const int PPUBusDecayConstant = 1786830; // 20 frames. Approximately how long it takes for the PPU bus to decay on my console.
         public byte PPUOAMAddress; // The address unsed to index into Object Attribute Memory
         public bool PPUStatus_VBlank; // This is set during Vblank, and cleared at the end, or if $2002 is read. This value can be read in address $2002
         public bool PPUStatus_VBlank_Delayed; // when writing to $2000 to potentially start an NMI, there's a 1 ppu cycle delay on this flag
@@ -1041,9 +1039,8 @@ namespace TriCNES
 
         bool PPU_Spritex16; // Are sprites using 8x8 mode, or 8x16 mode? Set by writing to $2000
 
-        public int PPU_Scanline; // Which scanline is the PPU currently on
-        public int PPU_Dot; // Which dot of the scanline is the PPU currently on
-        public int NMIDelay; // When a NMI is about to occur, there's a small delay depending on the alignment with the CPU clock.
+        public ushort PPU_Scanline; // Which scanline is the PPU currently on
+        public ushort PPU_Dot; // Which dot of the scanline is the PPU currently on
 
         public bool PPU_VRegisterChangedOutOfVBlank;    // when changing the v register (Read write address) out of vblank, palettes can become corrupted
         public bool PPU_OAMCorruptionRenderingDisabledOutOfVBlank;  // When rendering is disabled on specific dots of visible scanlines, OAM data can become corrupted
@@ -1401,7 +1398,6 @@ namespace TriCNES
                     if (!SyncFM2)
                     {
                         PPU_PendingVBlank = true;
-                        PPU_PendingNMI = true;
                     }
                     else
                     {
@@ -1420,7 +1416,7 @@ namespace TriCNES
                         PPU_RESET = false;
                     }
                     // else, address $2002 was read on this ppu cycle. no VBlank flag.
-                    if(!PPU_ShowScreenBoarders)
+                    if (!PPU_ShowScreenBorders)
                     {
                         FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
                     }
@@ -1435,9 +1431,9 @@ namespace TriCNES
                 }
 
             }
-            else if(PPU_Scanline == 242 && PPU_Dot == 1)
+            else if (PPU_Scanline == 242 && PPU_Dot == 1)
             {
-                if (PPU_ShowScreenBoarders && !PPU_DecodeSignal) // if we're showing the boarders, we need to wait for 2 more scanlines to render.
+                if (PPU_ShowScreenBorders && !PPU_DecodeSignal) // if we're showing the boarders, we need to wait for 2 more scanlines to render.
                 {
                     FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
                 }
@@ -1457,12 +1453,15 @@ namespace TriCNES
                 PPUStatus_VBlank = false;
                 PPUStatus_SpriteOverflow = false;
                 PPU_CanDetectSpriteZeroHit = true;
-                if (PPU_ShowScreenBoarders && PPU_DecodeSignal) // if we're showing the boarders, we need to wait for the pre-render line.
+            }
+            else if (PPU_Scanline == 0 && PPU_Dot == 1)
+            { 
+                if (PPU_ShowScreenBorders && PPU_DecodeSignal) // if we're showing the boarders, we need to wait for scanline 0.
                 {
                     FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
                 }
             }
-            else if (PPU_Scanline == 261 && PPU_Dot == 10)
+            else if (PPU_Scanline == 261 && PPU_Dot == 7)
             {
                 // And then a few cycles later, the CPU notices that this flag was cleared.
                 PPUStatus_VBlank_Delayed = false;
@@ -1593,14 +1592,14 @@ namespace TriCNES
                 }
                 else
                 {
-                    if (PPU_ShowScreenBoarders) // Draw the pixels in the boarder too.
+                    if (PPU_ShowScreenBorders) // Draw the pixels in the boarder too.
                     {
                         PPU_Render_CalculatePixel(true); // this determines the color of the pixel being drawn.
                     }
                 }
 
 
-                if (!PPU_ShowScreenBoarders)
+                if (!PPU_ShowScreenBorders)
                 {
                     DrawToScreen();
 
@@ -1630,13 +1629,13 @@ namespace TriCNES
                     }
                 }
             }
-            else if (PPU_ShowScreenBoarders)
+            else if (PPU_ShowScreenBorders)
             {
                 PPU_Render_CalculatePixel(true); // this determines the color of the pixel being drawn.
             }
-            if (PPU_ShowScreenBoarders)
+            if (PPU_ShowScreenBorders)
             {
-                DrawToBoarderedScreen();
+                DrawToBorderedScreen();
             }
             ThisDotReadFromPaletteRAM = false;
 
@@ -1695,7 +1694,7 @@ namespace TriCNES
                 }
                 if (!PPU_DecodeSignal)
                 {
-                    if (!PPU_ShowScreenBoarders)
+                    if (!PPU_ShowScreenBorders)
                     {
                         if (scanline0OddFrameOffset == 1 && PPU_Dot == 4)
                         {
@@ -1746,7 +1745,7 @@ namespace TriCNES
             }
         }
 
-        void DrawToBoarderedScreen()
+        void DrawToBorderedScreen()
         {
 
             int dot = PPU_Dot;
@@ -1767,7 +1766,7 @@ namespace TriCNES
             int boarderedDot = 0;
             int boarderedScanline = scanline;
 
-            if(PPU_ShowScreenBoarders && dot == 325)
+            if(PPU_ShowScreenBorders && dot == 325)
             {
                 ntsc_signal_of_dot_0 = ntsc_signal;
             }
@@ -1977,7 +1976,7 @@ namespace TriCNES
 
 
         public bool PPU_DecodeSignal;
-        public bool PPU_ShowScreenBoarders;
+        public bool PPU_ShowScreenBorders;
         static float[] Voltages =
             { 0.228f, 0.312f, 0.552f, 0.880f, // Signal low
 		        0.616f, 0.840f, 1.100f, 1.100f, // Signal high
@@ -1987,7 +1986,7 @@ namespace TriCNES
         public byte ntsc_signal;
         public byte ntsc_signal_of_dot_0;
         public float[] NTSC_Samples = new float[257 * 8 + 24];
-        public float[] Boardered_NTSC_Samples = new float[341 * 8 + 24];
+        public float[] Bordered_NTSC_Samples = new float[341 * 8 + 24];
         static float[] Levels =
             {
             (Voltages[0] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
@@ -2053,7 +2052,7 @@ namespace TriCNES
 
         void PPU_SignalDecode(int nesColor)
         {
-            bool boardered = PPU_ShowScreenBoarders;
+            bool boardered = PPU_ShowScreenBorders;
             byte phase = ntsc_signal;
             int i = 0;
             while (i < 8)
@@ -2071,9 +2070,9 @@ namespace TriCNES
                     int emphasis = (nesColor >> 6);   // 0..7  "eee"
                     if (colInd > 13) { level = 1; }   // For colors 14..15, level 1 is forced.
                     int attenuation = (
-                                (((emphasis & 1) != 0) && InColorPhase(0xC, phase)) ||
+                                ((((emphasis & 1) != 0) && InColorPhase(0xC, phase)) ||
                                 (((emphasis & 2) != 0) && InColorPhase(0x4, phase)) ||
-                                (((emphasis & 4) != 0) && InColorPhase(0x8, phase)) && (colInd < 0xE)) ? 8 : 0;
+                                (((emphasis & 4) != 0) && InColorPhase(0x8, phase))) && (colInd < 0xE)) ? 8 : 0;
                     float low = Levels[0 + level + attenuation];
                     float high = Levels[4 + level + attenuation];
                     if (colInd == 0) { low = high; } // For color 0, only high level is emitted
@@ -2099,7 +2098,7 @@ namespace TriCNES
                     {
                         dot--;
                     }
-                    Boardered_NTSC_Samples[dot * 8 + i] = sample;
+                    Bordered_NTSC_Samples[dot * 8 + i] = sample;
                 }
                 else if (PPU_Dot <= 256+3)
                 {
@@ -2117,87 +2116,117 @@ namespace TriCNES
                 i++;
             }
         }
+        public bool PPU_ShowRawNTSCSignal;
         void RenderNTSCScanline()
         {
             byte phase = ntsc_signal_of_dot_0;
-            bool boardered = PPU_ShowScreenBoarders; // this value could change at any moment, so it would be nice to avoid errors due to array lengths.
+            bool bordered = PPU_ShowScreenBorders; // this value could change at any moment, so it would be nice to avoid errors due to array lengths.
 
             int scanline0OddFrameOffset = 0;
-            if (PPU_Scanline == 0 && PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && !boardered)
+            if (PPU_Scanline == 0 && PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && !bordered)
             {
                 scanline0OddFrameOffset = 8;
             }
 
-            int width = boardered ? BoarderedNTSCScreen.Width : NTSCScreen.Width;
+            int width = bordered ? BorderedNTSCScreen.Width : NTSCScreen.Width;
 
             int i = 0;
             while (i < width + scanline0OddFrameOffset)
             {
-                int center = i + 8;
-                int begin = center - 6;
-                int end = center + 6;
-                double Y = 0;
-                double U = 0;
-                double V = 0;
-                for (int p = begin; p < end; ++p) // Collect and accumulate samples
+                double R = 0;
+                double G = 0;
+                double B = 0;
+                if (!PPU_ShowRawNTSCSignal)
                 {
-                    float sample = boardered ? (Boardered_NTSC_Samples[p]) : (NTSC_Samples[p]);
-                    Y += sample;
-                    U += sample * SinTable[(phase + p) % 12];
-                    V += sample * CosTable[(phase + p) % 12];
+                    int center = i + 8;
+                    int begin = center - 6;
+                    int end = center + 6;
+                    double Y = 0;
+                    double U = 0;
+                    double V = 0;
+                    for (int p = begin; p < end; ++p) // Collect and accumulate samples
+                    {
+                        float sample = bordered ? (Bordered_NTSC_Samples[p]) : (NTSC_Samples[p]);
+                        Y += sample;
+                        U += sample * SinTable[(phase + p) % 12];
+                        V += sample * CosTable[(phase + p) % 12];
+                    }
+
+                    //U *= (0.35355339 * 2);
+                    //V *= (0.35355339 * 2);
+
+                    U = U * 0.5f + 0.5f;
+                    V = V * 0.5f + 0.5f;
+
+                    bool DebugYUV = false;
+                    if (DebugYUV)
+                    {
+                        Y = 0.5;
+                        U = (i + 0.0f) / width;
+                        V = 1 - (PPU_Scanline / 240f);
+
+                        U -= 0.5f;
+                        V -= 0.5f;
+
+                        U *= (0.35355339 * 2);
+                        V *= (0.35355339 * 2);
+
+                        U += 0.5f;
+                        V += 0.5f;
+                    }
+
+                    // convert YUV to RGB
+                    R = 1.164 * (Y - 16 / 256.0) + 1.596 * (V - 128 / 256.0);
+                    G = 1.164 * (Y - 16 / 256.0) - 0.392 * (U - 128 / 256.0) - 0.813 * (V - 128 / 256.0);
+                    B = 1.164 * (Y - 16 / 256.0) + 2.017 * (U - 128 / 256.0);
+
+                    // other values ?
+                    //double R = 1.164 * (Y - 16 / 256.0) + 1.14 * (V - 128 / 256.0);
+                    //double G = 1.164 * (Y - 16 / 256.0) - (1 / 1.14) * (U - 128 / 256.0) - (1 / (1.14 * 1.78)) * (V - 128 / 256.0);
+                    //double B = 1.164 * (Y - 16 / 256.0) + (1.14 * 1.78) * (U - 128 / 256.0);
+
+                    // convert YUV to normalized RGB
+                    //double R = 1.164 * (Y - 16 / 256.0) + 1 * (V - 128 / 256.0);
+                    //double G = 1.164 * (Y - 16 / 256.0) - 0.31764705882 * (U - 128 / 256.0) - 0.68359375 * (V - 128 / 256.0);
+                    //double B = 1.164 * (Y - 16 / 256.0) + 1 * (U - 128 / 256.0);
+
+                    if (R < 0) { R = 0; }
+                    if (R > 1) { R = 1; }
+                    if (G < 0) { G = 0; }
+                    if (G > 1) { G = 1; }
+                    if (B < 0) { B = 0; }
+                    if (B > 1) { B = 1; }
                 }
-
-                //U *= (0.35355339 * 2);
-                //V *= (0.35355339 * 2);
-
-                U = U * 0.5f + 0.5f;
-                V = V * 0.5f + 0.5f;
-
-                bool DebugYUV = false;
-                if(DebugYUV)
+                if (PPU_ShowScreenBorders)
                 {
-                    Y = 0.5;
-                    U = (i + 0.0f) / width;
-                    V = 1 - (PPU_Scanline / 240f);
-
-                    U -= 0.5f;
-                    V -= 0.5f;
-
-                    U *= (0.35355339*2);
-                    V *= (0.35355339*2);
-
-                    U += 0.5f;
-                    V += 0.5f;
-                }
-
-                // convert YUV to RGB
-                double R = 1.164 * (Y - 16 / 256.0) + 1.596 * (V - 128 / 256.0);
-                double G = 1.164 * (Y - 16 / 256.0) - 0.392 * (U - 128 / 256.0) - 0.813 * (V - 128 / 256.0);
-                double B = 1.164 * (Y - 16 / 256.0) + 2.017 * (U - 128 / 256.0);
-
-                // other values ?
-                //double R = 1.164 * (Y - 16 / 256.0) + 1.14 * (V - 128 / 256.0);
-                //double G = 1.164 * (Y - 16 / 256.0) - (1 / 1.14) * (U - 128 / 256.0) - (1 / (1.14 * 1.78)) * (V - 128 / 256.0);
-                //double B = 1.164 * (Y - 16 / 256.0) + (1.14 * 1.78) * (U - 128 / 256.0);
-
-                // convert YUV to normalized RGB
-                //double R = 1.164 * (Y - 16 / 256.0) + 1 * (V - 128 / 256.0);
-                //double G = 1.164 * (Y - 16 / 256.0) - 0.31764705882 * (U - 128 / 256.0) - 0.68359375 * (V - 128 / 256.0);
-                //double B = 1.164 * (Y - 16 / 256.0) + 1 * (U - 128 / 256.0);
-
-                if (R < 0) { R = 0; }
-                if (R > 1) { R = 1; }
-                if (G < 0) { G = 0; }
-                if (G > 1) { G = 1; }
-                if (B < 0) { B = 0; }
-                if (B > 1) { B = 1; }
-
-                if (PPU_ShowScreenBoarders)
-                {
-                    BoarderedNTSCScreen.SetPixel(i, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color. 
+                    if (PPU_ShowRawNTSCSignal)
+                    {
+                        R = Bordered_NTSC_Samples[i] * 12;
+                        G = Bordered_NTSC_Samples[i] * 12;
+                        B = Bordered_NTSC_Samples[i] * 12;
+                        if (R < 0) { R = 0; }
+                        if (R > 1) { R = 1; }
+                        if (G < 0) { G = 0; }
+                        if (G > 1) { G = 1; }
+                        if (B < 0) { B = 0; }
+                        if (B > 1) { B = 1; }
+                    }
+                    BorderedNTSCScreen.SetPixel(i, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color. 
                 }
                 else
                 {
+                    if (PPU_ShowRawNTSCSignal)
+                    {
+                        R = NTSC_Samples[i] * 12;
+                        G = NTSC_Samples[i] * 12;
+                        B = NTSC_Samples[i] * 12;
+                        if (R < 0) { R = 0; }
+                        if (R > 1) { R = 1; }
+                        if (G < 0) { G = 0; }
+                        if (G > 1) { G = 1; }
+                        if (B < 0) { B = 0; }
+                        if (B > 1) { B = 1; }
+                    }
                     if (scanline0OddFrameOffset == 0)
                     {
                         NTSCScreen.SetPixel(i, PPU_Scanline, Color.FromArgb((byte)(R * 255), (byte)(G * 255), (byte)(B * 255))); // this sets the pixel on screen to the chosen color.
@@ -2282,7 +2311,7 @@ namespace TriCNES
                 OAM[PPU_OAMCorruptionIndex * 8 + i] = OAM[i]; // The corrupted row is replaced with the values from row 0
                 i++;
             }
-            SecondaryOAM[PPU_OAMCorruptionIndex] = SecondaryOAM[0]; // Also corrupt this byte.
+            OAM2[PPU_OAMCorruptionIndex] = OAM2[0]; // Also corrupt this byte.
             // this all happens in a single cycle.
         }
 
@@ -2296,10 +2325,10 @@ namespace TriCNES
         public byte PPU_SpriteEvaluationTemp; // is this just the ppubus?
         void PPU_Render_SpriteEvaluation()
         {
-            bool SpriteEval_ReadOnly = false;
+            bool SpriteEval_ReadOnly_PreRenderLine = false;
             if(PPU_Scanline == 261)
             {
-                SpriteEval_ReadOnly = true;
+                SpriteEval_ReadOnly_PreRenderLine = true;
             }
             if ((PPU_Mask_ShowBackground_Instant || PPU_Mask_ShowSprites_Instant))
             {
@@ -2322,13 +2351,13 @@ namespace TriCNES
                 { //odd cycles
                     if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                     {
-                        if (SpriteEval_ReadOnly)
+                        if (SpriteEval_ReadOnly_PreRenderLine)
                         {
-                            PPU_SpriteEvaluationTemp = SecondaryOAM[OAM2Address];
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address];
                         }
                         else
                         {
-                            PPU_SpriteEvaluationTemp = ReadOAM(); // During these cycles, OAM is hard-coded to read $FF.
+                            PPU_SpriteEvaluationTemp = 0xFF;
                         }
                         if (PPU_Dot == 1)
                         {
@@ -2353,9 +2382,9 @@ namespace TriCNES
                     {
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                         {
-                            if (!SpriteEval_ReadOnly)
+                            if (!SpriteEval_ReadOnly_PreRenderLine)
                             {
-                                SecondaryOAM[OAM2Address] = PPU_SpriteEvaluationTemp; // store FF in secondary OAM
+                                OAM2[OAM2Address] = PPU_SpriteEvaluationTemp; // store FF in secondary OAM
                             }
                             if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
                             {
@@ -2382,7 +2411,7 @@ namespace TriCNES
                                 PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
                                 PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
                                 PPU_PendingOAMCorruption = true;
-                                PPU_OAMCorruptionIndex = 1; // this value will be used when rendering is re-enabled and the corruption occurs
+                                PPU_OAMCorruptionIndex = OAM2Address; // this value will be used when rendering is re-enabled and the corruption occurs
                             }
                         }
                     }
@@ -2415,7 +2444,7 @@ namespace TriCNES
                         {
                             PPU_OAMEvaluationCorruptionOddCycle = false;
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
-                            if (!SpriteEval_ReadOnly)
+                            if (!SpriteEval_ReadOnly_PreRenderLine)
                             {
                                 PPUOAMAddress++;
                             }
@@ -2429,15 +2458,15 @@ namespace TriCNES
                         if (!OAMAddressOverflowedDuringSpriteEvaluation)
                         {
                             byte PreIncVal = PPUOAMAddress; // for checking if PPUOAMAddress overflows
-                            if (!SecondaryOAMFull && !SpriteEval_ReadOnly) // If secondary OAM is not yet full,
+                            if (!SecondaryOAMFull && !SpriteEval_ReadOnly_PreRenderLine) // If secondary OAM is not yet full,
                             {
-                                SecondaryOAM[OAM2Address] = PPU_SpriteEvaluationTemp; // store this value at the secondary oam address.
+                                OAM2[OAM2Address] = PPU_SpriteEvaluationTemp; // store this value at the secondary oam address.
                             }
-                            
+                            byte OAM2READ = OAM2[OAM2Address];
                             if (SpriteEvaluationTick == 0) // tick 0: check if this object's y position is in range for this scanline
                             {
                                 PPU_OAMEvaluationObjectInXRange = false;
-                                if (!SpriteEval_ReadOnly && (PPU_Scanline & 0xFF) - PPU_SpriteEvaluationTemp >= 0 && (PPU_Scanline & 0xFF) - PPU_SpriteEvaluationTemp < (PPU_Spritex16 ? 16 : 8))
+                                if (!SpriteEval_ReadOnly_PreRenderLine && (PPU_Scanline & 0xFF) - PPU_SpriteEvaluationTemp >= 0 && (PPU_Scanline & 0xFF) - PPU_SpriteEvaluationTemp < (PPU_Spritex16 ? 16 : 8))
                                 {
                                     PPU_OAMEvaluationObjectInRange = true;
                                     // if this sprite is within range.
@@ -2445,7 +2474,7 @@ namespace TriCNES
                                     {
                                         if (!OamCorruptedOnOddCycle)
                                         {
-                                            if (!SpriteEval_ReadOnly)
+                                            if (!SpriteEval_ReadOnly_PreRenderLine)
                                             {
                                                 PPUOAMAddress++; // +1
                                             }
@@ -2470,7 +2499,7 @@ namespace TriCNES
                                     {
                                         PPUStatus_SpriteOverflow = true; // set the sprite overflow flag
                                     }
-                                    if (!SpriteEval_ReadOnly)
+                                    if (!SpriteEval_ReadOnly_PreRenderLine)
                                     {
                                         SpriteEvaluationTick++; // increment the tick for next even ppu cycle.
                                     }
@@ -2482,7 +2511,7 @@ namespace TriCNES
                                         PPU_NextScanlineContainsSpriteZero = false; // this value will be transferred to PPU_PreviousScanlineContainsSpriteZero at the end of the scanline, and that variable is used in sp 0 hit detection.
                                     }
                                     PPU_OAMEvaluationObjectInRange = false;
-                                    if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
+                                    if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly_PreRenderLine)
                                     {
                                         if (SecondaryOAMFull)
                                         {
@@ -2517,14 +2546,14 @@ namespace TriCNES
                                         PPU_OAMEvaluationObjectInXRange = true;
                                         if (!SecondaryOAMFull)
                                         {
-                                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
+                                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly_PreRenderLine)
                                             {
                                                 PPUOAMAddress++; // +1
                                             }
                                         }
                                         else
                                         {
-                                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
+                                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly_PreRenderLine)
                                             {
                                                 PPUOAMAddress += 4; // +1 (In theory, this should be +4, though my experiments only reflect my consoles behavior if this is +1?)
                                             }
@@ -2535,7 +2564,7 @@ namespace TriCNES
                                         PPU_OAMEvaluationObjectInXRange = false;
                                         if (!SecondaryOAMFull)
                                         {
-                                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
+                                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly_PreRenderLine)
                                             {
                                                 PPUOAMAddress += 1; // +1 (In theory, this should be +4, though my experiments only reflect my consoles behavior if this is +1?)
                                                 PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
@@ -2545,14 +2574,14 @@ namespace TriCNES
                                 }
                                 else // ticks 1 and 2 don't make any checks. Only increment the OAM address.
                                 {
-                                    if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
+                                    if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly_PreRenderLine)
                                     {
                                         PPUOAMAddress++; // +1
                                     }
                                 }
                                 SpriteEvaluationTick++; // increment the tick for next even ppu cycle.
                                 SpriteEvaluationTick &= 3; // and reset the tick to 0 if it reaches 4.
-                                if (!SecondaryOAMFull && !SpriteEval_ReadOnly) // if secondary OAM is not full
+                                if (!SecondaryOAMFull && !SpriteEval_ReadOnly_PreRenderLine) // if secondary OAM is not full
                                 {
                                     OAM2Address++; // increment the secondary OAM address.
                                     OAM2Address &= 0x1F; // keep the secondary OAM address in-bounds
@@ -2568,6 +2597,7 @@ namespace TriCNES
                             {
                                 OAMAddressOverflowedDuringSpriteEvaluation = true; // set this flag.
                             }
+                            PPU_SpriteEvaluationTemp = OAM2READ; // When overflowed, the ppu reads instead of writing to OAM2. (Run this regardless of if OAM2 is full or not.)
                         }
                         else
                         {   // OAM Address Overflowerd During Sprite Evaluation
@@ -2575,11 +2605,12 @@ namespace TriCNES
                             // boo womp.
 
                             // also update the PPUOAMAddress.
-                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly)
+                            if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly_PreRenderLine)
                             {
                                 PPUOAMAddress += 4; // +4
                                 PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
                             }
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // When overflowed, the ppu reads instead of writing to OAM2.
                         }
                         if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && !PPU_OAMEvaluationCorruptionOddCycle) // if we just disabled rendering mid OAM evaluation, the address is incremented yet again.
                         {
@@ -2587,7 +2618,7 @@ namespace TriCNES
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
                             PPU_PendingOAMCorruption = true;
 
-                            if ((OAM2Address & 3) != 0 && !OAMAddressOverflowedDuringSpriteEvaluation && !SpriteEval_ReadOnly)
+                            if ((OAM2Address & 3) != 0 && !OAMAddressOverflowedDuringSpriteEvaluation && !SpriteEval_ReadOnly_PreRenderLine)
                             {
                                 OAM2Address &= 0xFC;
                                 OAM2Address += 4;
@@ -2657,7 +2688,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's Y position in the array
-                            PPU_SpriteYposition[OAM2Address / 4] = SecondaryOAM[OAM2Address];
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteYposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
                             PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
@@ -2666,7 +2698,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's pattern in the array
-                            PPU_SpritePattern[OAM2Address / 4] = SecondaryOAM[OAM2Address];
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpritePattern[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
                             PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
@@ -2675,7 +2708,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's attribute in the array
-                            PPU_SpriteAttribute[OAM2Address / 4] = SecondaryOAM[OAM2Address];
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteAttribute[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
                             PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
@@ -2684,7 +2718,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's X position in the array
-                            PPU_SpriteXposition[OAM2Address / 4] = SecondaryOAM[OAM2Address];
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
                             PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         // notably, the secondary OAM address does not get incremented until case 7
@@ -2693,7 +2728,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's X position in the array... again.
-                            PPU_SpriteXposition[OAM2Address / 4] = SecondaryOAM[OAM2Address];
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
                             // But also: Find the PPU address of this sprite's graphical data inside the Pattern Tables.
                             PPU_SpriteEvaluation_GetSpriteAddress((byte)(OAM2Address / 4));
                         }
@@ -2703,7 +2739,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's X position in the array... again.
-                            PPU_SpriteXposition[OAM2Address / 4] = SecondaryOAM[OAM2Address];
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
                             // but also: set up the bit plane shift register.
                             PPU_SpritePatternL = FetchPPU(PPU_AddressBus);
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
@@ -2725,7 +2762,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                         {
                             // set this object's X position in the array... again.
-                            PPU_SpriteXposition[OAM2Address / 4] = SecondaryOAM[OAM2Address];
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
                             // but also: add 8 to the PPU address. The other bit plane is 8 addresses away.
                             PPU_AddressBus += 8; // at this point, the address couldn't possibly overflow, so there's no need to worry about that.
                         }
@@ -2736,7 +2774,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                         {
                             // set this object's X position in the array... again.
-                            PPU_SpriteXposition[OAM2Address / 4] = SecondaryOAM[OAM2Address]; // read X pos again
+                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp; // read X pos again
                             // but also: set up the second bit plane
                             PPU_SpritePatternH = FetchPPU(PPU_AddressBus);
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
@@ -2858,21 +2897,21 @@ namespace TriCNES
 
 
 
-        void PPU_Render_CalculatePixel(bool boarders)
+        void PPU_Render_CalculatePixel(bool borders)
         {
             // dots 1 through 256
             if(PPU_Dot > 256)
             {
-                boarders = true;
+                borders = true;
             }
-            if (PPU_Dot <= 256 || boarders)
+            if (PPU_Dot <= 256 || borders)
             {
                 // there are 8 palettes in the PPU
                 // 4 are for the background, and the other 4 are for sprites.
                 byte Palette = 0;
                 // each of these palettes have 4 colors
                 byte Color = 0;
-                if (!boarders)
+                if (!borders)
                 {
                     if (PPU_Mask_ShowBackground && (PPU_Dot > 8 || PPU_Mask_8PxShowBackground)) // if rendering is enables for this pixel
                     {
@@ -2894,7 +2933,7 @@ namespace TriCNES
                 byte SpritePalette = 0;
                 byte SpriteColor = 0;
                 bool SpritePriority = false; // if set, this sprite will be in front of background tiles. Otherwise, it will only take priority if the background is using color 0.
-                if (!boarders)
+                if (!borders)
                 {
                     if (PPU_Mask_ShowSprites && (PPU_Dot > 8 || PPU_Mask_8PxShowSprites))
                     {
@@ -3609,7 +3648,7 @@ namespace TriCNES
                     return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
                 }
                 Address &= 0x7FF;
-                return PPU[Address];
+                return VRAM[Address];
             }
         }
 
@@ -4905,8 +4944,6 @@ namespace TriCNES
                                 flag_Zero = ((status & 0x02) >> 1) == 1;
                                 flag_Interrupt = ((status & 0x04) >> 2) == 1;
                                 flag_Decimal = ((status & 0x08) >> 3) == 1;
-                                flag_B = false;// ((status & 0x10) >> 4) == 1;
-                                flag_T = true;// ((status & 0x20) >> 5) == 1;
                                 flag_Overflow = ((status & 0x40) >> 6) == 1;
                                 flag_Negative = ((status & 0x80) >> 7) == 1;
                                 operationComplete = true;
@@ -5328,8 +5365,6 @@ namespace TriCNES
                                 flag_Zero = (status & 0x02) != 0;
                                 flag_Interrupt = (status & 0x04) != 0;
                                 flag_Decimal = (status & 0x08) != 0;
-                                flag_B = false;// ((status & 0x10) != 0) == 1;
-                                flag_T = true;// ((status & 0x20) != 0) == 1;
                                 flag_Overflow = (status & 0x40) != 0;
                                 flag_Negative = (status & 0x80) != 0;
 
@@ -8741,7 +8776,6 @@ namespace TriCNES
 
         bool PPUControlIncrementMode32; // Set by writing to $2000. If set, the VRAM address is incremented by 32 instead of 1 after reads/writes to $2007.
         bool PPUControl_NMIEnabled;     // Set by writing to $2000. If set, the NMI can occur.
-        bool PPUControl_NMIEnabled_Delay; // There's a slight delay between this value getting set, and the PPU registering that.
 
         public bool PPU_PatternSelect_Sprites; //which pattern table is used for sprites / background
         public bool PPU_PatternSelect_Background; //which pattern table is used for sprites / background
@@ -9134,7 +9168,7 @@ namespace TriCNES
             }
             else // if this is not pointing to CHR RAM or palettes
             {
-                PPU[Address & 0x7FF] = In;
+                VRAM[Address & 0x7FF] = In;
 
             }
         }
@@ -9203,20 +9237,12 @@ namespace TriCNES
                         break;
                     case 0x2002:
                         // PPU Flags.
-                        if(programCounter == 0xEA6D)
-                        {
-
-                        }
                         dataBus = (byte)((((PPUStatus_VBlank ? 0x80 : 0) | (PPUStatus_SpriteZeroHit ? 0x40 : 0) | (PPUStatus_SpriteOverflow ? 0x20 : 0)) & 0xE0) + (PPUBus & 0x1F));
                         if (!DebugObserve)
                         {
                             PPUAddrLatch = false;
                             PPUStatus_VBlank = false;
                             PPUStatus_VBlank_Delayed = false;
-                            if (PPU_Dot < 3) // If $2002 is written to within 3 cycles of PPU_PendingNMI
-                            {
-                                PPU_PendingNMI = false;
-                            }
                             PPU_PendingVBlank = false;
                             PPUBus = dataBus;
                             for (int i = 5; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
@@ -9553,16 +9579,17 @@ namespace TriCNES
                         }
                         return;
                     }
-                    else //if (Address >= 0x6000)
+                    else if (Address >= 0x6000)
                     {
                         if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
                         {
                             DataPinsAreNotFloating = true;
                             dataBus = Cart.PRGRAM[Address & 0x1FFF];
                         }
-                        //else, open bus
                         return;
                     }
+                    //else, open bus
+                    return;
                 case 7: // AOROM
                     if (Address >= 0x8000)
                     {
@@ -9655,11 +9682,11 @@ namespace TriCNES
                 }
                 else if (PPU_Dot <= 256)
                 {
-                    return OAM[PPUOAMAddress];
+                    return PPU_SpriteEvaluationTemp;
                 }
                 else if (PPU_Dot <= 320)
                 {
-                    return 0xFF;
+                    return PPU_SpriteEvaluationTemp;
                 }
                 return OAM[PPUOAMAddress];
             }
@@ -9667,7 +9694,6 @@ namespace TriCNES
         }
 
         bool PPU_PendingVBlank;
-        bool PPU_PendingNMI; //at vblank
 
         public bool TAS_ReadingTAS;         // if we're reading inputs from a TAS, this will be set.
         public int TAS_InputSequenceIndex;  // which index from the TAS input log will be used for this current controller strobe?
@@ -10776,8 +10802,6 @@ namespace TriCNES
                 PPUPos += "\t";
             }
 
-            //PPUCycle++;
-
             string LogLine = "$" + addr + "\t" + bytes + "\t" + instruction + "\tA:" + sA + "\tX:" + sX + "\tY:" + sY + "\tSP:" + sS + "\t" + Flags + "\tCycle: " + totalCycles;
 
             bool LogExtra = true;
@@ -10805,6 +10829,688 @@ namespace TriCNES
 
 
         }
+
+        public List<Byte> SaveState()
+        {
+            List<Byte> State = new List<byte>();
+
+            State.Add((byte)programCounter);
+            State.Add((byte)(programCounter>>8));
+            State.Add((byte)addressBus);
+            State.Add((byte)(addressBus >> 8));
+            State.Add((byte)temporaryAddress);
+            State.Add((byte)(temporaryAddress >> 8));
+            State.Add((byte)OAMAddressBus);
+            State.Add((byte)(OAMAddressBus >> 8));
+            State.Add((byte)PPU_ReadWriteAddress);
+            State.Add((byte)(PPU_ReadWriteAddress >> 8));
+            State.Add((byte)PPU_TempVRAMAddress);
+            State.Add((byte)(PPU_TempVRAMAddress >> 8));
+
+            State.Add(PPUClock);
+            State.Add(CPUClock);
+            State.Add(APUClock);
+            State.Add(MasterClock);
+
+            State.Add(operationCycle);
+            State.Add(opCode);
+            State.Add((byte)(operationComplete ? 1 : 0));
+
+            State.Add(dataBus);
+            State.Add(A);
+            State.Add(X);
+            State.Add(Y);
+            State.Add(stackPointer);
+            status = flag_Carry ? (byte)0x01 : (byte)0;
+            status += flag_Zero ? (byte)0x02 : (byte)0;
+            status += flag_Interrupt ? (byte)0x04 : (byte)0;
+            status += flag_Decimal ? (byte)0x08 : (byte)0;
+            status += flag_Overflow ? (byte)0x40 : (byte)0;
+            status += flag_Negative ? (byte)0x80 : (byte)0;
+            State.Add(status);
+
+            State.Add(specialBus);
+            State.Add(H);
+            State.Add((byte)(IgnoreH ? 1 : 0));
+
+            State.Add((byte)(CPU_Read ? 1 : 0));
+            State.Add((byte)(DoBRK ? 1 : 0));
+            State.Add((byte)(DoNMI ? 1 : 0));
+            State.Add((byte)(DoIRQ ? 1 : 0));
+            State.Add((byte)(DoReset ? 1 : 0));
+            State.Add((byte)(DoOAMDMA ? 1 : 0));
+            State.Add((byte)(FirstCycleOfOAMDMA ? 1 : 0));
+            State.Add((byte)(DoDMCDMA ? 1 : 0));
+            State.Add(DMCDMADelay);
+            State.Add(CannotRunDMCDMARightNow);
+            State.Add((byte)(SuppressInterrupt ? 1 : 0));
+            State.Add((byte)(InterruptHijackedByIRQ ? 1 : 0));
+            State.Add((byte)(InterruptHijackedByNMI ? 1 : 0));
+            State.Add(DMAPage);
+            State.Add(DMAAddress);
+            State.Add((byte)(APU_ControllerPortsStrobing ? 1 : 0));
+            State.Add((byte)(APU_ControllerPortsStrobed ? 1 : 0));
+            State.Add(ControllerPort1);
+            State.Add(ControllerPort2);
+            State.Add(ControllerShiftRegister1);
+            State.Add(ControllerShiftRegister2);
+            State.Add(Controller1ShiftCounter);
+            State.Add(Controller2ShiftCounter);
+
+            State.Add((byte)(APU_Status_DMCInterrupt ? 1 : 0));
+            State.Add((byte)(APU_Status_FrameInterrupt ? 1 : 0));
+            State.Add((byte)(APU_Status_DMC ? 1 : 0));
+            State.Add((byte)(APU_Status_DelayedDMC ? 1 : 0));
+            State.Add((byte)(APU_Status_Noise ? 1 : 0));
+            State.Add((byte)(APU_Status_Triangle ? 1 : 0));
+            State.Add((byte)(APU_Status_Pulse2 ? 1 : 0));
+            State.Add((byte)(APU_Status_Pulse1 ? 1 : 0));
+            State.Add((byte)(Clearing_APU_FrameInterrupt ? 1 : 0));
+            State.Add(APU_DelayedDMC4015);
+            State.Add((byte)(APU_ImplicitAbortDMC4015 ? 1 : 0));
+            State.Add((byte)(APU_SetImplicitAbortDMC4015 ? 1 : 0));
+            foreach (Byte b in APU_Register) { State.Add(b); }
+            State.Add((byte)(APU_FrameCounterMode ? 1 : 0));
+            State.Add((byte)(APU_FrameCounterInhibitIRQ ? 1 : 0));
+            State.Add(APU_FrameCounterReset);
+            State.Add((byte)APU_Framecounter);
+            State.Add((byte)(APU_Framecounter >> 8));
+            State.Add((byte)(APU_QuarterFrameClock ? 1 : 0));
+            State.Add((byte)(APU_HalfFrameClock ? 1 : 0));
+            State.Add((byte)(APU_Envelope_StartFlag ? 1 : 0));
+            State.Add((byte)(APU_Envelope_DividerClock ? 1 : 0));
+            State.Add(APU_Envelope_DecayLevel);
+            State.Add(APU_LengthCounter_Pulse1);
+            State.Add(APU_LengthCounter_Pulse2);
+            State.Add(APU_LengthCounter_Triangle);
+            State.Add(APU_LengthCounter_Noise);
+            State.Add((byte)(APU_LengthCounter_HaltPulse1 ? 1 : 0));
+            State.Add((byte)(APU_LengthCounter_HaltPulse2 ? 1 : 0));
+            State.Add((byte)(APU_LengthCounter_HaltTriangle ? 1 : 0));
+            State.Add((byte)(APU_LengthCounter_HaltNoise ? 1 : 0));
+            State.Add((byte)(APU_LengthCounter_ReloadPulse1 ? 1 : 0));
+            State.Add((byte)(APU_LengthCounter_ReloadPulse2 ? 1 : 0));
+            State.Add((byte)(APU_LengthCounter_ReloadTriangle ? 1 : 0));
+            State.Add((byte)(APU_LengthCounter_ReloadNoise ? 1 : 0));
+            State.Add(APU_LengthCounter_ReloadValuePulse1);
+            State.Add(APU_LengthCounter_ReloadValuePulse2);
+            State.Add(APU_LengthCounter_ReloadValueTriangle);
+            State.Add(APU_LengthCounter_ReloadValueNoise);
+            State.Add((byte)APU_ChannelTimer_Pulse1);
+            State.Add((byte)(APU_ChannelTimer_Pulse1 >> 8));
+            State.Add((byte)APU_ChannelTimer_Pulse2);
+            State.Add((byte)(APU_ChannelTimer_Pulse2 >> 8));
+            State.Add((byte)APU_ChannelTimer_Triangle);
+            State.Add((byte)(APU_ChannelTimer_Triangle >> 8));
+            State.Add((byte)APU_ChannelTimer_Noise);
+            State.Add((byte)(APU_ChannelTimer_Noise >> 8));
+            State.Add((byte)APU_ChannelTimer_DMC);
+            State.Add((byte)(APU_ChannelTimer_DMC >> 8));
+            State.Add((byte)(APU_DMC_EnableIRQ ? 1 : 0));
+            State.Add((byte)(APU_DMC_Loop ? 1 : 0));
+            State.Add((byte)APU_DMC_Rate);
+            State.Add((byte)(APU_DMC_Rate >> 8));
+            State.Add(APU_DMC_Output);
+            State.Add((byte)APU_DMC_SampleAddress);
+            State.Add((byte)(APU_DMC_SampleAddress >> 8));
+            State.Add((byte)APU_DMC_SampleLength);
+            State.Add((byte)(APU_DMC_SampleLength >> 8));
+            State.Add((byte)APU_DMC_BytesRemaining);
+            State.Add((byte)(APU_DMC_BytesRemaining >> 8));
+            State.Add(APU_DMC_Buffer);
+            State.Add((byte)APU_DMC_AddressCounter);
+            State.Add((byte)(APU_DMC_AddressCounter >> 8));
+            State.Add(APU_DMC_Shifter);
+            State.Add(APU_DMC_ShifterBitsRemaining);
+            State.Add((byte)(APU_Silent ? 1 : 0));
+
+            State.Add(SecondaryOAMSize);
+            State.Add(OAM2Address);
+            State.Add((byte)(SecondaryOAMFull ? 1 : 0));
+            State.Add(SpriteEvaluationTick);
+            State.Add((byte)(OAMAddressOverflowedDuringSpriteEvaluation ? 1 : 0));
+            State.Add(OAM2Address);
+            State.Add(PPUBus);
+            for (int i = 0; i < 8; i++)
+            {
+                State.Add((byte)PPUBusDecay[i]);
+                State.Add((byte)(PPUBusDecay[i] >> 8));
+                State.Add((byte)(PPUBusDecay[i] >> 16));
+                State.Add((byte)(PPUBusDecay[i] >> 24));
+            }
+            State.Add(PPUOAMAddress);
+            State.Add((byte)(PPUStatus_VBlank ? 1 : 0));
+            State.Add((byte)(PPUStatus_VBlank_Delayed ? 1 : 0));
+            State.Add((byte)(PPUStatus_SpriteZeroHit ? 1 : 0));
+            State.Add((byte)(PPUStatus_SpriteOverflow ? 1 : 0));
+            State.Add((byte)(PPU_Spritex16 ? 1 : 0));
+            State.Add((byte)PPU_Scanline);
+            State.Add((byte)(PPU_Scanline >> 8));
+            State.Add((byte)PPU_Dot);
+            State.Add((byte)(PPU_Dot >> 8));
+            State.Add((byte)(PPU_VRegisterChangedOutOfVBlank ? 1 : 0));
+            State.Add((byte)(PPU_OAMCorruptionRenderingDisabledOutOfVBlank ? 1 : 0));
+            State.Add((byte)(PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant ? 1 : 0));
+            State.Add((byte)(PPU_PendingOAMCorruption ? 1 : 0));
+            State.Add(PPU_OAMCorruptionIndex);
+            State.Add((byte)(PPU_OAMCorruptionRenderingEnabledOutOfVBlank ? 1 : 0));
+            State.Add((byte)(PPU_OAMEvaluationCorruptionOddCycle ? 1 : 0));
+            State.Add((byte)(PPU_OAMEvaluationObjectInRange ? 1 : 0));
+            State.Add((byte)(PPU_OAMEvaluationObjectInXRange ? 1 : 0));
+            State.Add((byte)(PPU_PaletteCorruptionRenderingDisabledOutOfVBlank ? 1 : 0));
+            State.Add(PPU_AttributeLatchRegister);
+            State.Add((byte)PPU_BackgroundAttributeShiftRegisterL);
+            State.Add((byte)(PPU_BackgroundAttributeShiftRegisterL >> 8));
+            State.Add((byte)PPU_BackgroundAttributeShiftRegisterH);
+            State.Add((byte)(PPU_BackgroundAttributeShiftRegisterH >> 8));
+            State.Add((byte)PPU_BackgroundPatternShiftRegisterL);
+            State.Add((byte)(PPU_BackgroundPatternShiftRegisterL >> 8));
+            State.Add((byte)PPU_BackgroundPatternShiftRegisterH);
+            State.Add((byte)(PPU_BackgroundPatternShiftRegisterH >> 8));
+            State.Add(PPU_FineXScroll);
+            for (int i = 0; i < 8; i++){State.Add(PPU_SpriteShiftRegisterL[i]);}
+            for (int i = 0; i < 8; i++) { State.Add(PPU_SpriteShiftRegisterH[i]); }
+            for (int i = 0; i < 8; i++) { State.Add(PPU_SpriteAttribute[i]); }
+            for (int i = 0; i < 8; i++) { State.Add(PPU_SpritePattern[i]); }
+            for (int i = 0; i < 8; i++) { State.Add(PPU_SpriteXposition[i]); }
+            for (int i = 0; i < 8; i++) { State.Add(PPU_SpriteYposition[i]); }
+            for (int i = 0; i < 8; i++) { State.Add(PPU_SpriteShifterCounter[i]); }
+            State.Add((byte)(PPU_NextScanlineContainsSpriteZero ? 1 : 0));
+            State.Add((byte)(PPU_CurrentScanlineContainsSpriteZero ? 1 : 0));
+            State.Add(PPU_SpritePatternL);
+            State.Add(PPU_SpritePatternH);
+            State.Add((byte)(PPU_Mask_Greyscale ? 1 : 0));
+            State.Add((byte)(PPU_Mask_8PxShowBackground ? 1 : 0));
+            State.Add((byte)(PPU_Mask_8PxShowSprites ? 1 : 0));
+            State.Add((byte)(PPU_Mask_ShowBackground ? 1 : 0));
+            State.Add((byte)(PPU_Mask_ShowSprites ? 1 : 0));
+            State.Add((byte)(PPU_Mask_EmphasizeRed ? 1 : 0));
+            State.Add((byte)(PPU_Mask_EmphasizeGreen ? 1 : 0));
+            State.Add((byte)(PPU_Mask_EmphasizeBlue ? 1 : 0));
+            State.Add((byte)(PPU_Mask_ShowBackground_Delayed ? 1 : 0));
+            State.Add((byte)(PPU_Mask_ShowSprites_Delayed ? 1 : 0));
+            State.Add((byte)(PPU_Mask_ShowBackground_Instant ? 1 : 0));
+            State.Add((byte)(PPU_Mask_ShowSprites_Instant ? 1 : 0));
+            State.Add(PPU_LowBitPlane);
+            State.Add(PPU_HighBitPlane);
+            State.Add(PPU_Attribute);
+            State.Add(PPU_NextCharacter);
+            State.Add((byte)(PPU_CanDetectSpriteZeroHit ? 1 : 0));
+            State.Add((byte)PPU_ADDR_Prev);
+            State.Add((byte)(PPU_ADDR_Prev >> 8));
+            State.Add((byte)(PPU_OddFrame ? 1 : 0));
+            State.Add(PaletteRAMAddress);
+            State.Add((byte)(ThisDotReadFromPaletteRAM ? 1 : 0));
+            State.Add((byte)(NMI_PinsSignal ? 1 : 0));
+            State.Add((byte)(NMI_PreviousPinsSignal ? 1 : 0));
+            State.Add((byte)(IRQ_LevelDetector ? 1 : 0));
+            State.Add((byte)(NMILine ? 1 : 0));
+            State.Add((byte)(IRQLine ? 1 : 0));
+            State.Add((byte)(CopyV ? 1 : 0));
+            State.Add((byte)(SkippedPreRenderDot341 ? 1 : 0));
+            State.Add((byte)(OamCorruptedOnOddCycle ? 1 : 0));
+            State.Add(PPU_SpriteEvaluationTemp);
+            State.Add(PPU_RenderTemp);
+            State.Add((byte)(PPU_Commit_NametableFetch ? 1 : 0));
+            State.Add((byte)(PPU_Commit_AttributeFetch ? 1 : 0));
+            State.Add((byte)(PPU_Commit_PatternLowFetch ? 1 : 0));
+            State.Add((byte)(PPU_Commit_PatternHighFetch ? 1 : 0));
+            State.Add((byte)(PPU_Commit_LoadShiftRegisters ? 1 : 0));
+
+            State.Add((byte)PPU_VRAM_MysteryAddress);
+            State.Add((byte)(PPU_VRAM_MysteryAddress >> 8));
+            State.Add((byte)PPU_AddressBus);
+            State.Add((byte)(PPU_AddressBus >> 8));
+            State.Add(PPU_Update2006Delay);
+            State.Add(PPU_Update2005Delay);
+            State.Add(PPU_Update2005Value);
+            State.Add(PPU_Update2001Delay);
+            State.Add(PPU_Update2001EmphasisBitsDelay);
+            State.Add(PPU_Update2001OAMCorruptionDelay);
+            State.Add(PPU_Update2001Value);
+            State.Add(PPU_Update2000Delay);
+            State.Add(PPU_Update2000Value);
+            State.Add((byte)PPU_Update2006Value);
+            State.Add((byte)(PPU_Update2006Value >> 8));
+            State.Add((byte)PPU_Update2006Value_Temp);
+            State.Add((byte)(PPU_Update2006Value_Temp >> 8));
+            State.Add((byte)(PPU_WasRenderingBefore2001Write ? 1 : 0));
+            State.Add(PPU_VRAMAddressBuffer);
+            State.Add((byte)(PPUAddrLatch ? 1 : 0));
+            State.Add((byte)(PPUControlIncrementMode32 ? 1 : 0));
+            State.Add((byte)(PPUControl_NMIEnabled ? 1 : 0));
+            State.Add((byte)(PPU_PatternSelect_Sprites ? 1 : 0));
+            State.Add((byte)(PPU_PatternSelect_Background ? 1 : 0));
+            State.Add((byte)(PPU_PendingVBlank ? 1 : 0));
+
+            State.Add((byte)(OAMDMA_Aligned ? 1 : 0));
+            State.Add((byte)(OAMDMA_Halt ? 1 : 0));
+            State.Add((byte)(DMCDMA_Halt ? 1 : 0));
+            State.Add(OAM_InternalBus);
+
+            foreach (Byte b in RAM)  { State.Add(b); }
+            foreach (Byte b in VRAM) { State.Add(b); }
+            foreach (Byte b in OAM)  { State.Add(b); }
+            foreach (Byte b in OAM2) { State.Add(b); }
+            foreach (Byte b in PaletteRAM) { State.Add(b); }
+            foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
+            foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
+
+            State.Add(Cart.Mapper_1_ShiftRegister);
+            State.Add(Cart.Mapper_1_Control);
+            State.Add(Cart.Mapper_1_CHR0);
+            State.Add(Cart.Mapper_1_CHR1);
+            State.Add(Cart.Mapper_1_ShiftRegister);
+            State.Add((byte)(Cart.Mapper_1_PB ? 1 : 0));
+
+            State.Add(Cart.Mapper_2_BankSelect);
+
+            State.Add(Cart.Mapper_4_8000);
+            State.Add(Cart.Mapper_4_BankA);
+            State.Add(Cart.Mapper_4_Bank8C);
+            State.Add(Cart.Mapper_4_CHR_2K0);
+            State.Add(Cart.Mapper_4_CHR_2K8);
+            State.Add(Cart.Mapper_4_CHR_1K0);
+            State.Add(Cart.Mapper_4_CHR_1K4);
+            State.Add(Cart.Mapper_4_CHR_1K8);
+            State.Add(Cart.Mapper_4_CHR_1KC);
+            State.Add(Cart.Mapper_4_IRQLatch);
+            State.Add(Cart.Mapper_4_IRQCounter);
+            State.Add((byte)(Cart.Mapper_4_EnableIRQ ? 1 : 0));
+            State.Add((byte)(Cart.Mapper_4_ReloadIRQCounter ? 1 : 0));
+            State.Add((byte)(Cart.NametableHorizontalMirroring ? 1 : 0));
+            State.Add(Cart.Mapper_4_PRGRAMProtect);
+
+            State.Add(Cart.Mapper_7_BankSelect);
+
+            State.Add(Cart.Mapper_9_BankSelect);
+            State.Add(Cart.Mapper_9_CHR0_FD);
+            State.Add(Cart.Mapper_9_CHR0_FE);
+            State.Add(Cart.Mapper_9_CHR1_FD);
+            State.Add(Cart.Mapper_9_CHR1_FE);
+            State.Add((byte)(Cart.Mapper_9_NametableMirroring ? 1 : 0));
+            State.Add((byte)(Cart.Mapper_9_Latch0_FE ? 1 : 0));
+            State.Add((byte)(Cart.Mapper_9_Latch1_FE ? 1 : 0));
+
+            State.Add(Cart.Mapper_69_CMD);
+            State.Add(Cart.Mapper_69_CHR_1K0);
+            State.Add(Cart.Mapper_69_CHR_1K1);
+            State.Add(Cart.Mapper_69_CHR_1K2);
+            State.Add(Cart.Mapper_69_CHR_1K3);
+            State.Add(Cart.Mapper_69_CHR_1K4);
+            State.Add(Cart.Mapper_69_CHR_1K5);
+            State.Add(Cart.Mapper_69_CHR_1K6);
+            State.Add(Cart.Mapper_69_CHR_1K7);
+            State.Add(Cart.Mapper_69_Bank_6);
+            State.Add((byte)(Cart.Mapper_69_Bank_6_isRAM ? 1 : 0));
+            State.Add((byte)(Cart.Mapper_69_Bank_6_isRAMEnabled ? 1 : 0));
+            State.Add(Cart.Mapper_69_Bank_8);
+            State.Add(Cart.Mapper_69_Bank_A);
+            State.Add(Cart.Mapper_69_Bank_C);
+            State.Add(Cart.Mapper_69_NametableMirroring);
+            State.Add((byte)(Cart.Mapper_69_EnableIRQ ? 1 : 0));
+            State.Add((byte)(Cart.Mapper_69_EnableIRQCounterDecrement ? 1 : 0));
+            State.Add((byte)Cart.Mapper_69_IRQCounter);
+            State.Add((byte)(Cart.Mapper_69_IRQCounter >> 8));
+
+            // putting stuff down here that I plan to refactor in future updates to the emulator.
+
+            State.Add(PPU_Data_StateMachine);
+            State.Add((byte)(PPU_Data_StateMachine_Read ? 1 : 0));
+            State.Add((byte)(PPU_Data_StateMachine_Read_Delayed ? 1 : 0));
+            State.Add((byte)(PPU_Data_StateMachine_PerformMysteryWrite ? 1 : 0));
+            State.Add(PPU_Data_StateMachine_InputValue);
+            State.Add((byte)(PPU_Data_StateMachine_UpdateVRAMAddressEarly ? 1 : 0));
+            State.Add((byte)(PPU_Data_StateMachine_UpdateVRAMBufferLate ? 1 : 0));
+            State.Add((byte)(PPU_Data_StateMachine_NormalWriteBehavior ? 1 : 0));
+            State.Add((byte)(PPU_Data_StateMachine_InterruptedReadToWrite ? 1 : 0));
+
+            State.Add(MMC3_M2Filter);
+            State.Add((byte)(ResetM2Filter ? 1 : 0));
+
+            return State;
+        }
+
+        public void LoadState(List<byte> State)
+        {
+            int p = 0;
+            programCounter = State[p++];
+            programCounter |= (ushort)(State[p++] << 8);
+            addressBus = State[p++];
+            addressBus |= (ushort)(State[p++] << 8);
+            temporaryAddress = State[p++];
+            temporaryAddress |= (ushort)(State[p++] << 8);
+            OAMAddressBus = State[p++];
+            OAMAddressBus |= (ushort)(State[p++] << 8);
+            PPU_ReadWriteAddress = State[p++];
+            PPU_ReadWriteAddress |= (ushort)(State[p++] << 8);
+            PPU_TempVRAMAddress = State[p++];
+            PPU_TempVRAMAddress |= (ushort)(State[p++] << 8);
+
+            PPUClock = State[p++];
+            CPUClock = State[p++];
+            APUClock = State[p++];
+            MasterClock = State[p++];
+
+            operationCycle = State[p++];
+            opCode = State[p++];
+            operationComplete = (State[p++] & 1) == 1;
+
+            dataBus = State[p++];
+            A = State[p++];
+            X = State[p++];
+            Y = State[p++];
+            stackPointer = State[p++];
+
+            status = State[p++];
+            flag_Carry = (status & 1) == 1;
+            flag_Zero = ((status & 0x02) >> 1) == 1;
+            flag_Interrupt = ((status & 0x04) >> 2) == 1;
+            flag_Decimal = ((status & 0x08) >> 3) == 1;
+            flag_Overflow = ((status & 0x40) >> 6) == 1;
+            flag_Negative = ((status & 0x80) >> 7) == 1;
+
+            specialBus = State[p++];
+            H = State[p++];
+            IgnoreH = (State[p++] & 1) == 1;
+
+            CPU_Read = (State[p++] & 1) == 1;
+            DoBRK = (State[p++] & 1) == 1;
+            DoNMI = (State[p++] & 1) == 1;
+            DoIRQ = (State[p++] & 1) == 1;
+            DoReset = (State[p++] & 1) == 1;
+            DoOAMDMA = (State[p++] & 1) == 1;
+            FirstCycleOfOAMDMA = (State[p++] & 1) == 1;
+            DoDMCDMA = (State[p++] & 1) == 1;
+            DMCDMADelay = State[p++];
+            CannotRunDMCDMARightNow = State[p++];
+            SuppressInterrupt = (State[p++] & 1) == 1;
+            InterruptHijackedByIRQ = (State[p++] & 1) == 1;
+            InterruptHijackedByNMI = (State[p++] & 1) == 1;
+            DMAPage = State[p++];
+            DMAAddress = State[p++];
+            APU_ControllerPortsStrobing = (State[p++] & 1) == 1;
+            APU_ControllerPortsStrobed = (State[p++] & 1) == 1;
+            ControllerPort1 = State[p++];
+            ControllerPort2 = State[p++];
+            ControllerShiftRegister1 = State[p++];
+            ControllerShiftRegister2 = State[p++];
+            Controller1ShiftCounter = State[p++];
+            Controller2ShiftCounter = State[p++];
+
+            APU_Status_DMCInterrupt = (State[p++] & 1) == 1;
+            APU_Status_FrameInterrupt = (State[p++] & 1) == 1;
+            APU_Status_DMC = (State[p++] & 1) == 1;
+            APU_Status_DelayedDMC = (State[p++] & 1) == 1;
+            APU_Status_Noise = (State[p++] & 1) == 1;
+            APU_Status_Triangle = (State[p++] & 1) == 1;
+            APU_Status_Pulse2 = (State[p++] & 1) == 1;
+            APU_Status_Pulse1 = (State[p++] & 1) == 1;
+            Clearing_APU_FrameInterrupt = (State[p++] & 1) == 1;
+            APU_DelayedDMC4015 = State[p++];
+            APU_ImplicitAbortDMC4015 = (State[p++] & 1) == 1;
+            APU_SetImplicitAbortDMC4015 = (State[p++] & 1) == 1;
+            for (int i = 0; i < APU_Register.Length; i++) { APU_Register[i] = State[p++]; }
+            APU_FrameCounterMode = (State[p++] & 1) == 1;
+            APU_FrameCounterInhibitIRQ = (State[p++] & 1) == 1;
+            APU_FrameCounterReset = State[p++];
+            APU_Framecounter = State[p++];
+            APU_Framecounter |= (ushort)(State[p++] << 8);
+            APU_QuarterFrameClock = (State[p++] & 1) == 1;
+            APU_HalfFrameClock = (State[p++] & 1) == 1;
+            APU_Envelope_StartFlag = (State[p++] & 1) == 1;
+            APU_Envelope_DividerClock = (State[p++] & 1) == 1;
+            APU_Envelope_DecayLevel = State[p++];
+            APU_LengthCounter_Pulse1 = State[p++];
+            APU_LengthCounter_Pulse2 = State[p++];
+            APU_LengthCounter_Triangle = State[p++];
+            APU_LengthCounter_Noise = State[p++];
+            APU_LengthCounter_HaltPulse1 = (State[p++] & 1) == 1;
+            APU_LengthCounter_HaltPulse2 = (State[p++] & 1) == 1;
+            APU_LengthCounter_HaltTriangle = (State[p++] & 1) == 1;
+            APU_LengthCounter_HaltNoise = (State[p++] & 1) == 1;
+            APU_LengthCounter_ReloadPulse1 = (State[p++] & 1) == 1;
+            APU_LengthCounter_ReloadPulse2 = (State[p++] & 1) == 1;
+            APU_LengthCounter_ReloadTriangle = (State[p++] & 1) == 1;
+            APU_LengthCounter_ReloadNoise = (State[p++] & 1) == 1;
+            APU_LengthCounter_ReloadValuePulse1 = State[p++];
+            APU_LengthCounter_ReloadValuePulse2 = State[p++];
+            APU_LengthCounter_ReloadValueTriangle = State[p++];
+            APU_LengthCounter_ReloadValueNoise = State[p++];
+            APU_ChannelTimer_Pulse1 = State[p++];
+            APU_ChannelTimer_Pulse1 |= (ushort)(State[p++] << 8);
+            APU_ChannelTimer_Pulse2 = State[p++];
+            APU_ChannelTimer_Pulse2 |= (ushort)(State[p++] << 8);
+            APU_ChannelTimer_Triangle = State[p++];
+            APU_ChannelTimer_Triangle |= (ushort)(State[p++] << 8);
+            APU_ChannelTimer_Noise = State[p++];
+            APU_ChannelTimer_Noise |= (ushort)(State[p++] << 8);
+            APU_ChannelTimer_DMC = State[p++];
+            APU_ChannelTimer_DMC |= (ushort)(State[p++] << 8);
+            APU_DMC_EnableIRQ = (State[p++] & 1) == 1;
+            APU_DMC_Loop = (State[p++] & 1) == 1;
+            APU_DMC_Rate = State[p++];
+            APU_DMC_Rate |= (ushort)(State[p++] << 8);
+            APU_DMC_Output = State[p++];
+            APU_DMC_SampleAddress = State[p++];
+            APU_DMC_SampleAddress |= (ushort)(State[p++] << 8);
+            APU_DMC_SampleLength = State[p++];
+            APU_DMC_SampleLength |= (ushort)(State[p++] << 8);
+            APU_DMC_BytesRemaining = State[p++];
+            APU_DMC_BytesRemaining |= (ushort)(State[p++] << 8);
+            APU_DMC_Buffer = State[p++];
+            APU_DMC_AddressCounter = State[p++];
+            APU_DMC_AddressCounter |= (ushort)(State[p++] << 8);
+            APU_DMC_Shifter = State[p++];
+            APU_DMC_ShifterBitsRemaining = State[p++];
+            APU_Silent = (State[p++] & 1) == 1;
+
+            SecondaryOAMSize = State[p++];
+            OAM2Address = State[p++];
+            SecondaryOAMFull = (State[p++] & 1) == 1;
+            SpriteEvaluationTick = State[p++];
+            OAMAddressOverflowedDuringSpriteEvaluation = (State[p++] & 1) == 1;
+            OAM2Address = State[p++];
+            PPUBus = State[p++];
+            for (int i = 0; i < 8; i++)
+            {
+                PPUBusDecay[i] = State[p++];
+                PPUBusDecay[i] |= (ushort)(State[p++] << 8);
+                PPUBusDecay[i] |= (ushort)(State[p++] << 16);
+                PPUBusDecay[i] |= (ushort)(State[p++] << 24);
+            }
+            PPUOAMAddress = State[p++];
+            PPUStatus_VBlank = (State[p++] & 1) == 1;
+            PPUStatus_VBlank_Delayed = (State[p++] & 1) == 1;
+            PPUStatus_SpriteZeroHit = (State[p++] & 1) == 1;
+            PPUStatus_SpriteOverflow = (State[p++] & 1) == 1;
+            PPU_Spritex16 = (State[p++] & 1) == 1;
+            PPU_Scanline = State[p++];
+            PPU_Scanline |= (ushort)(State[p++] << 8);
+            PPU_Dot = State[p++];
+            PPU_Dot |= (ushort)(State[p++] << 8);
+            PPU_VRegisterChangedOutOfVBlank = (State[p++] & 1) == 1;
+            PPU_OAMCorruptionRenderingDisabledOutOfVBlank = (State[p++] & 1) == 1;
+            PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = (State[p++] & 1) == 1;
+            PPU_PendingOAMCorruption = (State[p++] & 1) == 1;
+            PPU_OAMCorruptionIndex = State[p++];
+            PPU_OAMCorruptionRenderingEnabledOutOfVBlank = (State[p++] & 1) == 1;
+            PPU_OAMEvaluationCorruptionOddCycle = (State[p++] & 1) == 1;
+            PPU_OAMEvaluationObjectInRange = (State[p++] & 1) == 1;
+            PPU_OAMEvaluationObjectInXRange = (State[p++] & 1) == 1;
+            PPU_PaletteCorruptionRenderingDisabledOutOfVBlank = (State[p++] & 1) == 1;
+            PPU_AttributeLatchRegister = State[p++];
+            PPU_BackgroundAttributeShiftRegisterL = State[p++];
+            PPU_BackgroundAttributeShiftRegisterL |= (ushort)(State[p++] << 8);
+            PPU_BackgroundAttributeShiftRegisterH = State[p++];
+            PPU_BackgroundAttributeShiftRegisterH |= (ushort)(State[p++] << 8);
+            PPU_BackgroundPatternShiftRegisterL = State[p++];
+            PPU_BackgroundPatternShiftRegisterL |= (ushort)(State[p++] << 8);
+            PPU_BackgroundPatternShiftRegisterH = State[p++];
+            PPU_BackgroundPatternShiftRegisterH |= (ushort)(State[p++] << 8);
+            PPU_FineXScroll = State[p++];
+            for (int i = 0; i < 8; i++) { PPU_SpriteShiftRegisterL[i] = State[p++]; }
+            for (int i = 0; i < 8; i++) { PPU_SpriteShiftRegisterH[i] = State[p++]; }
+            for (int i = 0; i < 8; i++) { PPU_SpriteAttribute[i] = State[p++]; }
+            for (int i = 0; i < 8; i++) { PPU_SpritePattern[i] = State[p++]; }
+            for (int i = 0; i < 8; i++) { PPU_SpriteXposition[i] = State[p++]; }
+            for (int i = 0; i < 8; i++) { PPU_SpriteYposition[i] = State[p++]; }
+            for (int i = 0; i < 8; i++) { PPU_SpriteShifterCounter[i] = State[p++]; }
+            PPU_NextScanlineContainsSpriteZero = (State[p++] & 1) == 1;
+            PPU_CurrentScanlineContainsSpriteZero = (State[p++] & 1) == 1;
+            PPU_SpritePatternL = State[p++];
+            PPU_SpritePatternH = State[p++];
+            PPU_Mask_Greyscale = (State[p++] & 1) == 1;
+            PPU_Mask_8PxShowBackground = (State[p++] & 1) == 1;
+            PPU_Mask_8PxShowSprites = (State[p++] & 1) == 1;
+            PPU_Mask_ShowBackground = (State[p++] & 1) == 1;
+            PPU_Mask_ShowSprites = (State[p++] & 1) == 1;
+            PPU_Mask_EmphasizeRed = (State[p++] & 1) == 1;
+            PPU_Mask_EmphasizeGreen = (State[p++] & 1) == 1;
+            PPU_Mask_EmphasizeBlue = (State[p++] & 1) == 1;
+            PPU_Mask_ShowBackground_Delayed = (State[p++] & 1) == 1;
+            PPU_Mask_ShowSprites_Delayed = (State[p++] & 1) == 1;
+            PPU_Mask_ShowBackground_Instant = (State[p++] & 1) == 1;
+            PPU_Mask_ShowSprites_Instant = (State[p++] & 1) == 1;
+            PPU_LowBitPlane = State[p++];
+            PPU_HighBitPlane = State[p++];
+            PPU_Attribute = State[p++];
+            PPU_NextCharacter = State[p++];
+            PPU_CanDetectSpriteZeroHit = (State[p++] & 1) == 1;
+            PPU_ADDR_Prev = State[p++];
+            PPU_ADDR_Prev |= (ushort)(State[p++] << 8);
+            PPU_OddFrame = (State[p++] & 1) == 1;
+            PaletteRAMAddress = State[p++];
+            ThisDotReadFromPaletteRAM = (State[p++] & 1) == 1;
+            NMI_PinsSignal = (State[p++] & 1) == 1;
+            NMI_PreviousPinsSignal = (State[p++] & 1) == 1;
+            IRQ_LevelDetector = (State[p++] & 1) == 1;
+            NMILine = (State[p++] & 1) == 1;
+            IRQLine = (State[p++] & 1) == 1;
+            CopyV = (State[p++] & 1) == 1;
+            SkippedPreRenderDot341 = (State[p++] & 1) == 1;
+            OamCorruptedOnOddCycle = (State[p++] & 1) == 1;
+            PPU_SpriteEvaluationTemp = State[p++];
+            PPU_RenderTemp = State[p++];
+            PPU_Commit_NametableFetch = (State[p++] & 1) == 1;
+            PPU_Commit_AttributeFetch = (State[p++] & 1) == 1;
+            PPU_Commit_PatternLowFetch = (State[p++] & 1) == 1;
+            PPU_Commit_PatternHighFetch = (State[p++] & 1) == 1;
+            PPU_Commit_LoadShiftRegisters = (State[p++] & 1) == 1;
+
+            PPU_VRAM_MysteryAddress = State[p++];
+            PPU_VRAM_MysteryAddress |= (ushort)(State[p++] << 8);
+            PPU_AddressBus = State[p++];
+            PPU_AddressBus |= (ushort)(State[p++] << 8);
+            PPU_Update2006Delay = State[p++];
+            PPU_Update2005Delay = State[p++];
+            PPU_Update2005Value = State[p++];
+            PPU_Update2001Delay = State[p++];
+            PPU_Update2001EmphasisBitsDelay = State[p++];
+            PPU_Update2001OAMCorruptionDelay = State[p++];
+            PPU_Update2001Value = State[p++];
+            PPU_Update2000Delay = State[p++];
+            PPU_Update2000Value = State[p++];
+            PPU_Update2006Value = State[p++];
+            PPU_Update2006Value |= (ushort)(State[p++] << 8);
+            PPU_Update2006Value_Temp = State[p++];
+            PPU_Update2006Value_Temp |= (ushort)(State[p++] << 8);
+            PPU_WasRenderingBefore2001Write = (State[p++] & 1) == 1;
+            PPU_VRAMAddressBuffer = State[p++];
+            PPUAddrLatch = (State[p++] & 1) == 1;
+            PPUControlIncrementMode32 = (State[p++] & 1) == 1;
+            PPUControl_NMIEnabled = (State[p++] & 1) == 1;
+            PPU_PatternSelect_Sprites = (State[p++] & 1) == 1;
+            PPU_PatternSelect_Background = (State[p++] & 1) == 1;
+            PPU_PendingVBlank = (State[p++] & 1) == 1;
+
+            OAMDMA_Aligned = (State[p++] & 1) == 1;
+            OAMDMA_Halt = (State[p++] & 1) == 1;
+            DMCDMA_Halt = (State[p++] & 1) == 1;
+            OAM_InternalBus = State[p++];
+
+            for (int i = 0; i < RAM.Length; i++) { RAM[i] = State[p++]; }
+            for (int i = 0; i < VRAM.Length; i++) { VRAM[i] = State[p++]; }
+            for (int i = 0; i < OAM.Length; i++) { OAM[i] = State[p++]; }
+            for (int i = 0; i < OAM2.Length; i++) { OAM2[i] = State[p++]; }
+            for (int i = 0; i < PaletteRAM.Length; i++) { PaletteRAM[i] = State[p++]; }
+            for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
+            for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
+
+            Cart.Mapper_1_ShiftRegister = State[p++];
+            Cart.Mapper_1_Control = State[p++];
+            Cart.Mapper_1_CHR0 = State[p++];
+            Cart.Mapper_1_CHR1 = State[p++];
+            Cart.Mapper_1_ShiftRegister = State[p++];
+            Cart.Mapper_1_PB = (State[p++] & 1) == 1;
+
+            Cart.Mapper_2_BankSelect = State[p++];
+
+            Cart.Mapper_4_8000 = State[p++];
+            Cart.Mapper_4_BankA = State[p++];
+            Cart.Mapper_4_Bank8C = State[p++];
+            Cart.Mapper_4_CHR_2K0 = State[p++];
+            Cart.Mapper_4_CHR_2K8 = State[p++];
+            Cart.Mapper_4_CHR_1K0 = State[p++];
+            Cart.Mapper_4_CHR_1K4 = State[p++];
+            Cart.Mapper_4_CHR_1K8 = State[p++];
+            Cart.Mapper_4_CHR_1KC = State[p++];
+            Cart.Mapper_4_IRQLatch = State[p++];
+            Cart.Mapper_4_IRQCounter = State[p++];
+            Cart.Mapper_4_EnableIRQ = (State[p++] & 1) == 1;
+            Cart.Mapper_4_ReloadIRQCounter = (State[p++] & 1) == 1;
+            Cart.NametableHorizontalMirroring = (State[p++] & 1) == 1;
+            Cart.Mapper_4_PRGRAMProtect = State[p++];
+
+            Cart.Mapper_7_BankSelect = State[p++];
+
+            Cart.Mapper_9_BankSelect = State[p++];
+            Cart.Mapper_9_CHR0_FD = State[p++];
+            Cart.Mapper_9_CHR0_FE = State[p++];
+            Cart.Mapper_9_CHR1_FD = State[p++];
+            Cart.Mapper_9_CHR1_FE = State[p++];
+            Cart.Mapper_9_NametableMirroring = (State[p++] & 1) == 1;
+            Cart.Mapper_9_Latch0_FE = (State[p++] & 1) == 1;
+            Cart.Mapper_9_Latch1_FE = (State[p++] & 1) == 1;
+
+            Cart.Mapper_69_CMD = State[p++];
+            Cart.Mapper_69_CHR_1K0 = State[p++];
+            Cart.Mapper_69_CHR_1K1 = State[p++];
+            Cart.Mapper_69_CHR_1K2 = State[p++];
+            Cart.Mapper_69_CHR_1K3 = State[p++];
+            Cart.Mapper_69_CHR_1K4 = State[p++];
+            Cart.Mapper_69_CHR_1K5 = State[p++];
+            Cart.Mapper_69_CHR_1K6 = State[p++];
+            Cart.Mapper_69_CHR_1K7 = State[p++];
+            Cart.Mapper_69_Bank_6 = State[p++];
+            Cart.Mapper_69_Bank_6_isRAM = (State[p++] & 1) == 1;
+            Cart.Mapper_69_Bank_6_isRAMEnabled = (State[p++] & 1) == 1;
+            Cart.Mapper_69_Bank_8 = State[p++];
+            Cart.Mapper_69_Bank_A = State[p++];
+            Cart.Mapper_69_Bank_C = State[p++];
+            Cart.Mapper_69_NametableMirroring = State[p++];
+            Cart.Mapper_69_EnableIRQ = (State[p++] & 1) == 1;
+            Cart.Mapper_69_EnableIRQCounterDecrement = (State[p++] & 1) == 1;
+            Cart.Mapper_69_IRQCounter = State[p++];
+            Cart.Mapper_69_IRQCounter |= (ushort)(State[p++] << 8);
+
+
+            // putting stuff down here that I plan to refactor in future updates to the emulator.
+
+            PPU_Data_StateMachine = State[p++];
+            PPU_Data_StateMachine_Read = (State[p++] & 1) == 1;
+            PPU_Data_StateMachine_Read_Delayed = (State[p++] & 1) == 1;
+            PPU_Data_StateMachine_PerformMysteryWrite = (State[p++] & 1) == 1;
+            PPU_Data_StateMachine_InputValue = State[p++];
+            PPU_Data_StateMachine_UpdateVRAMAddressEarly = (State[p++] & 1) == 1;
+            PPU_Data_StateMachine_UpdateVRAMBufferLate = (State[p++] & 1) == 1;
+            PPU_Data_StateMachine_NormalWriteBehavior = (State[p++] & 1) == 1;
+            PPU_Data_StateMachine_InterruptedReadToWrite = (State[p++] & 1) == 1;
+
+            MMC3_M2Filter = State[p++];
+            ResetM2Filter = (State[p++] & 1) == 1;
+        }
+
     }
 
     public class DirectBitmap : IDisposable
