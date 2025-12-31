@@ -554,7 +554,11 @@ namespace TriCNES
             }
             if (CPUClock == 8)
             {
-                NMILine = PPUControl_NMIEnabled && PPUStatus_VBlank_Delayed;
+                NMILine |= PPUControl_NMIEnabled && PPUStatus_VBlank;
+                if(operationCycle == 0 && !(PPUStatus_VBlank && PPUControl_NMIEnabled))
+                {
+                    NMILine = false;
+                }
             }
             if (PPUClock == 0)
             {
@@ -1033,7 +1037,6 @@ namespace TriCNES
         const int PPUBusDecayConstant = 1786830; // 20 frames. Approximately how long it takes for the PPU bus to decay on my console.
         public byte PPUOAMAddress; // The address unsed to index into Object Attribute Memory
         public bool PPUStatus_VBlank; // This is set during Vblank, and cleared at the end, or if $2002 is read. This value can be read in address $2002
-        public bool PPUStatus_VBlank_Delayed; // when writing to $2000 to potentially start an NMI, there's a 1 ppu cycle delay on this flag
         public bool PPUStatus_SpriteZeroHit; // If a sprite zero hit occurs, this is set. This value can be read in address $2002
         public bool PPUStatus_SpriteOverflow; // If a scanline had more than 8 objects in range, this is set. This value can be read in address $2002
 
@@ -1410,7 +1413,6 @@ namespace TriCNES
                     {
                         // Huzzah! The status flags are set.
                         PPUStatus_VBlank = true;
-                        PPUStatus_VBlank_Delayed = true; // There are a few extra ppu cycles after PPUStatus_VBlank is cleared in which writing to $2000 during Vblank in order to trigger an NMI can still occur.
                         PPU_PendingVBlank = false; // clear this flag
                                                    // if PPUControl_NMIEnabled is set to true, then the NMI edge detector will detect this at the end of the CPU cycle!
                         PPU_RESET = false;
@@ -1453,20 +1455,15 @@ namespace TriCNES
                 PPUStatus_VBlank = false;
                 PPUStatus_SpriteOverflow = false;
                 PPU_CanDetectSpriteZeroHit = true;
-            }
+            }            
+
             else if (PPU_Scanline == 0 && PPU_Dot == 1)
-            { 
+            {
                 if (PPU_ShowScreenBorders && PPU_DecodeSignal) // if we're showing the boarders, we need to wait for scanline 0.
                 {
                     FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
                 }
             }
-            else if (PPU_Scanline == 261 && PPU_Dot == 10)
-            {
-                // And then a few cycles later, the CPU notices that this flag was cleared.
-                PPUStatus_VBlank_Delayed = false;
-            }
-
             // Right now, I'm only emulating MMC3's IRQ counter in this function.
             PPU_MapperSpecificFunctions();
             PPU_ADDR_Prev = PPU_AddressBus; // Record the value of the ppu address bus. This is used in the PPU_MapperSpecificFunctions(), so if this changes between here and next ppu cycle, we'll know.
@@ -3908,7 +3905,6 @@ namespace TriCNES
 
         public void _6502()
         {
-
             if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || (DoOAMDMA && CPU_Read)) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
             {
                 if (
@@ -9242,7 +9238,6 @@ namespace TriCNES
                         {
                             PPUAddrLatch = false;
                             PPUStatus_VBlank = false;
-                            PPUStatus_VBlank_Delayed = false;
                             PPU_PendingVBlank = false;
                             PPUBus = dataBus;
                             for (int i = 5; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
@@ -10982,7 +10977,6 @@ namespace TriCNES
             }
             State.Add(PPUOAMAddress);
             State.Add((byte)(PPUStatus_VBlank ? 1 : 0));
-            State.Add((byte)(PPUStatus_VBlank_Delayed ? 1 : 0));
             State.Add((byte)(PPUStatus_SpriteZeroHit ? 1 : 0));
             State.Add((byte)(PPUStatus_SpriteOverflow ? 1 : 0));
             State.Add((byte)(PPU_Spritex16 ? 1 : 0));
@@ -11325,7 +11319,6 @@ namespace TriCNES
             }
             PPUOAMAddress = State[p++];
             PPUStatus_VBlank = (State[p++] & 1) == 1;
-            PPUStatus_VBlank_Delayed = (State[p++] & 1) == 1;
             PPUStatus_SpriteZeroHit = (State[p++] & 1) == 1;
             PPUStatus_SpriteOverflow = (State[p++] & 1) == 1;
             PPU_Spritex16 = (State[p++] & 1) == 1;

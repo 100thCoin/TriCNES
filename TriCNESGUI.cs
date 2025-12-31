@@ -82,7 +82,7 @@ namespace TriCNES
                         PendingSaveState = false;
                         Savestate = EMU.SaveState();
                     }
-                    if(PendingLoadState && Savestate != null)
+                    if(PendingLoadState && Savestate != null && Savestate.Count > 0)
                     {
                         PendingLoadState = false;
                         EMU.LoadState(Savestate);
