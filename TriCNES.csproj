@@ -37,9 +37,12 @@
   </PropertyGroup>
   <PropertyGroup>
     <LangVersion>8</LangVersion>
-</PropertyGroup>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="PresentationCore" />
+    <Reference Include="SDL2-CS, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\ppy.SDL2-CS.1.0.82\lib\netstandard2.0\SDL2-CS.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.IO.Compression" />
@@ -84,6 +87,12 @@
     <Compile Include="TriCNTViewer.Designer.cs">
       <DependentUpon>TriCNTViewer.cs</DependentUpon>
     </Compile>
+    <Compile Include="TriCTASTimeline.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="TriCTASTimeline.Designer.cs">
+      <DependentUpon>TriCTASTimeline.cs</DependentUpon>
+    </Compile>
     <Compile Include="TriCTraceLogger.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -111,9 +120,14 @@
     <EmbeddedResource Include="TriCNTViewer.resx">
       <DependentUpon>TriCNTViewer.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="TriCTASTimeline.resx">
+      <DependentUpon>TriCTASTimeline.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="TriCTraceLogger.resx">
       <DependentUpon>TriCTraceLogger.cs</DependentUpon>
     </EmbeddedResource>
+    <None Include="app.config" />
+    <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -125,13 +139,13 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="icon.ico" />
+    <Content Include="SDL2.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

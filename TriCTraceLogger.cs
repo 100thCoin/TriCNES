@@ -40,7 +40,7 @@ namespace TriCNES
                 {
                     rtb_TraceLog.Text = Log;
                 };
-                this.BeginInvoke(upd);
+                this.Invoke(upd);
             }
         }
 

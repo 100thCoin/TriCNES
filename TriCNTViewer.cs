@@ -32,7 +32,7 @@ namespace TriCNES
                 pictureBox1.Image = b;
                 pictureBox1.Update();
             };
-            this.BeginInvoke(upd);
+            this.Invoke(upd);
         }
 
         public bool UseBackdrop()
