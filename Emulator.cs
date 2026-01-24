@@ -8670,15 +8670,83 @@ namespace TriCNES
         bool DebugObserve = false;
         public byte Observe(ushort Address)
         {
-            // this is mostly just so my debugger can read from PPU addresses without actually modifying the values of them.
-            // Some registers change things when read, and this prevents that.
-            byte t = dataBus; // copy the databus
-            DebugObserve = true; // this flag prevents ppu registers from updating things when reading
-            Fetch(Address);
-            DebugObserve = false; // uncheck this flag
-            byte t2 = dataBus; // copy the new databus value
-            dataBus = t; // restore the old databus
-            return t2; // return the new databus
+            // Reading from anywhere goes through this function.
+            if ((Address >= 0x8000))
+            {
+                // Reading from ROM.
+                // Different mappers could rearrange the data from the ROM into different locations on the system bus.
+                return MapperObserve(Address, Cart.MemoryMapper);
+            }
+            else if (Address < 0x2000)
+            {
+                // Reading from RAM.
+                // Ram mirroring! Only addresses $0000 through $07FF exist in RAM, so ignore bits 11 and 12
+                return RAM[Address & 0x7FF];
+            }
+            else if (Address >= 0x2000 && Address < 0x4000)
+            {
+                // PPU registers. most of these aren't meant to be read.
+                Address = (ushort)(Address & 0x2007);
+                switch (Address)
+                {
+                    case 0x2000:
+                        // Write only. Return the PPU databus.
+                        return PPUBus;
+                    case 0x2001:
+                        // Write only. Return the PPU databus.
+                        return PPUBus;
+                    case 0x2002:
+                        // PPU Flags.
+                        return (byte)((((PPUStatus_VBlank ? 0x80 : 0) | (PPUStatus_SpriteZeroHit ? 0x40 : 0) | (PPUStatus_SpriteOverflow ? 0x20 : 0)) & 0xE0) + (PPUBus & 0x1F));
+                    case 0x2003:
+                        // write only. Return the PPU databus.
+                        return PPUBus;
+                    case 0x2004:
+                        // Read from OAM
+                        return (byte)(ReadOAM() & 0xE3);
+                    case 0x2005:
+                        // write only. Return the PPU databus.
+                        return PPUBus;
+                    case 0x2006:
+                        // write only. Return the PPU databus.
+                        return PPUBus;
+                    case 0x2007:
+                        // Reading from VRAM.
+                        return ObservePPU(PPU_ReadWriteAddress);
+                }
+
+            }
+            else if (Address >= 0x4000 && Address <= 0x401F) // observe the APU registers
+            {
+                //addressBus 
+                byte Reg = (byte)(Address & 0x1F);
+                if (Reg == 0x15)
+                {
+
+                    byte InternalBus = dataBus;
+
+                    InternalBus &= 0x20;
+                    InternalBus |= (byte)(APU_Status_DMCInterrupt ? 0x80 : 0);
+                    InternalBus |= (byte)(APU_Status_FrameInterrupt ? 0x40 : 0);
+                    InternalBus |= (byte)((APU_DMC_BytesRemaining != 0 && APU_Status_DelayedDMC) ? 0x10 : 0); // see footnote.
+                    InternalBus |= (byte)((APU_LengthCounter_Noise != 0) ? 0x08 : 0);
+                    InternalBus |= (byte)((APU_LengthCounter_Triangle != 0) ? 0x04 : 0);
+                    InternalBus |= (byte)((APU_LengthCounter_Pulse2 != 0) ? 0x02 : 0);
+                    InternalBus |= (byte)((APU_LengthCounter_Pulse1 != 0) ? 0x01 : 0);
+                    return InternalBus; // reading from $4015 can not affect the databus
+                }
+                else if (Reg == 0x16 || Reg == 0x17)
+                {
+                    return (byte)((((Reg == 0x16) ? (ControllerShiftRegister1 & 0x80) : (ControllerShiftRegister2 & 0x80)) == 0 ? 0 : 1) | (dataBus & 0xE0));
+                }
+            }
+            else
+            {
+                //mapper chip stuff, but also open bus!
+                return MapperObserve(Address, Cart.MemoryMapper);
+            }
+
+            return dataBus;
         }
         public byte Fetch(ushort Address)
         {
@@ -8707,30 +8775,23 @@ namespace TriCNES
                     case 0x2000:
                         // Write only. Return the PPU databus.
                         dataBus = PPUBus;
-                        if (DebugObserve) // for debug logging, actually return this value.
-                        {
-                            dataBus = PPU_Ctrl;
-                        }
+
                         break;
                     case 0x2001:
                         // Write only. Return the PPU databus.
                         dataBus = PPUBus;
-                        if (DebugObserve) // for debug logging, actually return this value.
-                        {
-                            dataBus = PPU_Mask;
-                        }
+
                         break;
                     case 0x2002:
                         // PPU Flags.
                         dataBus = (byte)((((PPUStatus_VBlank ? 0x80 : 0) | (PPUStatus_SpriteZeroHit ? 0x40 : 0) | (PPUStatus_SpriteOverflow ? 0x20 : 0)) & 0xE0) + (PPUBus & 0x1F));
-                        if (!DebugObserve)
-                        {
-                            PPUAddrLatch = false;
-                            PPUStatus_VBlank = false;
-                            PPU_PendingVBlank = false;
-                            PPUBus = dataBus;
-                            for (int i = 5; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
-                        }
+                        
+                        PPUAddrLatch = false;
+                        PPUStatus_VBlank = false;
+                        PPU_PendingVBlank = false;
+                        PPUBus = dataBus;
+                        for (int i = 5; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
+                        
                         break;
                     case 0x2003:
                         // write only. Return the PPU databus.
@@ -8742,11 +8803,10 @@ namespace TriCNES
                         {
                             dataBus &= 0xE3; // the attributes always return 0 for bits 2, 3, and 4
                         }
-                        if (!DebugObserve)
-                        {
-                            PPUBus = dataBus;
-                            for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
-                        }
+                        
+                        PPUBus = dataBus;
+                        for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
+                        
                         break;
                     case 0x2005:
                         // write only. Return the PPU databus.
@@ -8757,95 +8817,82 @@ namespace TriCNES
                     case 0x2007:
                         // Reading from VRAM.
 
-                        if (!DebugObserve)
+                        // if this is 1 CPU cycle after another read, there's interesting behavior.
+                        if (PPU_Data_StateMachine == 3 && PPU_Data_StateMachine_Read)
                         {
-                            // if this is 1 CPU cycle after another read, there's interesting behavior.
-                            if (PPU_Data_StateMachine == 3 && PPU_Data_StateMachine_Read)
+                            //Behavior that is CPU/PPU alignment specific
+                            if (PPUClock == 0)
                             {
-                                //Behavior that is CPU/PPU alignment specific
-                                if (PPUClock == 0)
+                                dataBus = PPU_VRAMAddressBuffer; // just read the buffer
+                            }
+                            else if (PPUClock == 1)
+                            {
+                                PPU_Data_StateMachine_UpdateVRAMAddressEarly = true;
+                                dataBus = PPU_VRAMAddressBuffer; // just read the buffer, but *also* the VRAM address will be updated early.
+
+                            }
+                            else if (PPUClock == 2)
+                            {
+                                PPU_Data_StateMachine_UpdateVRAMAddressEarly = true; // update the vram address early...
+
+                                dataBus = (byte)(PPU_ReadWriteAddress & 0xFF); // the value read is not the buffer, but instead it's the low byte of the read/write address. 
+                            }
+                            else if (PPUClock == 3)
+                            {
+                                if (PPU_ReadWriteAddress >= 0x2000) // this is apparently different depending on where the read is? TODO: More testing required.
                                 {
-                                    dataBus = PPU_VRAMAddressBuffer; // just read the buffer
-                                }
-                                else if (PPUClock == 1)
-                                {
-                                    PPU_Data_StateMachine_UpdateVRAMAddressEarly = true;
-                                    dataBus = PPU_VRAMAddressBuffer; // just read the buffer, but *also* the VRAM address will be updated early.
+                                    if (PPU_VRAMAddressBuffer != 0)
+                                    {
+                                        // TODO: Inconsistent on real hardware, even with the same alignment.
+                                    }
+                                    dataBus = PPU_VRAMAddressBuffer; // with some bits missing
+                                    PPU_Data_StateMachine_UpdateVRAMAddressEarly = true; // update the vram address early...
 
                                 }
-                                else if (PPUClock == 2)
+                                else
                                 {
                                     PPU_Data_StateMachine_UpdateVRAMAddressEarly = true; // update the vram address early...
 
                                     dataBus = (byte)(PPU_ReadWriteAddress & 0xFF); // the value read is not the buffer, but instead it's the low byte of the read/write address. 
                                 }
-                                else if (PPUClock == 3)
-                                {
-                                    if (PPU_ReadWriteAddress >= 0x2000) // this is apparently different depending on where the read is? TODO: More testing required.
-                                    {
-                                        if (PPU_VRAMAddressBuffer != 0)
-                                        {
-                                            // TODO: Inconsistent on real hardware, even with the same alignment.
-                                        }
-                                        dataBus = PPU_VRAMAddressBuffer; // with some bits missing
-                                        PPU_Data_StateMachine_UpdateVRAMAddressEarly = true; // update the vram address early...
-
-                                    }
-                                    else
-                                    {
-                                        PPU_Data_StateMachine_UpdateVRAMAddressEarly = true; // update the vram address early...
-
-                                        dataBus = (byte)(PPU_ReadWriteAddress & 0xFF); // the value read is not the buffer, but instead it's the low byte of the read/write address. 
-                                    }
-                                }
                             }
-                            else // a normal read, not interrupting another read.
-                            {
-                                // this isn't a RMW instruction
-                                if (PPU_ReadWriteAddress >= 0x3F00)
-                                {
-                                    // reading from the palettes
-                                    PPU_AddressBus = PPU_ReadWriteAddress;
-                                    dataBus = FetchPPU((ushort)(PPU_AddressBus & 0x3FFF));
-                                }
-                                else
-                                {
-                                    // not reading from the palettes, reading from the buffer.
-                                    dataBus = PPU_VRAMAddressBuffer;
-                                }                               
-                            }
-
-                            // if the PPU state machine is not currently in progress...
-                            if (PPU_Data_StateMachine == 9)
-                            {
-                                PPU_Data_StateMachine = 0; // start it at 0
-                                if (PPUClock == 1 || PPUClock == 0)
-                                {
-                                    // and if this is phase 0 or 1, the buffer is updated later.
-                                    PPU_Data_StateMachine_UpdateVRAMBufferLate = true;
-                                }
-                                if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015)))
-                                {
-                                    PPU_ReadWriteAddress++; // I'm unsure on the timing of this, but I know the DMC DMA landing here ends up incrementing this one more time than my "state machine" currently runs.
-                                }
-                            }
-
-                            PPU_Data_StateMachine_Read = true; // This is a read instruction, so the state machien needs to read.
-                            PPU_Data_StateMachine_Read_Delayed = true; // This is also set, in case the state machine is interrupted.
-                            PPUBus = dataBus;
-                            for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                         }
-                        else
-                        { // else, if this is just reading from $2007 with the debug logger...
+                        else // a normal read, not interrupting another read.
+                        {
+                            // this isn't a RMW instruction
                             if (PPU_ReadWriteAddress >= 0x3F00)
                             {
-                                dataBus = FetchPPU((ushort)(PPU_ReadWriteAddress & 0x3FFF)); // just read the color, and don't update the read/write address
+                                // reading from the palettes
+                                PPU_AddressBus = PPU_ReadWriteAddress;
+                                dataBus = FetchPPU((ushort)(PPU_AddressBus & 0x3FFF));
                             }
                             else
                             {
-                                dataBus = PPU_VRAMAddressBuffer; // just read the buffer, and don't update it.
+                                // not reading from the palettes, reading from the buffer.
+                                dataBus = PPU_VRAMAddressBuffer;
+                            }                               
+                        }
+
+                        // if the PPU state machine is not currently in progress...
+                        if (PPU_Data_StateMachine == 9)
+                        {
+                            PPU_Data_StateMachine = 0; // start it at 0
+                            if (PPUClock == 1 || PPUClock == 0)
+                            {
+                                // and if this is phase 0 or 1, the buffer is updated later.
+                                PPU_Data_StateMachine_UpdateVRAMBufferLate = true;
+                            }
+                            if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015)))
+                            {
+                                PPU_ReadWriteAddress++; // I'm unsure on the timing of this, but I know the DMC DMA landing here ends up incrementing this one more time than my "state machine" currently runs.
                             }
                         }
+
+                        PPU_Data_StateMachine_Read = true; // This is a read instruction, so the state machien needs to read.
+                        PPU_Data_StateMachine_Read_Delayed = true; // This is also set, in case the state machine is interrupted.
+                        PPUBus = dataBus;
+                        for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
+                        
                         break;
                 }
                 DataPinsAreNotFloating = true;
@@ -8857,16 +8904,13 @@ namespace TriCNES
                 MapperFetch(Address, Cart.MemoryMapper);
             }
 
-            if ((addressBus >= 0x4000 && addressBus <= 0x401F) || (DebugObserve && Address >= 0x4000 && Address <= 0x401F)) // If APU registers are active, bus conflicts can occur. Or perhaps you are intentionally reading from the APU registers...
+            if (addressBus >= 0x4000 && addressBus <= 0x401F) // If APU registers are active, bus conflicts can occur. Or perhaps you are intentionally reading from the APU registers...
             {
                 //addressBus 
                 byte Reg = (byte)(Address & 0x1F);
                 if (Reg == 0x15)
                 {
-                    if (DebugObserve)
-                    {
-                        dataBus = 0x40; // if this is DebugObserve, the databus's previous value is restored after this function. Fear not!
-                    }
+                    
                     byte InternalBus = dataBus;
 
                     InternalBus &= 0x20;
@@ -8877,10 +8921,9 @@ namespace TriCNES
                     InternalBus |= (byte)((APU_LengthCounter_Triangle != 0) ? 0x04 : 0);
                     InternalBus |= (byte)((APU_LengthCounter_Pulse2 != 0) ? 0x02 : 0);
                     InternalBus |= (byte)((APU_LengthCounter_Pulse1 != 0) ? 0x01 : 0);
-                    if (!DebugObserve)
-                    {
-                        Clearing_APU_FrameInterrupt = true;
-                    }
+                    
+                    Clearing_APU_FrameInterrupt = true;
+                    
 
                     // footnote:
                     // Consider the following. LDA #0, STA $4015, LDA $4015.
@@ -8896,19 +8939,18 @@ namespace TriCNES
                     // controller ports
                     // grab 1 bit from the controller's shift register.
                     // also add the upper 3 bits of the databus.
-                    if (!DebugObserve)
+                    
+                    if (Reg == 0x16)
                     {
-                        if (Reg == 0x16)
-                        {
-                            // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
-                            Controller1ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle
-                        }
-                        else
-                        {
-                            // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
-                            Controller2ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle
-                        }
+                        // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
+                        Controller1ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle
                     }
+                    else
+                    {
+                        // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
+                        Controller2ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle
+                    }
+                    
                     APU_ControllerPortsStrobed = false; // This allows data to rapidly be streamed in through the A button if the controllers are read while strobed.
                     if (DoOAMDMA && DataPinsAreNotFloating) // If all the databus pins are floating, then the controller bits are visible. Otherwise... not so much.
                     {
@@ -9042,6 +9084,106 @@ namespace TriCNES
             }
         }
 
+        public byte ObservePPU(ushort Address)
+        {
+            // pretty much a copy of FetchPPU, except it doesn't trigger MMC2 stuff.
+            if (Cart == null)
+            {
+                return 0;
+            }
+            // when reading from the PPU's Video RAM, there's a lot of mapper-specific behavior to consider.
+            Address &= 0x3FFF;
+            if (Address < 0x2000)
+            {
+                if (Cart.UsingCHRRAM)
+                {
+                    return Cart.CHRRAM[Address];
+                }
+                else
+                {
+                    //Pattern Table
+                    switch (Cart.MemoryMapper)
+                    {
+                        case 0: return Cart.CHRROM[Address & (Cart.CHRROM.Length - 1)];
+                        case 1: // MMC1
+                            // bit 4 of Mapper_1_Control controls how the pattern tables are swapped. if set, 2 banks of 4Kib. Otherwise, 1 8Kib bank
+                            if ((Cart.Mapper_1_Control & 0x10) != 0)
+                            {
+                                // with the MMC1 chip, you can swap out the pattern tables.
+                                // address < 0x1000 is the first pattern table, else, the second pattern table.
+                                // if the final write for the MMC1 shift register was in the $A000 - $BFFF, this updates Cart.Mapper_1_CHR0
+                                // if the final write for the MMC1 shift register was in the $B000 - $CFFF, this updates Cart.Mapper_1_CHR1
+                                if (Address < 0x1000) { return Cart.CHRROM[((Cart.Mapper_1_CHR0 & 0x1F) * 0x1000 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else { Address &= 0xFFF; return Cart.CHRROM[((Cart.Mapper_1_CHR1 & 0x1F) * 0x1000 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            }
+                            else // one swappable bank that changes both pattern tables.
+                            {
+                                // this uses the value written to Mapper_1_CHR0
+                                return Cart.CHRROM[((Cart.Mapper_1_CHR0 & 0b11111110) * 0x2000 + Address) & (Cart.CHRROM.Length - 1)];
+                            }
+                        case 3: // CNROM
+                            // by writing to any address $8000 or greater with CNROM, bits 0 and 1 determine the CHR bank.
+                            return Cart.CHRROM[(Cart.Mapper_3_CHRBank * 0x2000 + Address) & (Cart.CHRROM.Length - 1)];
+                        case 4:
+                        case 118:
+                        case 119: // MMC3
+                            //Writes to $8000 determine the mode, writes to $8001 determine the banks
+                            if ((Cart.Mapper_4_8000 & 0x80) == 0) // bit 7 of the previous write to $8000 determines which pattern table is 2 2kb banks, and which is 4 1kb banks.
+                            {
+                                if (Address < 0x800) { return Cart.CHRROM[(Cart.Mapper_4_CHR_2K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else if (Address < 0x1000) { Address &= 0x7FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else if (Address < 0x1400) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else if (Address < 0x1800) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_1K4 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else if (Address < 0x1C00) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_1K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_1KC * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            }
+                            else
+                            {
+                                if (Address < 0x400) { return Cart.CHRROM[(Cart.Mapper_4_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else if (Address < 0x800) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_1K4 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else if (Address < 0xC00) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_1K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else if (Address < 0x1000) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_1KC * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else if (Address < 0x1800) { Address &= 0x7FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_2K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                                else { Address &= 0x7FF; return Cart.CHRROM[(Cart.Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            }
+                        case 9: //MMC2                            
+                            byte temp = 0;
+                            ushort Addr = Address;
+                            if (Address < 0x1000) { temp = Cart.CHRROM[(Cart.Mapper_9_Latch0_FE ? Cart.Mapper_9_CHR0_FE : Cart.Mapper_9_CHR0_FD) * 0x1000 + Addr]; }
+                            else { Addr &= 0xFFF; temp = Cart.CHRROM[(Cart.Mapper_9_Latch1_FE ? Cart.Mapper_9_CHR1_FE : Cart.Mapper_9_CHR1_FD) * 0x1000 + Addr]; }
+                            return temp;
+                        case 69: // Sunsoft FME-7
+                            if (Address < 0x400) { return Cart.CHRROM[(Cart.Mapper_69_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            else if (Address < 0x800) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_69_CHR_1K1 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            else if (Address < 0xC00) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_69_CHR_1K2 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            else if (Address < 0x1000) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_69_CHR_1K3 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            else if (Address < 0x1400) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_69_CHR_1K4 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            else if (Address < 0x1800) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_69_CHR_1K5 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            else if (Address < 0x1C00) { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_69_CHR_1K6 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                            else { Address &= 0x3FF; return Cart.CHRROM[(Cart.Mapper_69_CHR_1K7 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+
+                    }
+                    // if it wasn't any of those mappers, I still need to implement stuff.
+
+                    return Cart.CHRROM[Address & (Cart.CHRROM.Length - 1)];
+                }
+
+            }
+            else // if the VRAM address is >= $2000, we need to consider nametable mirroring.
+            {
+                Address = PPUAddressWithMirroring(Address);
+                if (Address >= 0x3F00)
+                {
+                    // read from palette RAM.
+                    // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
+                    return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
+                }
+                Address &= 0x7FF;
+                return VRAM[Address];
+            }
+        }
+
+
         ushort PPUAddressWithMirroring(ushort Address)
         {
             // if the address is less than $2000, there is no mirroring.
@@ -9146,6 +9288,205 @@ namespace TriCNES
                     break;
             }
             return Address;
+        }
+
+        byte MapperObserve(ushort Address, byte Mapper)
+        {
+            switch (Mapper)
+            {
+                default:
+                case 0: //NROM
+                    if (Address >= 0x8000)
+                    {
+                        return Cart.PRGROM[Address & (Cart.PRGROM.Length - 1)]; // Get the address form the ROM file. If the ROM only has $4000 bytes, this will make addresses > $BFFF mirrors of $8000 through $BFFF.
+                    }
+                    //open bus
+                    return dataBus;
+
+                case 1: //MMC1
+                    if (Address >= 0x8000)
+                    {
+                        // The bank mode for MMC1:
+                        byte MMC1PRGROMBankMode = (byte)((Cart.Mapper_1_Control & 0b01100) >> 2);
+                        switch (MMC1PRGROMBankMode)
+                        {
+                            case 0:
+                            case 1:
+                                {
+                                    // switch 32 KB at $8000, ignoring low bit of bank number
+                                    ushort tempo = (ushort)(Address & 0x7FFF);
+                                    return Cart.PRGROM[(0x8000 * (Cart.Mapper_1_PRG & 0x0E) + tempo) % Cart.PRGROM.Length];
+                                }
+                            case 2:
+                                // fix first bank at $8000 and switch 16 KB bank at $C000
+                                if (Address >= 0xC000)
+                                {
+                                    ushort tempo = (ushort)(Address & 0x3FFF);
+                                    return Cart.PRGROM[0x4000 * (Cart.Mapper_1_PRG) + tempo];
+                                }
+                                else
+                                {
+                                    ushort tempo = (ushort)(Address & 0x3FFF);
+                                    return Cart.PRGROM[tempo];
+                                }
+                            case 3:
+                                // fix last bank at $C000 and switch 16 KB bank at $8000
+                                if (Address >= 0xC000)
+                                {
+                                    ushort tempo = (ushort)(Address & 0x3FFF);
+                                    return Cart.PRGROM[Cart.PRGROM.Length - 0x4000 + tempo];
+                                }
+                                else
+                                {
+                                    ushort tempo = (ushort)(Address & 0x3FFF);
+                                    return Cart.PRGROM[(0x4000 * (Cart.Mapper_1_PRG & 0x0F) + tempo) & (Cart.PRGROM.Length - 1)];
+                                }
+                        }
+                    }
+                    else // if the address is < $8000
+                    {
+                        if (((Cart.Mapper_1_PRG & 0x10) == 0)) // if Work RAM is enabled
+                        {
+                            return Cart.PRGRAM[Address & 0x1FFF];
+                        }
+                        // else, open bus.
+                    }
+                    //open bus
+                    return dataBus;
+
+                case 71:
+                case 2: //UxROM
+                    if (Address >= 0x8000)
+                    {
+                        if (Address >= 0xC000)
+                        {
+                            ushort tempo = (ushort)(Address & 0x3FFF);
+                            return Cart.PRGROM[Cart.PRGROM.Length - 0x4000 + tempo];
+                        }
+                        else
+                        {
+                            ushort tempo = (ushort)(Address & 0x3FFF);
+                            return Cart.PRGROM[0x4000 * (Cart.Mapper_2_BankSelect & 0x0F) + tempo];
+                        }
+                    }
+                    return dataBus;
+                // case 3, CNROM doesn't have any PRG bank switching, so it shares the logic with NROM
+                case 4:
+                case 118:
+                case 119:
+                    //MMC3
+                    if (Address >= 0xE000) // This bank is fixed the the final PRG bank of the ROM
+                    {
+                        return Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x3FFF)];
+                    }
+                    else if (Address >= 0xC000)
+                    {
+                        if ((Cart.Mapper_4_8000 & 0x40) == 0x40)
+                        {
+                            //$C000 swappable
+                            return Cart.PRGROM[(Cart.Mapper_4_Bank8C << 13) | (Address & 0x1FFF)];
+                        }
+                        else
+                        {
+                            //$8000 swappable
+                            return Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x1FFF)];
+                        }
+                    }
+                    else if (Address >= 0xA000)
+                    {
+                        //$8000 swappable
+                        return Cart.PRGROM[(Cart.Mapper_4_BankA << 13) | (Address & 0x1FFF)];
+                    }
+                    else if (Address >= 0x8000)
+                    {
+                        if ((Cart.Mapper_4_8000 & 0x40) == 0x40)
+                        {
+                            //$8000 swappable
+                            return Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x1FFF)];
+                        }
+                        else
+                        {
+                            //$C000 swappable
+                            return Cart.PRGROM[(Cart.Mapper_4_Bank8C << 13) | (Address & 0x1FFF)];
+                        }
+                    }
+                    else if (Address >= 0x6000)
+                    {
+                        if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
+                        {
+                            return Cart.PRGRAM[Address & 0x1FFF];
+                        }
+                        return dataBus;
+                    }
+                    //else, open bus
+                    return dataBus;
+                case 7: // AOROM
+                    if (Address >= 0x8000)
+                    {
+                        ushort tempo = (ushort)(Address & 0x7FFF);
+                        return Cart.PRGROM[(0x8000 * (Cart.Mapper_7_BankSelect & 0x07) + tempo) & (Cart.PRGROM.Length - 1)];
+                    }
+                    // AOROM doesn't have any PRG RAM
+                    return dataBus;
+                case 9: //MMC2
+                    if (Address >= 0xA000)
+                    {
+                        return Cart.PRGROM[((Cart.PRG_Size - 2) << 14) | (Address & 0x7FFF)];
+                    }
+                    else
+                    {
+                        return Cart.PRGROM[(Cart.Mapper_9_BankSelect << 13) | (Address & 0x1FFF)];
+                    }
+                    return dataBus;
+                case 69:
+                    //Sunsoft FME-7 (used in Gimmick)
+                    if (Address >= 0x6000)
+                    {
+                        ushort tempo = (ushort)(Address % 0x2000);
+                        if (Address >= 0x6000)
+                        {
+                            //actions
+                            if (Address < 0x8000)
+                            {
+                                if (Cart.Mapper_69_Bank_6_isRAM)
+                                {
+                                    if (Cart.Mapper_69_Bank_6_isRAMEnabled)
+                                    {
+                                        return Cart.PRGRAM[Address & 0x1FFF];
+                                    }
+                                    else
+                                    {   //open bus
+                                        return dataBus;
+                                    }
+                                }
+                                else
+                                {   //read from ROM
+                                    return Cart.PRGROM[(Cart.Mapper_69_Bank_6 * 0x2000 + tempo) % Cart.PRGROM.Length];
+                                }
+                            }
+                            else if (Address < 0xA000)
+                            {
+                                return Cart.PRGROM[(Cart.Mapper_69_Bank_8 * 0x2000 + tempo) % Cart.PRGROM.Length];
+                            }
+                            else if (Address < 0xC000)
+                            {
+                                return Cart.PRGROM[(Cart.Mapper_69_Bank_A * 0x2000 + tempo) % Cart.PRGROM.Length];
+                            }
+                            else if (Address < 0xE000)
+                            {
+                                return Cart.PRGROM[(Cart.Mapper_69_Bank_C * 0x2000 + tempo) % Cart.PRGROM.Length];
+                            }
+                            else
+                            {
+                                return Cart.PRGROM[Cart.PRGROM.Length - 0x2000 + tempo];
+                            }
+                        }
+                    }
+                    //open bus
+                    return dataBus;
+
+            }
+
         }
 
         void MapperFetch(ushort Address, byte Mapper)

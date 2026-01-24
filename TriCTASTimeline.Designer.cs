@@ -43,6 +43,9 @@ namespace TriCNES
             this.saveWithSavestatesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.exportTor08ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.settingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.cellFrequencyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.perVBlankToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.perControllerStrobeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.b_play = new System.Windows.Forms.Button();
             this.contextMenuStrip_Timeline = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.deleteFrameToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -59,9 +62,6 @@ namespace TriCNES
             this.label_AutoSavestateThreshold = new System.Windows.Forms.Label();
             this.tb_AutoSavestateThreshold = new System.Windows.Forms.TextBox();
             this.cb_RecordInputs = new System.Windows.Forms.CheckBox();
-            this.cellFrequencyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.perVBlankToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.perControllerStrobeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             ((System.ComponentModel.ISupportInitialize)(this.pb_Timeline)).BeginInit();
             this.menuStrip1.SuspendLayout();
             this.contextMenuStrip_Timeline.SuspendLayout();
@@ -160,6 +160,31 @@ namespace TriCNES
             this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
             this.settingsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
             this.settingsToolStripMenuItem.Text = "Settings";
+            // 
+            // cellFrequencyToolStripMenuItem
+            // 
+            this.cellFrequencyToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.perVBlankToolStripMenuItem,
+            this.perControllerStrobeToolStripMenuItem});
+            this.cellFrequencyToolStripMenuItem.Name = "cellFrequencyToolStripMenuItem";
+            this.cellFrequencyToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.cellFrequencyToolStripMenuItem.Text = "Cell Frequency";
+            // 
+            // perVBlankToolStripMenuItem
+            // 
+            this.perVBlankToolStripMenuItem.Checked = true;
+            this.perVBlankToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.perVBlankToolStripMenuItem.Name = "perVBlankToolStripMenuItem";
+            this.perVBlankToolStripMenuItem.Size = new System.Drawing.Size(184, 22);
+            this.perVBlankToolStripMenuItem.Text = "Per VBlank";
+            this.perVBlankToolStripMenuItem.Click += new System.EventHandler(this.perVBlankToolStripMenuItem_Click);
+            // 
+            // perControllerStrobeToolStripMenuItem
+            // 
+            this.perControllerStrobeToolStripMenuItem.Name = "perControllerStrobeToolStripMenuItem";
+            this.perControllerStrobeToolStripMenuItem.Size = new System.Drawing.Size(184, 22);
+            this.perControllerStrobeToolStripMenuItem.Text = "Per Controller Strobe";
+            this.perControllerStrobeToolStripMenuItem.Click += new System.EventHandler(this.perControllerStrobeToolStripMenuItem_Click);
             // 
             // b_play
             // 
@@ -318,31 +343,6 @@ namespace TriCNES
         "verwrite older frames if you rewind.");
             this.cb_RecordInputs.UseVisualStyleBackColor = true;
             // 
-            // cellFrequencyToolStripMenuItem
-            // 
-            this.cellFrequencyToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.perVBlankToolStripMenuItem,
-            this.perControllerStrobeToolStripMenuItem});
-            this.cellFrequencyToolStripMenuItem.Name = "cellFrequencyToolStripMenuItem";
-            this.cellFrequencyToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.cellFrequencyToolStripMenuItem.Text = "Cell Frequency";
-            // 
-            // perVBlankToolStripMenuItem
-            // 
-            this.perVBlankToolStripMenuItem.Checked = true;
-            this.perVBlankToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.perVBlankToolStripMenuItem.Name = "perVBlankToolStripMenuItem";
-            this.perVBlankToolStripMenuItem.Size = new System.Drawing.Size(184, 22);
-            this.perVBlankToolStripMenuItem.Text = "Per VBlank";
-            this.perVBlankToolStripMenuItem.Click += new System.EventHandler(this.perVBlankToolStripMenuItem_Click);
-            // 
-            // perControllerStrobeToolStripMenuItem
-            // 
-            this.perControllerStrobeToolStripMenuItem.Name = "perControllerStrobeToolStripMenuItem";
-            this.perControllerStrobeToolStripMenuItem.Size = new System.Drawing.Size(184, 22);
-            this.perControllerStrobeToolStripMenuItem.Text = "Per Controller Strobe";
-            this.perControllerStrobeToolStripMenuItem.Click += new System.EventHandler(this.perControllerStrobeToolStripMenuItem_Click);
-            // 
             // TriCTASTimeline
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -365,7 +365,7 @@ namespace TriCNES
             this.Controls.Add(this.b_FrameAdvance);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "TriCTASTimeline";
-            this.Text = "TriCTASTimeline";
+            this.Text = "TAS Timeline";
             ((System.ComponentModel.ISupportInitialize)(this.pb_Timeline)).EndInit();
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();

@@ -73,6 +73,12 @@
     <Compile Include="TASProperties3ct.Designer.cs">
       <DependentUpon>TASProperties3ct.cs</DependentUpon>
     </Compile>
+    <Compile Include="TriCHexEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="TriCHexEditor.Designer.cs">
+      <DependentUpon>TriCHexEditor.cs</DependentUpon>
+    </Compile>
     <Compile Include="TriCNESGUI.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -104,6 +110,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="TASProperties3ct.resx">
       <DependentUpon>TASProperties3ct.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="TriCHexEditor.resx">
+      <DependentUpon>TriCHexEditor.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="TriCNESGUI.resx">
       <DependentUpon>TriCNESGUI.cs</DependentUpon>

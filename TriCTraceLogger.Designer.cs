@@ -135,7 +135,7 @@
             this.MinimizeBox = false;
             this.MinimumSize = new System.Drawing.Size(969, 616);
             this.Name = "TriCTraceLogger";
-            this.Text = "TriCTraceLogger";
+            this.Text = "Trace Logger";
             this.groupBox1.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();

@@ -46,13 +46,14 @@ namespace TriCNES
         byte settings_alignment;
 
         public Emulator EMU;
-        Thread EmuClock;
+        public Thread EmuClock;
         string filePath;
         TASProperties TASPropertiesForm;
         TASProperties3ct TASPropertiesForm3ct;
         public TriCTraceLogger? TraceLogger;
         public TriCNTViewer? NametableViewer;
         public TriCTASTimeline? TasTimeline;
+        public TriCHexEditor? HexExditor;
 
         void RunUpkeep()
         {
@@ -103,10 +104,14 @@ namespace TriCNES
                 EMU.DebugRange_High = TraceLogger.RangeHigh;
                 EMU.OnlyDebugInRange = TraceLogger.OnlyDebugInRange();
             }
-            else
+            else if(EMU.Logging)
             {
                 EMU.Logging = false;
                 EMU.DebugLog = new StringBuilder();
+            }
+            if(HexExditor != null)
+            {
+                HexExditor.Update();
             }
         }
 
@@ -980,6 +985,19 @@ namespace TriCNES
             NametableViewer.MainGUI = this;
             NametableViewer.Show();
             NametableViewer.Location = Location;
+        }
+
+        private void hexEditorToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (HexExditor != null)
+            {
+                HexExditor.Focus();
+                return;
+            }
+            HexExditor = new TriCHexEditor();
+            HexExditor.MainGUI = this;
+            HexExditor.Show();
+            HexExditor.Location = Location;
         }
 
         List<Byte> Savestate = new List<byte>();
