@@ -103,6 +103,7 @@ namespace TriCNES
                 EMU.DebugRange_Low = TraceLogger.RangeLow;
                 EMU.DebugRange_High = TraceLogger.RangeHigh;
                 EMU.OnlyDebugInRange = TraceLogger.OnlyDebugInRange();
+                EMU.LoggingPPU = TraceLogger.LogPPUCycles();
             }
             else if(EMU.Logging)
             {

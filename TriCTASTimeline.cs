@@ -877,8 +877,7 @@ namespace TriCNES
             int HighlightedFrame = frameIndex;
             if (HighlightedFrame < frameEmulated)
             {
-                frameEmulated = HighlightedFrame; // mark everything after this as "stale"
-                frameIndex = HighlightedFrame;
+                MarkStale(HighlightedFrame);
             }
             timelineScrollbar.Maximum = Inputs.Count + 38;
             RefreshTimeline();
@@ -886,12 +885,11 @@ namespace TriCNES
 
         private void insertFrameToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Inputs.Insert(frameIndex,0);
+            Inputs.Insert(frameIndex, 0);
             int HighlightedFrame = frameIndex;
             if (HighlightedFrame < frameEmulated)
             {
-                frameEmulated = HighlightedFrame; // mark everything after this as "stale"
-                frameIndex = HighlightedFrame;
+                MarkStale(HighlightedFrame);
             }
             timelineScrollbar.Maximum = Inputs.Count + 38;
             RefreshTimeline();

@@ -87,5 +87,10 @@ namespace TriCNES
         {
             return cb_ClearEveryFrame.Checked;
         }
+
+        public bool LogPPUCycles()
+        {
+            return cb_LogPPU.Checked;
+        }
     }
 }

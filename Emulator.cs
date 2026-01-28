@@ -254,6 +254,7 @@ namespace TriCNES
 
         //Debugging
         public bool Logging;    // If set, the tracelogger will record all instructions ran.
+        public bool LoggingPPU;
         public StringBuilder DebugLog; // This is where the tracelogger is recording.
 
         public Emulator() // The instantiator for this class
@@ -494,7 +495,6 @@ namespace TriCNES
         public bool PPU_Data_StateMachine_InterruptedReadToWrite;   // If a write happens on cycle 3 of the state machine.
 
         public byte MMC3_M2Filter;  // The MMC3 chip only clocks the IRQ timer if A12 has been low for at *least* 3 falling edges of M2.
-        public bool ResetM2Filter;  // Due to how I implemented the M2 filter, I need to reset it to zero at a specific moment, or else I can miss an IRQ clock.
 
         public bool LagFrame; // True if the controller port was not strobed in a frame.
         public bool TASTimelineClockFiltering; // Primarily used in the TASTimeline if you are using subframe Inputs.
@@ -589,10 +589,6 @@ namespace TriCNES
                     {
                         MMC3_M2Filter++;
                     }
-                }
-                else
-                {
-                    ResetM2Filter = true; // the filter gets reset in the function that clocks the MMC3 IRQ
                 }
             }
 
@@ -1484,6 +1480,10 @@ namespace TriCNES
                     FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
                 }
             }
+            if(Logging && LoggingPPU)
+            {
+                Debug_PPU();
+            }
             // Right now, I'm only emulating MMC3's IRQ counter in this function.
             PPU_MapperSpecificFunctions();
             PPU_ADDR_Prev = PPU_AddressBus; // Record the value of the ppu address bus. This is used in the PPU_MapperSpecificFunctions(), so if this changes between here and next ppu cycle, we'll know.
@@ -1536,10 +1536,6 @@ namespace TriCNES
             if (PPU_Update2001Delay > 0) // if we wrote to 2001 recently
             {
                 PPU_Update2001Delay--;
-                if (PPU_Update2001Delay == 1)
-                {
-
-                }
                 if (PPU_Update2001Delay == 0) // if we've waited enough cycles, apply the changes
                 {
                     PPU_Mask = PPU_Update2001Value; // this value is only used for debugging.
@@ -1594,7 +1590,7 @@ namespace TriCNES
                         PPU_Render_ShiftRegistersAndBitPlanes(); // update shift registers for the background.
                     }
                 }
-                else if (PPU_Dot > 336)
+                else if (PPU_Dot >= 336)
                 {
                     PPU_Render_ShiftRegistersAndBitPlanes_DummyNT();
                 }
@@ -2305,9 +2301,8 @@ namespace TriCNES
 
                     }
                 }
-                if (ResetM2Filter)
+                if ((PPU_AddressBus & 0b0001000000000000) != 0)
                 {
-                    ResetM2Filter = false;
                     MMC3_M2Filter = 0;
                 }
             }
@@ -3535,6 +3530,9 @@ namespace TriCNES
                     // store the character read from the nametable
                     PPU_NextCharacter = PPU_RenderTemp;
                     break;
+                case 4:
+                    PPU_AddressBus = (ushort)(((PPU_ReadWriteAddress & 0b0111000000000000) >> 12) | PPU_NextCharacter * 16 | (PPU_PatternSelect_Background ? 0x1000 : 0));
+                    break;
             }
 
         }
@@ -3955,7 +3953,7 @@ namespace TriCNES
                 }
 
 
-                if (Logging) // For debugging only.
+                if (Logging && !LoggingPPU) // For debugging only.
                 {
                     Debug(); // This is where the tracelogger occurs.
                 }
@@ -11171,6 +11169,24 @@ namespace TriCNES
 
         }
 
+        void Debug_PPU()
+        {
+            string dotColor = "";
+            if(PPU_ShowScreenBorders || (PPU_Scanline < 240 && PPU_Dot <= 256 && PPU_Dot > 0))
+            {
+                dotColor = "COLOR: " + DotColor.ToString("X2") + "\t";
+            }
+            string MMC3 = "";
+            if (((PPU_ADDR_Prev & 0b0001000000000000) == 0) && ((PPU_AddressBus & 0b0001000000000000) != 0) && MMC3_M2Filter == 3)
+            {
+                MMC3 = "* Decrement MMC3 IRQ Counter *";
+            }
+            string Addr = "Address: "+PPU_AddressBus.ToString("X4") + "\t";
+            string m2Filter = Cart.MemoryMapper == 4 ? ("M2Filter: " + MMC3_M2Filter.ToString() + "\t") : "";
+            string LogLine = "(" + PPU_Scanline.ToString() + ", " + PPU_Dot.ToString() + ")  \t" + Addr + m2Filter + dotColor + MMC3;
+            DebugLog.AppendLine(LogLine);
+        }
+
         public List<Byte> SaveState()
         {
             List<Byte> State = new List<byte>();
@@ -11511,7 +11527,6 @@ namespace TriCNES
             State.Add((byte)(PPU_Data_StateMachine_InterruptedReadToWrite ? 1 : 0));
 
             State.Add(MMC3_M2Filter);
-            State.Add((byte)(ResetM2Filter ? 1 : 0));
 
             return State;
         }
@@ -11857,7 +11872,6 @@ namespace TriCNES
             PPU_Data_StateMachine_InterruptedReadToWrite = (State[p++] & 1) == 1;
 
             MMC3_M2Filter = State[p++];
-            ResetM2Filter = (State[p++] & 1) == 1;
         }
 
         public void Dispose()

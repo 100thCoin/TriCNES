@@ -36,6 +36,7 @@
             this.tb_RangeLow = new System.Windows.Forms.TextBox();
             this.tb_RangeHigh = new System.Windows.Forms.TextBox();
             this.cb_ClearEveryFrame = new System.Windows.Forms.CheckBox();
+            this.cb_LogPPU = new System.Windows.Forms.CheckBox();
             this.groupBox1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -117,11 +118,22 @@
             this.cb_ClearEveryFrame.Text = "Clear Log Every Frame";
             this.cb_ClearEveryFrame.UseVisualStyleBackColor = true;
             // 
+            // cb_LogPPU
+            // 
+            this.cb_LogPPU.AutoSize = true;
+            this.cb_LogPPU.Location = new System.Drawing.Point(165, 548);
+            this.cb_LogPPU.Name = "cb_LogPPU";
+            this.cb_LogPPU.Size = new System.Drawing.Size(103, 17);
+            this.cb_LogPPU.TabIndex = 6;
+            this.cb_LogPPU.Text = "Log PPU Cycles";
+            this.cb_LogPPU.UseVisualStyleBackColor = true;
+            // 
             // TriCTraceLogger
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(953, 577);
+            this.Controls.Add(this.cb_LogPPU);
             this.Controls.Add(this.cb_ClearEveryFrame);
             this.Controls.Add(this.tb_RangeHigh);
             this.Controls.Add(this.tb_RangeLow);
@@ -151,5 +163,6 @@
         private System.Windows.Forms.TextBox tb_RangeLow;
         private System.Windows.Forms.TextBox tb_RangeHigh;
         private System.Windows.Forms.CheckBox cb_ClearEveryFrame;
+        private System.Windows.Forms.CheckBox cb_LogPPU;
     }
 }
