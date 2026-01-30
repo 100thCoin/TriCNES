@@ -1,10 +1,11 @@
 ﻿using System;
-using System.Drawing;
-using System.Text;
-using System.IO;
-using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using static System.Windows.Forms.AxHost;
 
 namespace TriCNES
 {
@@ -20,6 +21,7 @@ namespace TriCNES
         public byte[] CHRROM;       // The entire character rom portion of the .nes file
 
         public byte MemoryMapper;   // Header info: what mapper chip is this cartridge using?
+        public byte SubMapper;      // Header Info: what variant of the mapper chip are we using?
         public byte PRG_Size;       // Header info: how many kb of PRG data does this cartridge have?
         public byte CHR_Size;       // Header info: how many kb of CHR data does this cartridge have?
         public byte PRG_SizeMinus1; // PRG_Size-1; This is frequently used when grabbing data from PRG banks
@@ -39,6 +41,7 @@ namespace TriCNES
 
             MemoryMapper = (byte)(ROM[7] & 0xF0);   // Parsing the iNES header to determine what mapper chip this cartridge uses.
             MemoryMapper |= (byte)(ROM[6] >> 4);    // The upper nybble of byte 6, bitwise OR with the upper nybble of byte 7.
+            SubMapper = (byte)((ROM[8] & 0xF0) >> 4);
 
             PRG_Size = ROM[4];  // Parsing the iNES header to determine how many kb of PRG data exists on this cartridge.
             CHR_Size = ROM[5];  // Parsing the iNES header to determine how many kb of CHR data exists on this cartridge.
@@ -1480,6 +1483,8 @@ namespace TriCNES
                     FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
                 }
             }
+            
+            
             if(Logging && LoggingPPU)
             {
                 Debug_PPU();
@@ -1546,6 +1551,12 @@ namespace TriCNES
 
                     PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
                     PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
+
+                    if(!PPU_Mask_ShowBackground && !PPU_Mask_ShowSprites)
+                    {
+                        PPU_AddressBus = PPU_ReadWriteAddress; // the address bus is always v when rendering is disabled.
+                    }
+
                 }
             }
             if (PPU_Update2001OAMCorruptionDelay > 0) // if we wrote to 2001 recently
@@ -1592,7 +1603,10 @@ namespace TriCNES
                 }
                 else if (PPU_Dot >= 336)
                 {
-                    PPU_Render_ShiftRegistersAndBitPlanes_DummyNT();
+                    if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
+                    {
+                        PPU_Render_ShiftRegistersAndBitPlanes_DummyNT();
+                    }
                 }
 
                 if ((PPU_Dot > 0 && PPU_Dot <= 257)) // if this is a visible pixel, or preparing the start of next scanline
@@ -3929,6 +3943,7 @@ namespace TriCNES
             }
             else if (operationCycle == 0) // We are not running any DMAs, and this is the first cycle of an instruction.
             {
+
                 // cycle 0. fetch opcode:
                 addressBus = programCounter;
 
@@ -6513,7 +6528,7 @@ namespace TriCNES
                                 break;
                         }
                         break;
-                    case 0x87: //AAX zp
+                    case 0x87: //SAX zp
                         switch (operationCycle)
                         {
                             case 1:
@@ -6616,7 +6631,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x8F: //AAX Abs
+                    case 0x8F: //SAX Abs
                         switch (operationCycle)
                         {
                             case 1:
@@ -6789,7 +6804,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x97: //AAX zp, Y
+                    case 0x97: //SAX zp, Y
                         switch (operationCycle)
                         {
                             case 1:
@@ -9410,10 +9425,35 @@ namespace TriCNES
                     }
                     else if (Address >= 0x6000)
                     {
-                        if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
+                        if (Cart.SubMapper == 1) // MMC6
                         {
-                            return Cart.PRGRAM[Address & 0x1FFF];
+                            if ((Cart.Mapper_4_8000 & 0x20) != 0)
+                            {
+                                // MMC6 differs from MMC3 since there's only 1Kib of PRG RAM
+                                if (Address >= 0x7000 && Address <= 0x71FF)
+                                {
+                                    if ((Cart.Mapper_4_PRGRAMProtect & 0x20) != 0)
+                                    {
+                                        return Cart.PRGRAM[Address & 0x3FF];
+                                    }
+                                }
+                                else if (Address >= 0x7200 && Address <= 0x73FF)
+                                {
+                                    if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
+                                    {
+                                        return Cart.PRGRAM[Address & 0x3FF];
+                                    }
+                                }
+                            }
                         }
+                        else
+                        {
+                            if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
+                            {
+                                return Cart.PRGRAM[Address & 0x1FFF];
+                            }
+                        }
+                        
                         return dataBus;
                     }
                     //else, open bus
@@ -9631,10 +9671,36 @@ namespace TriCNES
                     }
                     else if (Address >= 0x6000)
                     {
-                        if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
+                        if (Cart.SubMapper == 1) // MMC6
                         {
-                            DataPinsAreNotFloating = true;
-                            dataBus = Cart.PRGRAM[Address & 0x1FFF];
+                            if ((Cart.Mapper_4_8000 & 0x20) != 0)
+                            {
+                                // MMC6 differs from MMC3 since there's only 1Kib of PRG RAM
+                                if (Address >= 0x7000 && Address <= 0x71FF)
+                                {
+                                    if ((Cart.Mapper_4_PRGRAMProtect & 0x20) != 0)
+                                    {
+                                        DataPinsAreNotFloating = true;
+                                        dataBus = Cart.PRGRAM[Address & 0x3FF];
+                                    }
+                                }
+                                else if (Address >= 0x7200 && Address <= 0x73FF)
+                                {
+                                    if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
+                                    {
+                                        DataPinsAreNotFloating = true;
+                                        dataBus = Cart.PRGRAM[Address & 0x3FF];
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
+                            {
+                                DataPinsAreNotFloating = true;
+                                dataBus = Cart.PRGRAM[Address & 0x1FFF];
+                            }
                         }
                         return;
                     }
@@ -10288,10 +10354,36 @@ namespace TriCNES
                 case 119:   //MMC3
                     if (Address < 0x8000)
                     {   //Battery backed RAM
-                        if ((Cart.Mapper_4_PRGRAMProtect & 0xC0) != 0) // bit 7 enables PRG RAM, bit 6 enables writing there.
+
+                        if (Cart.SubMapper == 1) // MMC6
+                        {
+                            // MMC6 differs from MMC3 since there's only 1Kib of PRG RAM
+                            if ((Cart.Mapper_4_8000 & 0x20) != 0)
+                            {
+                                if (Address >= 0x7000 && Address <= 0x71FF)
+                                {
+                                    if ((Cart.Mapper_4_PRGRAMProtect & 0x10) != 0)
+                                    {
+                                        Cart.PRGRAM[Address & 0x3FF] = Input;
+
+                                    }
+                                }
+                                else if (Address >= 0x7200 && Address <= 0x73FF)
+                                {
+                                    if ((Cart.Mapper_4_PRGRAMProtect & 0x40) != 0)
+                                    {
+                                        Cart.PRGRAM[Address & 0x3FF] = Input;
+                                    }
+                                }
+                            }
+                        }
+                        else if ((Cart.Mapper_4_PRGRAMProtect & 0xC0) != 0) // bit 7 enables PRG RAM, bit 6 enables writing there.
                         {
                             Cart.PRGRAM[Address & 0x1FFF] = Input;
                         }
+
+
+
                         return;
                     }
                     else
@@ -11177,13 +11269,19 @@ namespace TriCNES
                 dotColor = "COLOR: " + DotColor.ToString("X2") + "\t";
             }
             string MMC3 = "";
-            if (((PPU_ADDR_Prev & 0b0001000000000000) == 0) && ((PPU_AddressBus & 0b0001000000000000) != 0) && MMC3_M2Filter == 3)
+            if (Cart.MemoryMapper == 4)
             {
-                MMC3 = "* Decrement MMC3 IRQ Counter *";
+                MMC3 = "MMC3 IRQ Counter: " + Cart.Mapper_4_IRQCounter;
+                if (((PPU_ADDR_Prev & 0b0001000000000000) == 0) && ((PPU_AddressBus & 0b0001000000000000) != 0) && MMC3_M2Filter == 3)
+                {
+                    MMC3 += " * Decrement MMC3 IRQ Counter *";
+                }
             }
             string Addr = "Address: "+PPU_AddressBus.ToString("X4") + "\t";
             string m2Filter = Cart.MemoryMapper == 4 ? ("M2Filter: " + MMC3_M2Filter.ToString() + "\t") : "";
-            string LogLine = "(" + PPU_Scanline.ToString() + ", " + PPU_Dot.ToString() + ")  \t" + Addr + m2Filter + dotColor + MMC3;
+            string enabled = "[" + (PPU_Mask_ShowSprites ? "S" : "-") + (PPU_Mask_ShowBackground ? "B" : "-") + "]\t";
+
+            string LogLine = "(" + PPU_Scanline.ToString() + ", " + PPU_Dot.ToString() + ")  \t" + Addr + m2Filter + dotColor + enabled + MMC3;
             DebugLog.AppendLine(LogLine);
         }
 
