@@ -5,7 +5,6 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using static System.Windows.Forms.AxHost;
 
 namespace TriCNES
 {
@@ -413,7 +412,6 @@ namespace TriCNES
 
             // PPU registers
             PPU_Update2000Delay = 0;
-            PPU_Ctrl = 0; // this value is only used for debugging.
             PPUControl_NMIEnabled = false;
             PPUControlIncrementMode32 = false;
             PPU_Spritex16 = false;
@@ -1047,6 +1045,11 @@ namespace TriCNES
         public bool PPUStatus_SpriteZeroHit; // If a sprite zero hit occurs, this is set. This value can be read in address $2002
         public bool PPUStatus_SpriteOverflow; // If a scanline had more than 8 objects in range, this is set. This value can be read in address $2002
 
+        public bool PPU_VSET; // This line is high for half a ppu cycle at the start of scanline 240.
+        public bool PPU_VSET_Latch1; // A latch used in the timing for the VBlank flag.
+        public bool PPU_VSET_Latch2; // A latch used in the timing for the VBlank flag.
+        public bool PPU_Read2002; // This clears the VBlank flag.
+
         bool PPU_Spritex16; // Are sprites using 8x8 mode, or 8x16 mode? Set by writing to $2000
 
         public ushort PPU_Scanline; // Which scanline is the PPU currently on
@@ -1091,9 +1094,7 @@ namespace TriCNES
         public byte PPU_SpritePatternL; // Temporary value used in sprite evaluation.
         public byte PPU_SpritePatternH; // Temporary value used in sprite evaluation.
 
-        byte PPU_Ctrl; // Used exclusively in debugging. If "observing" address $2000, this holds a copy of the value written there.
 
-        byte PPU_Mask; // Used exclusively in debugging. If "observing" address $2001, this holds a copy of the value written there.
         bool PPU_Mask_Greyscale;         // Set by writing to $2001. If set, only use color 00, 10, 20, or 30 when drawing a pixel.
         bool PPU_Mask_8PxShowBackground; // Set by writing to $2001. If set, the background will be visible in the 8 left-most pixels of the screen.
         bool PPU_Mask_8PxShowSprites;    // Set by writing to $2001. If set, the sprites will be visible in the 8 left-most pixels of the screen.
@@ -1192,7 +1193,6 @@ namespace TriCNES
                 PPU_Update2000Delay--;
                 if (PPU_Update2000Delay == 0)
                 {
-                    PPU_Ctrl = PPU_Update2000Value; // this value is only used for debugging.
                     PPUControl_NMIEnabled = (PPU_Update2000Value & 0x80) != 0;
                     PPUControlIncrementMode32 = (PPU_Update2000Value & 0x4) != 0;
                     PPU_Spritex16 = (PPU_Update2000Value & 0x20) != 0;
@@ -1428,14 +1428,8 @@ namespace TriCNES
                 }
                 if (PPU_Dot == 1)
                 {
-                    if (PPU_PendingVBlank) // If a read to $2002 did not happen this cycle. (Reading $2002 sets PPU_PendingVBlank to false)
-                    {
-                        // Huzzah! The status flags are set.
-                        PPUStatus_VBlank = true;
-                        PPU_PendingVBlank = false; // clear this flag
-                                                   // if PPUControl_NMIEnabled is set to true, then the NMI edge detector will detect this at the end of the CPU cycle!
-                        PPU_RESET = false;
-                    }
+                    PPU_RESET = false;
+
                     // else, address $2002 was read on this ppu cycle. no VBlank flag.
                     if (!PPU_ShowScreenBorders)
                     {
@@ -1462,17 +1456,20 @@ namespace TriCNES
             else if (PPU_Scanline == 260 && PPU_Dot == 340)
             {
                 PPU_OddFrame = !PPU_OddFrame; // I guess this could happen on pretty much any cycle?
+
             }
             else if (PPU_Scanline == 261 && PPU_Dot == 0)
             {
+
                 PPUStatus_SpriteZeroHit = false;
+                PPUStatus_SpriteOverflow = false;                
+                
                 // this contradicts the information on the nesdev wiki, but I think I'm going to go mad if this really is cleared on dot 1.
             }
             else if (PPU_Scanline == 261 && PPU_Dot == 1)
             {
                 // On the dot 1 of the pre-render scanline, all of these flags are cleared.
                 PPUStatus_VBlank = false;
-                PPUStatus_SpriteOverflow = false;
                 PPU_CanDetectSpriteZeroHit = true;
             }
 
@@ -1483,9 +1480,19 @@ namespace TriCNES
                     FrameAdvance_ReachedVBlank = true; // Emulator specific stuff. Used for frame advancing to detect the frame has ended, and nothing else.
                 }
             }
-            
-            
-            if(Logging && LoggingPPU)
+
+            PPU_VSET_Latch1 = !PPU_VSET; //  VSET_Latch1 is latched with /VSET on the first half of a PPU cycle.
+            if(PPU_VSET && !PPU_VSET_Latch2)
+            {
+                PPUStatus_VBlank = true;
+            }
+            if(PPU_Read2002)
+            {
+                PPU_Read2002 = false;
+                PPUStatus_VBlank = false;
+            }
+
+            if (Logging && LoggingPPU)
             {
                 Debug_PPU();
             }
@@ -1516,7 +1523,7 @@ namespace TriCNES
             //but to complicate things, the delay after writing to $2001 happens between those 2 steps, and also on a specific alignment, this delay is 1 cycle longer for sprite evaluation.
 
             // If this is NOT phase 1
-            if ((MasterClock & 3) != 2)
+            if ((CPUClock & 3) != 3)
             {
                 // sprite evaluation has a 1 ppu cycle delay before recognizing these flags were set or cleared.
                 PPU_Mask_ShowBackground_Delayed = PPU_Mask_ShowBackground;
@@ -1530,12 +1537,18 @@ namespace TriCNES
                     PPU_Render_SpriteEvaluation(); // fill in secondary OAM, and set up various arrays of sprite properties.
                 }
             }
-            if ((MasterClock & 3) == 2)
+            if ((CPUClock & 3) == 3)
             {
                 // on phase 1,
                 // sprite evaluation has a 2 ppu cycle delay before recognizing these flags were set or cleared.
                 PPU_Mask_ShowBackground_Delayed = PPU_Mask_ShowBackground;
                 PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
+            }
+            if (!PPU_Mask_ShowBackground && !PPU_Mask_ShowSprites)
+            {
+                PPU_AddressBus = PPU_ReadWriteAddress; // the address bus is always v when rendering is disabled.
+                // TODO: Is this occuring one ppu cycles too late???
+                // I specifically moved this here (outside of the following if statements) because it broke nes_reset_state_detect-letters.nes on alignment 1.
             }
             // after sprite evaluation, but before screen rendering...
             if (PPU_Update2001Delay > 0) // if we wrote to 2001 recently
@@ -1543,7 +1556,6 @@ namespace TriCNES
                 PPU_Update2001Delay--;
                 if (PPU_Update2001Delay == 0) // if we've waited enough cycles, apply the changes
                 {
-                    PPU_Mask = PPU_Update2001Value; // this value is only used for debugging.
                     PPU_Mask_8PxShowBackground = (PPU_Update2001Value & 0x02) != 0;
                     PPU_Mask_8PxShowSprites = (PPU_Update2001Value & 0x04) != 0;
                     PPU_Mask_ShowBackground = (PPU_Update2001Value & 0x08) != 0;
@@ -1551,12 +1563,6 @@ namespace TriCNES
 
                     PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
                     PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
-
-                    if(!PPU_Mask_ShowBackground && !PPU_Mask_ShowSprites)
-                    {
-                        PPU_AddressBus = PPU_ReadWriteAddress; // the address bus is always v when rendering is disabled.
-                    }
-
                 }
             }
             if (PPU_Update2001OAMCorruptionDelay > 0) // if we wrote to 2001 recently
@@ -1697,6 +1703,15 @@ namespace TriCNES
                     }
                 }
             }
+            PPU_VSET = false;
+            if (PPU_PendingVBlank)
+            {
+                PPU_PendingVBlank = false;
+                PPU_VSET = true;
+            }
+            // PPU_VSET_Latch1 gets inverted, and that becomes the state of PPU_VSET_Latch2
+            PPU_VSET_Latch2 = !PPU_VSET_Latch1;
+
         }
 
         void DrawToScreen()
@@ -8800,8 +8815,7 @@ namespace TriCNES
                         dataBus = (byte)((((PPUStatus_VBlank ? 0x80 : 0) | (PPUStatus_SpriteZeroHit ? 0x40 : 0) | (PPUStatus_SpriteOverflow ? 0x20 : 0)) & 0xE0) + (PPUBus & 0x1F));
                         
                         PPUAddrLatch = false;
-                        PPUStatus_VBlank = false;
-                        PPU_PendingVBlank = false;
+                        PPU_Read2002 = true;
                         PPUBus = dataBus;
                         for (int i = 5; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                         
@@ -8812,10 +8826,6 @@ namespace TriCNES
                     case 0x2004:
                         // Read from OAM
                         dataBus = ReadOAM();
-                        if ((PPUOAMAddress & 3) == 2)
-                        {
-                            dataBus &= 0xE3; // the attributes always return 0 for bits 2, 3, and 4
-                        }
                         
                         PPUBus = dataBus;
                         for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
@@ -9792,7 +9802,11 @@ namespace TriCNES
         {
             if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline < 240)
             {
-                if (PPU_Dot > 0 && PPU_Dot <= 64)
+                if(PPU_Dot == 0 || PPU_Dot > 320)
+                {
+                    return OAM2[0];
+                }
+                else if (PPU_Dot > 0 && PPU_Dot <= 64)
                 {
                     return 0xFF;
                 }
@@ -9800,11 +9814,10 @@ namespace TriCNES
                 {
                     return PPU_SpriteEvaluationTemp;
                 }
-                else if (PPU_Dot <= 320)
+                else
                 {
                     return PPU_SpriteEvaluationTemp;
                 }
-                return OAM[PPUOAMAddress];
             }
             return OAM[PPUOAMAddress];
         }
@@ -11251,7 +11264,7 @@ namespace TriCNES
                 string TempLine_MMC3IRQ = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\tIRQTimer:" + Cart.Mapper_4_IRQCounter + "\tIRQLatch: " + Cart.Mapper_4_IRQLatch + "\tIRQEnabled: " + Cart.Mapper_4_EnableIRQ + "\tDoIRQ: " + DoIRQ + "\tPPU_ADDR_Prev: " + PPU_ADDR_Prev.ToString("X4");
 
 
-                DebugLog.AppendLine(TempLine_MMC3IRQ);
+                DebugLog.AppendLine(TempLine_PPU3);
             }
             else
             {
@@ -11541,6 +11554,11 @@ namespace TriCNES
             State.Add((byte)(PPU_PatternSelect_Sprites ? 1 : 0));
             State.Add((byte)(PPU_PatternSelect_Background ? 1 : 0));
             State.Add((byte)(PPU_PendingVBlank ? 1 : 0));
+
+            State.Add((byte)(PPU_VSET ? 1 : 0));
+            State.Add((byte)(PPU_VSET_Latch1 ? 1 : 0));
+            State.Add((byte)(PPU_VSET_Latch2 ? 1 : 0));
+            State.Add((byte)(PPU_Read2002 ? 1 : 0));
 
             State.Add((byte)(OAMDMA_Aligned ? 1 : 0));
             State.Add((byte)(OAMDMA_Halt ? 1 : 0));
@@ -11885,6 +11903,11 @@ namespace TriCNES
             PPU_PatternSelect_Sprites = (State[p++] & 1) == 1;
             PPU_PatternSelect_Background = (State[p++] & 1) == 1;
             PPU_PendingVBlank = (State[p++] & 1) == 1;
+
+            PPU_VSET = (State[p++] & 1) == 1;
+            PPU_VSET_Latch1 = (State[p++] & 1) == 1;
+            PPU_VSET_Latch2 = (State[p++] & 1) == 1;
+            PPU_Read2002 = (State[p++] & 1) == 1;
 
             OAMDMA_Aligned = (State[p++] & 1) == 1;
             OAMDMA_Halt = (State[p++] & 1) == 1;
