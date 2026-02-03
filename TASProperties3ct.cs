@@ -165,7 +165,7 @@ namespace TriCNES
                 }
                 else
                 {
-                    MessageBox.Show("TriCNES roms folder is smissing a required ROM for this TAS!\n\nMissing ROM: \"" + l + "\"");
+                    MessageBox.Show("TriCNES roms folder is missing a required ROM for this TAS!\n\nMissing ROM: \"" + l + "\"");
                     return;
                 }
                 i++;
