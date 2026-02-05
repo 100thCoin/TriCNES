@@ -1,4 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <TargetFramework>net4.8</TargetFramework>
     <OutputType>WinExe</OutputType>
@@ -11,6 +12,7 @@
     <LangVersion>8</LangVersion>
     <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
@@ -18,13 +20,16 @@
     <PackageReference Include="System.IO.Compression" Version="4.3.0" />
     <PackageReference Include="System.Resources.Extensions" Version="10.0.2" />
   </ItemGroup>
+
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
+
   <ItemGroup>
     <Content Include="icon.ico" />
     <Content Include="SDL2.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
 </Project>
