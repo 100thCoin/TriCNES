@@ -175,8 +175,8 @@ public partial class TASProperties3ct : Form
         }
         // if all carts are now loaded.
         // let's also prepare the cycles to swap on, and the carts to swap in
-        CyclesToSwapOn = new List<int>();
-        CartsToSwapIn = new List<int>();
+        CyclesToSwapOn = [];
+        CartsToSwapIn = [];
 
         l = SR.ReadLine();
         while (l != null)

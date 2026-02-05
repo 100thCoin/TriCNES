@@ -1090,7 +1090,7 @@ public partial class TriCNESGUI : Form
         HexExditor.Location = Location;
     }
 
-    List<Byte> Savestate = new List<byte>();
+    List<Byte> Savestate = [];
     bool PendingSaveState = false;
     private void saveStateToolStripMenuItem_Click(object sender, EventArgs e)
     {
@@ -1158,7 +1158,7 @@ public partial class TriCNESGUI : Form
         string extension = Path.GetExtension(TasFilePath);
         // create list of inputs from the tas file, and make any settings changes if needed.
         byte[] ByteArray = File.ReadAllBytes(TasFilePath);
-        List<ushort> TASInputs = new List<ushort>(); // Low byte is player 1, High byte is player 2.
+        List<ushort> TASInputs = []; // Low byte is player 1, High byte is player 2.
 
         switch (extension)
         {
@@ -1502,9 +1502,9 @@ public partial class TriCNESGUI : Form
                 int rerecords = ByteArray[4] | (ByteArray[5] << 8) | (ByteArray[6] << 16) | (ByteArray[7] << 24);
                 int frameCount = ByteArray[8] | (ByteArray[9] << 8) | (ByteArray[10] << 16) | (ByteArray[11] << 24);
 
-                List<List<byte>> saveStates = new List<List<byte>>();
-                List<List<byte>> saveStates2 = new List<List<byte>>();
-                List<bool> lagFrames = new List<bool>();
+                List<List<byte>> saveStates = [];
+                List<List<byte>> saveStates2 = [];
+                List<bool> lagFrames = [];
 
                 byte b = 0;
                 byte b2 = 0;
@@ -1514,8 +1514,8 @@ public partial class TriCNESGUI : Form
                     b = ByteArray[i];
                     b2 = ByteArray[i + 1];
                     TASInputs.Add((ushort)(b | (b2 << 8)));
-                    saveStates.Add(new List<byte>());
-                    saveStates2.Add(new List<byte>());
+                    saveStates.Add([]);
+                    saveStates2.Add([]);
                     lagFrames.Add(ByteArray[i + 2] == 1);
                     i += 3;
                 }
@@ -1656,7 +1656,7 @@ public partial class TriCNESGUI : Form
                 Timeline_PendingArbitrarySavestate = false; // pretty much only ever set when loading a TAS.
                 List<byte> state = EMU.SaveState();
                 TriCTASTimeline.TimelineSavestates.Add(state);
-                TriCTASTimeline.TimelineTempSavestates.Add(new List<byte>());
+                TriCTASTimeline.TimelineTempSavestates.Add([]);
             }
 
             bool[] ControllerHotkeys = OtherControllerHotkeys();
@@ -1769,14 +1769,14 @@ public partial class TriCNESGUI : Form
                     }
                     else
                     {
-                        List<byte> state = new List<byte>();
+                        List<byte> state = [];
                         TriCTASTimeline.TimelineSavestates.Add(state);
                     }
 
                     if (TriCTASTimeline.TimelineSavestates[TasTimeline.frameIndex].Count > 0)
                     {
                         // if this savestate is not empty
-                        List<byte> state = new List<byte>();
+                        List<byte> state = [];
                         TriCTASTimeline.TimelineTempSavestates.Add(state);
                         TasTimeline.TrimTempSavestates();
                         //TriCTASTimeline.TEMPRerecordTracker.Add(TasTimeline.Rerecords);

@@ -28,7 +28,7 @@ public partial class TriCTraceLogger : Form
 
     public void Init()
     {
-        rtb_TraceLog.SelectionTabs = new int[] { 0, 56, 56 * 2, 56 * 3, 56 * 4, 56 * 5, 56 * 6, 56 * 7, 56 * 8, 56 * 9, 56 * 10 };
+        rtb_TraceLog.SelectionTabs = [0, 56, 56 * 2, 56 * 3, 56 * 4, 56 * 5, 56 * 6, 56 * 7, 56 * 8, 56 * 9, 56 * 10];
     }
     String Log;
     public void Update()

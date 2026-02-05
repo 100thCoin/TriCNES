@@ -64,8 +64,7 @@ public partial class TriCTASTimeline : Form
     {
         MainGUI = Maingui;
         InitializeComponent();
-        Inputs = new List<ushort>();
-        Inputs.Add(0);
+        Inputs = [0];
         Font_Consolas = new Font("Consolas", 8);
         Brush_LeftColumn = new SolidBrush(Color.LightGray);
         Brush_LeftColumn_Saved = new SolidBrush(Color.Wheat);
@@ -124,8 +123,8 @@ public partial class TriCTASTimeline : Form
 
     void RefreshTopOfTimeline()
     {
-        Rectangle[] GridOverlay = new Rectangle[]
-            {
+        Rectangle[] GridOverlay =
+        [
             new Rectangle(0,0,80,16),
             new Rectangle(80 + 16*0,0,16,16),
             new Rectangle(80 + 16*1,0,16,16),
@@ -143,7 +142,7 @@ public partial class TriCTASTimeline : Form
             new Rectangle(80 + 16*13,0,16,16),
             new Rectangle(80 + 16*14,0,16,16),
             new Rectangle(80 + 16*15,0,16,16)
-            };
+        ];
         G.FillRectangle(Brush_LeftColumn, new Rectangle(0, 0, 80 + 16 * 16, 16));
         G.DrawRectangles(Pens.Black, GridOverlay);
         G.DrawString(ClockFiltering ? "Input #" : "Frame #", Font_Consolas, Brushes.Black, 0, 0);
@@ -496,10 +495,10 @@ public partial class TriCTASTimeline : Form
 
     public void Start()
     {
-        TimelineGrid = new List<TimelineCell[]>();
-        TimelineSavestates = new List<List<byte>>();
-        TimelineTempSavestates = new List<List<byte>>();
-        LagFrames = new List<bool>();
+        TimelineGrid = [];
+        TimelineSavestates = [];
+        TimelineTempSavestates = [];
+        LagFrames = [];
         //TEMPRerecordTracker = new List<int>();
 
         for (int i = 0; i < 40; i++)
@@ -523,7 +522,7 @@ public partial class TriCTASTimeline : Form
 
         List<byte> state = MainGUI.EMU.SaveState();
         TimelineSavestates.Add(state);
-        TimelineTempSavestates.Add(new List<byte>());
+        TimelineTempSavestates.Add([]);
         SavestateLength = state.Count;
         //TEMPRerecordTracker.Add(Rerecords);
     }
@@ -616,14 +615,14 @@ public partial class TriCTASTimeline : Form
             }
             else
             {
-                List<byte> state = new List<byte>();
+                List<byte> state = [];
                 TimelineSavestates.Add(state);
             }
 
             if (TimelineSavestates[frameIndex].Count > 0)
             {
                 // if this savestate is not empty
-                List<byte> state = new List<byte>();
+                List<byte> state = [];
                 TimelineTempSavestates.Add(state);
             }
             else
@@ -720,9 +719,9 @@ public partial class TriCTASTimeline : Form
 
             if (extension != ".3c3")
             {
-                LagFrames = new List<bool>();
-                TimelineSavestates = new List<List<byte>>();
-                TimelineTempSavestates = new List<List<byte>>();
+                LagFrames = [];
+                TimelineSavestates = [];
+                TimelineTempSavestates = [];
                 // savestates are initialized in the Timeline_PendingArbitrarySavestate
                 MainGUI.Timeline_PendingArbitrarySavestate = true;
 
@@ -992,26 +991,26 @@ public partial class TriCTASTimeline : Form
         MethodInvoker upd = delegate
         {
             int rowp1 = row + 1;
-            Rectangle[] GridOverlay = new Rectangle[]
-                {
-                    new Rectangle(0,rowp1*16,80,16),
-                    new Rectangle(80 + 16*0,rowp1*16,16,16),
-                    new Rectangle(80 + 16*1,rowp1*16,16,16),
-                    new Rectangle(80 + 16*2,rowp1*16,16,16),
-                    new Rectangle(80 + 16*3,rowp1*16,16,16),
-                    new Rectangle(80 + 16*4,rowp1*16,16,16),
-                    new Rectangle(80 + 16*5,rowp1*16,16,16),
-                    new Rectangle(80 + 16*6,rowp1*16,16,16),
-                    new Rectangle(80 + 16*7,rowp1*16,16,16),
-                    new Rectangle(80 + 16*8,rowp1*16,16,16),
-                    new Rectangle(80 + 16*9,rowp1*16,16,16),
-                    new Rectangle(80 + 16*10,rowp1*16,16,16),
-                    new Rectangle(80 + 16*11,rowp1*16,16,16),
-                    new Rectangle(80 + 16*12,rowp1*16,16,16),
-                    new Rectangle(80 + 16*13,rowp1*16,16,16),
-                    new Rectangle(80 + 16*14,rowp1*16,16,16),
-                    new Rectangle(80 + 16*15,rowp1*16,16,16)
-                };
+            Rectangle[] GridOverlay =
+            [
+                new Rectangle(0,rowp1*16,80,16),
+                new Rectangle(80 + 16*0,rowp1*16,16,16),
+                new Rectangle(80 + 16*1,rowp1*16,16,16),
+                new Rectangle(80 + 16*2,rowp1*16,16,16),
+                new Rectangle(80 + 16*3,rowp1*16,16,16),
+                new Rectangle(80 + 16*4,rowp1*16,16,16),
+                new Rectangle(80 + 16*5,rowp1*16,16,16),
+                new Rectangle(80 + 16*6,rowp1*16,16,16),
+                new Rectangle(80 + 16*7,rowp1*16,16,16),
+                new Rectangle(80 + 16*8,rowp1*16,16,16),
+                new Rectangle(80 + 16*9,rowp1*16,16,16),
+                new Rectangle(80 + 16*10,rowp1*16,16,16),
+                new Rectangle(80 + 16*11,rowp1*16,16,16),
+                new Rectangle(80 + 16*12,rowp1*16,16,16),
+                new Rectangle(80 + 16*13,rowp1*16,16,16),
+                new Rectangle(80 + 16*14,rowp1*16,16,16),
+                new Rectangle(80 + 16*15,rowp1*16,16,16)
+            ];
             if (frameIndex - TopFrame == row)
             {
                 G.FillRectangle(Brush_HighlightedCell, new Rectangle(0, rowp1 * 16, 80 + 16 * 16, 16));
@@ -1292,7 +1291,7 @@ public partial class TriCTASTimeline : Form
             TimelineSavestates.Add(state);
             if (TimelineTempSavestates[frameIndex].Count > 0)
             {
-                TimelineTempSavestates[frameIndex] = new List<byte>(); // remove temp savestate for this frame
+                TimelineTempSavestates[frameIndex] = []; // remove temp savestate for this frame
             }
         }
         else
@@ -1301,7 +1300,7 @@ public partial class TriCTASTimeline : Form
             TimelineSavestates[frameIndex] = state;
             if (TimelineTempSavestates[frameIndex].Count > 0)
             {
-                TimelineTempSavestates[frameIndex] = new List<byte>(); // remove temp savestate for this frame
+                TimelineTempSavestates[frameIndex] = []; // remove temp savestate for this frame
             }
 
             GC.Collect();
@@ -1313,7 +1312,7 @@ public partial class TriCTASTimeline : Form
         int deletion = frameIndex - TempSavestates;
         if (deletion >= 0 && deletion < TimelineTempSavestates.Count && TimelineTempSavestates[deletion].Count > 0)
         {
-            TimelineTempSavestates[deletion] = new List<byte>(); // remove temp savestate for this frame
+            TimelineTempSavestates[deletion] = []; // remove temp savestate for this frame
             int row = deletion - TopFrame;
             if (row >= 0 && row < 40)
             {
@@ -1387,9 +1386,9 @@ public partial class TriCTASTimeline : Form
         timelineScrollbar.Maximum = Inputs.Count + 38;
         MainGUI.Timeline_PendingHardReset = true;
 
-        LagFrames = new List<bool>();
-        TimelineSavestates = new List<List<byte>>();
-        TimelineTempSavestates = new List<List<byte>>();
+        LagFrames = [];
+        TimelineSavestates = [];
+        TimelineTempSavestates = [];
         // savestates are initialized in the Timeline_PendingArbitrarySavestate
         MainGUI.Timeline_PendingArbitrarySavestate = true;
 

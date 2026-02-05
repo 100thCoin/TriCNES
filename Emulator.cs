@@ -194,7 +194,8 @@ public class Emulator
 
     public ushort temporaryAddress; // I use this to temporarily modify the value of the address bus for some if statements. This is mostly for checking if the low byte under/over flows.
 
-    public static uint[] NesPalInts = {
+    public static uint[] NesPalInts =
+    [
         // each uint represents the ARGB components of a color.
         // there's 64 colors, but this is also how I implement specific values for the PPU's emphasis bits.
         // default palette:
@@ -239,7 +240,7 @@ public class Emulator
         0xFFA6A6A6, 0xFF788EB3, 0xFF8585C0, 0xFF957DBE, 0xFFA279AF, 0xFFA87A96, 0xFFA8807B, 0xFF9F8964, 0xFF919257, 0xFF829A59, 0xFF759D68, 0xFF6E9C80, 0xFF6F979C, 0xFF707070, 0xFF000000, 0xFF000000,
         // colorburst
         0xFF010900
-    };
+    ];
 
     int chosenColor; // During screen rendering, this value is the index into the color array.
     public DirectBitmap Screen = new DirectBitmap(256, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
@@ -663,7 +664,7 @@ public class Emulator
     public byte APU_LengthCounter_Noise = 0;    // The length counter for the APU's Noise channel.
 
     // When a length counter's reloaded value is set by writing to $4003, $4007, $400B, or $400F, this LookUp Table is used to determine the length based on the value written.
-    public static readonly byte[] APU_LengthCounterLUT = { 10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30 };
+    public static readonly byte[] APU_LengthCounterLUT = [10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30];
 
     public bool APU_LengthCounter_HaltPulse1 = false;   // set if Bit 5 of $4000 is 1
     public bool APU_LengthCounter_HaltPulse2 = false;   // set if Bit 5 of $4004 is 1
@@ -691,7 +692,7 @@ public class Emulator
     public bool APU_DMC_Loop = false;       // Will DPCM samples loop?
     public ushort APU_DMC_Rate = 428;       // The default sample rate is the slowest.
     // LookUp Table for how many CPU cycles are between each bit of the DPCM sample being played. (8 bits per byte, so to calculate how many cycles there are between each DMA, multiply these numbers by 8)
-    public static readonly ushort[] APU_DMCRateLUT = { 428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54 };
+    public static readonly ushort[] APU_DMCRateLUT = [428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54];
 
     // $4011 (and DPCM stuff)
     public byte APU_DMC_Output; // Directly writing here (Address $4011) will set the DMC output. This is how you play PCM audio.
@@ -1303,36 +1304,36 @@ public class Emulator
                 // if the state machine *is* interrupted, this runs
                 else
                     if (!PPU_Data_StateMachine_Read && PPU_Data_StateMachine_PerformMysteryWrite)
-                {
-                    // the mystery write
-
-                    // Here's how the mystery write behaves:
-                    // Suppose we're writing a value of $ZZ to address $2007, and the PPU Read/Write address is at address $YYXX
-                    // The mystery write will store $ZZ at address $YYZZ
-                    // In addition to that, $XX (The low byte of the read/write address) is also written to $YYXX
-
-                    // This only occurs if there's 2 consecutive CPU cycles that access $2007
-
-                    // The mystery writes cannot write to palettes. Instead, write the modified value read from palette RAM to the following address.
-                    if (PPU_VRAM_MysteryAddress >= 0x3F00)
                     {
+                        // the mystery write
 
-                        StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_VRAM_MysteryAddress);
-                        PPU_AddressBus = PPU_ReadWriteAddress;
+                        // Here's how the mystery write behaves:
+                        // Suppose we're writing a value of $ZZ to address $2007, and the PPU Read/Write address is at address $YYXX
+                        // The mystery write will store $ZZ at address $YYZZ
+                        // In addition to that, $XX (The low byte of the read/write address) is also written to $YYXX
 
+                        // This only occurs if there's 2 consecutive CPU cycles that access $2007
+
+                        // The mystery writes cannot write to palettes. Instead, write the modified value read from palette RAM to the following address.
+                        if (PPU_VRAM_MysteryAddress >= 0x3F00)
+                        {
+
+                            StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_VRAM_MysteryAddress);
+                            PPU_AddressBus = PPU_ReadWriteAddress;
+
+                        }
+                        else
+                        {
+                            // As far as I know, the PPU can only make 1 write per cycle... The exact timing here might be wrong, but the end result of the behavior emulated here seems to match my console.
+                            StorePPUData((ushort)(PPU_VRAM_MysteryAddress), (byte)PPU_VRAM_MysteryAddress);
+                            StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_ReadWriteAddress);
+                            PPU_AddressBus = PPU_ReadWriteAddress;
+                        }
+
+                        // That second write can be overwritten in the next steps depending on the CPU/PPU alignment.
+                        // My current understanding is: if the mystery write happens, that other extra write happens too.
+                        // but again, I'm not certain on the timing. Do these actually both happen on the same cycle?
                     }
-                    else
-                    {
-                        // As far as I know, the PPU can only make 1 write per cycle... The exact timing here might be wrong, but the end result of the behavior emulated here seems to match my console.
-                        StorePPUData((ushort)(PPU_VRAM_MysteryAddress), (byte)PPU_VRAM_MysteryAddress);
-                        StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_ReadWriteAddress);
-                        PPU_AddressBus = PPU_ReadWriteAddress;
-                    }
-
-                    // That second write can be overwritten in the next steps depending on the CPU/PPU alignment.
-                    // My current understanding is: if the mystery write happens, that other extra write happens too.
-                    // but again, I'm not certain on the timing. Do these actually both happen on the same cycle?
-                }
                 // the PPU Read/Write address is incremented 1 cycle after the write occurs.
             }
 
@@ -2178,17 +2179,18 @@ public class Emulator
     public bool PPU_DecodeSignal;
     public bool PPU_ShowScreenBorders;
     static float[] Voltages =
-        { 0.228f, 0.312f, 0.552f, 0.880f, // Signal low
-                0.616f, 0.840f, 1.100f, 1.100f, // Signal high
-                0.192f, 0.256f, 0.448f, 0.712f, // Signal low, attenuated
-                0.500f, 0.676f, 0.896f, 0.896f  // Signal high, attenuated
-                };
+    [
+        0.228f, 0.312f, 0.552f, 0.880f, // Signal low
+        0.616f, 0.840f, 1.100f, 1.100f, // Signal high
+        0.192f, 0.256f, 0.448f, 0.712f, // Signal low, attenuated
+        0.500f, 0.676f, 0.896f, 0.896f  // Signal high, attenuated
+    ];
     public byte ntsc_signal;
     public byte ntsc_signal_of_dot_0;
     public float[] NTSC_Samples = new float[257 * 8 + 24];
     public float[] Bordered_NTSC_Samples = new float[341 * 8 + 24];
     static float[] Levels =
-        {
+    [
         (Voltages[0] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
         (Voltages[1] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
         (Voltages[2] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
@@ -2205,13 +2207,13 @@ public class Emulator
         (Voltages[13] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
         (Voltages[14] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f,
         (Voltages[15] - Voltages[1]) / (Voltages[6] - Voltages[1]) / 12f
-    };
+    ];
     float Saturation = 0.75f;
     int SignalBufferWidth = 12;
     static double hue = 0;
     static float chroma_saturation_correction = 2.4f;
     static double[] SinTable =
-        {
+    [
         Math.Sin(Math.PI* (0 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
         Math.Sin(Math.PI* (1 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
         Math.Sin(Math.PI* (2 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
@@ -2224,9 +2226,9 @@ public class Emulator
         Math.Sin(Math.PI* (9 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
         Math.Sin(Math.PI* (10 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
         Math.Sin(Math.PI* (11 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction
-         };
+    ];
     static double[] CosTable =
-        {
+    [
         Math.Cos(Math.PI* (0 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
         Math.Cos(Math.PI* (1 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
         Math.Cos(Math.PI* (2 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
@@ -2239,7 +2241,7 @@ public class Emulator
         Math.Cos(Math.PI* (9 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
         Math.Cos(Math.PI* (10 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction,
         Math.Cos(Math.PI* (11 + 3 - 0.5 + hue) / 6) * chroma_saturation_correction
-         };
+    ];
     bool InColorPhase(int col, int DecodePhase)
     {
         return (col + DecodePhase) % 12 < 6;
@@ -3963,7 +3965,7 @@ public class Emulator
             i++;
         }
     }
-    byte[] DecayBitmask = { 0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F };
+    byte[] DecayBitmask = [0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F];
 
     // The object attribute memory DMA!
     bool OAMDMA_Aligned = false;
@@ -12207,41 +12209,38 @@ public class Emulator
 
     public List<Byte> SaveState()
     {
-        List<Byte> State = new List<byte>();
-
-        State.Add((byte)programCounter);
-        State.Add((byte)(programCounter >> 8));
-        State.Add((byte)addressBus);
-        State.Add((byte)(addressBus >> 8));
-        State.Add((byte)temporaryAddress);
-        State.Add((byte)(temporaryAddress >> 8));
-        State.Add((byte)OAMAddressBus);
-        State.Add((byte)(OAMAddressBus >> 8));
-        State.Add((byte)PPU_ReadWriteAddress);
-        State.Add((byte)(PPU_ReadWriteAddress >> 8));
-        State.Add((byte)PPU_TempVRAMAddress);
-        State.Add((byte)(PPU_TempVRAMAddress >> 8));
-
-        State.Add((byte)totalCycles);
-        State.Add((byte)(totalCycles >> 8));
-        State.Add((byte)(totalCycles >> 16));
-        State.Add((byte)(totalCycles >> 24));
-
-        State.Add(PPUClock);
-        State.Add(CPUClock);
-        State.Add(APUClock);
-        State.Add(MasterClock);
-
-        State.Add(operationCycle);
-        State.Add(opCode);
-        State.Add((byte)(operationComplete ? 1 : 0));
-
-        State.Add(dl);
-        State.Add(dataBus);
-        State.Add(A);
-        State.Add(X);
-        State.Add(Y);
-        State.Add(stackPointer);
+        List<Byte> State =
+        [
+            (byte)programCounter,
+            (byte)(programCounter >> 8),
+            (byte)addressBus,
+            (byte)(addressBus >> 8),
+            (byte)temporaryAddress,
+            (byte)(temporaryAddress >> 8),
+            (byte)OAMAddressBus,
+            (byte)(OAMAddressBus >> 8),
+            (byte)PPU_ReadWriteAddress,
+            (byte)(PPU_ReadWriteAddress >> 8),
+            (byte)PPU_TempVRAMAddress,
+            (byte)(PPU_TempVRAMAddress >> 8),
+            (byte)totalCycles,
+            (byte)(totalCycles >> 8),
+            (byte)(totalCycles >> 16),
+            (byte)(totalCycles >> 24),
+            PPUClock,
+            CPUClock,
+            APUClock,
+            MasterClock,
+            operationCycle,
+            opCode,
+            (byte)(operationComplete ? 1 : 0),
+            dl,
+            dataBus,
+            A,
+            X,
+            Y,
+            stackPointer,
+        ];
         status = flag_Carry ? (byte)0x01 : (byte)0;
         status += flag_Zero ? (byte)0x02 : (byte)0;
         status += flag_Interrupt ? (byte)0x04 : (byte)0;

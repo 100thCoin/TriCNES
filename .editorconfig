@@ -20,6 +20,9 @@ indent_size = 4
 #### .NET Formatting Rules ####
 [*.{cs,vb}]
 
+# Expression-level preferences
+dotnet_style_prefer_collection_expression = true
+
 # New line preferences
 dotnet_style_allow_multiple_blank_lines_experimental              = false
 dotnet_style_allow_statement_immediately_after_block_experimental = false

@@ -52,7 +52,7 @@ public static class Documentation
     static int memChanges = 8192;
 
     static string[] CycleDocs =
-    {
+    [
         //0 BRK
         "        #  address R/W description\r\n       --- ------- --- -----------------------------------------------\r\n        1    PC     R  fetch opcode, increment PC\r\n        2    PC     R  read next instruction byte (and throw it away), increment PC\r\n        3  $0100,S  W  push PCH on stack, decrement S\r\n        4  $0100,S  W  push PCL on stack, decrement S\r\n        5  $0100,S  W  push P on stack (with B flag set), decrement S\r\n        6   $FFFE   R  fetch PCL\r\n        7   $FFFF   R  fetch PCH"
         ,
@@ -150,12 +150,12 @@ public static class Documentation
         //29
         //HLT
         "        #   address  R/W description\r\n       --- --------- --- ------------------------------------------\r\n        1     PC      R  fetch opcode, does not increment PC\r\n        2     PC      R  fetch opcode, does not increment PC\r\n        3     PC      R  fetch opcode, does not increment PC\r\n        4     PC      R  fetch opcode, does not increment PC\r\n        5     PC      R  fetch opcode, does not increment PC\r\n        6     PC      R  fetch opcode, does not increment PC\r\n        7     PC      R  fetch opcode, does not increment PC\r\n        ...   PC      R  fetch opcode, does not increment PC\r\n\r\n       Notes: This process goes on forever."
-    };
+    ];
 
     // this explains what each isntruction does by their pnuemonic
 
     static string[] InstructionDocs =
-    {
+    [
         //0 BRK
         "Break\n\nPushes PC to the stack.\n\nPushes processor status to the stack.\nPC' = ($FFFE)\nSP' = SP-3"
         ,
@@ -384,12 +384,13 @@ public static class Documentation
         //75 SED
         "Set Decimal\n\nDFlag = true"
 
-    };
+    ];
 
     // this table is referenced in the debugging stuff.
     // basically, for each index into this array, you can fetch an opcode's name, addressing mode, what flags/registers it can modify, documentation, and the number of cycles before a read/write.
 
-    public static Op[] OpDocs = {
+    public static Op[] OpDocs =
+    [
         new Op(0x00,"BRK","i"       ,2,bFlag | stackPChanges | pcChanges            ,CycleDocs[0] ,InstructionDocs[0]),
         new Op(0x01,"ORA","(d,x)"   ,2,nFlag | zFlag | aChanges                     ,CycleDocs[22],InstructionDocs[1]),
         new Op(0x02,"HLT","i"       ,1,0                                            ,CycleDocs[29],InstructionDocs[2]),
@@ -653,7 +654,5 @@ public static class Documentation
         new Op(0xFD,"SBC","a,x"     ,3,aChanges | nFlag | zFlag | cFlag | vFlag             ,CycleDocs[18],InstructionDocs[70]),
         new Op(0xFE,"INC","a,x"     ,3,memChanges | nFlag | zFlag                           ,CycleDocs[19],InstructionDocs[72]),
         new Op(0xFF,"ISC","a,x"     ,3,aChanges | memChanges | nFlag | zFlag | cFlag | vFlag,CycleDocs[19],InstructionDocs[71])
-
-        };
-
+    ];
 }

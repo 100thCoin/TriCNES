@@ -53,7 +53,7 @@ public partial class TASProperties : Form
         extension = Path.GetExtension(TasFilePath);
         // create list of inputs from the tas file, and make any settings changes if needed.
         byte[] ByteArray = File.ReadAllBytes(TasFilePath);
-        List<ushort> TASInputs = new List<ushort>(); // Low byte is player 1, High byte is player 2.
+        List<ushort> TASInputs = []; // Low byte is player 1, High byte is player 2.
 
         rb_ClockFiltering.Checked = false;
         rb_LatchFiltering.Checked = true;
