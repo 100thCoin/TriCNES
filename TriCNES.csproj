@@ -2,17 +2,21 @@
   <PropertyGroup>
     <TargetFramework>net4.8</TargetFramework>
     <OutputType>WinExe</OutputType>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <LangVersion>8</LangVersion>
+    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
     <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
+    <PackageReference Include="System.IO.Compression" Version="4.3.0" />
+    <PackageReference Include="System.Resources.Extensions" Version="10.0.2" />
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
