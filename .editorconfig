@@ -76,3 +76,6 @@ csharp_space_between_square_brackets                                     = false
 # Wrapping preferences
 csharp_preserve_single_line_blocks     = true
 csharp_preserve_single_line_statements = true
+
+# Namespace preferences
+csharp_style_namespace_declarations = file_scoped

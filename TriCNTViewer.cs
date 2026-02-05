@@ -8,57 +8,56 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace TriCNES
+namespace TriCNES;
+
+public partial class TriCNTViewer : Form
 {
-    public partial class TriCNTViewer : Form
+    public TriCNESGUI MainGUI;
+    public TriCNTViewer()
     {
-        public TriCNESGUI MainGUI;
-        public TriCNTViewer()
-        {
-            InitializeComponent();
-            FormClosing += new FormClosingEventHandler(TriCNTViewer_Closing);
-        }
+        InitializeComponent();
+        FormClosing += new FormClosingEventHandler(TriCNTViewer_Closing);
+    }
 
-        private void TriCNTViewer_Closing(Object sender, FormClosingEventArgs e)
-        {
-            MainGUI.NametableViewer = null;
-            this.Dispose();
-        }
+    private void TriCNTViewer_Closing(Object sender, FormClosingEventArgs e)
+    {
+        MainGUI.NametableViewer = null;
+        this.Dispose();
+    }
 
-        public void Update(Bitmap b)
+    public void Update(Bitmap b)
+    {
+        MethodInvoker upd = delegate
         {
-            MethodInvoker upd = delegate
-            {
-                pictureBox1.Image = b;
-                pictureBox1.Update();
-            };
-            try
-            {
-                this.Invoke(upd);
-            }
-            catch (Exception e)
-            {
+            pictureBox1.Image = b;
+            pictureBox1.Update();
+        };
+        try
+        {
+            this.Invoke(upd);
+        }
+        catch (Exception e)
+        {
 
-            }
         }
+    }
 
-        public bool UseBackdrop()
-        {
-            return cb_ForcePal0ToBackdrop.Checked;
-        }
+    public bool UseBackdrop()
+    {
+        return cb_ForcePal0ToBackdrop.Checked;
+    }
 
-        public bool DrawBoundary()
-        {
-            return cb_ScreenBoundary.Checked;
-        }
-        public bool OverlayScreen()
-        {
-            return cb_OverlayScreen.Checked;
-        }
+    public bool DrawBoundary()
+    {
+        return cb_ScreenBoundary.Checked;
+    }
+    public bool OverlayScreen()
+    {
+        return cb_OverlayScreen.Checked;
+    }
 
-        private void screenshotToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            Clipboard.SetImage(pictureBox1.Image);
-        }
+    private void screenshotToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        Clipboard.SetImage(pictureBox1.Image);
     }
 }
