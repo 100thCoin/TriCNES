@@ -560,7 +560,7 @@ public partial class TriCNESGUI : Form
 
     public void StartTAS()
     {
-        if (filePath == "" || filePath == null)
+        if (filePath is "" or null)
         {
             MessageBox.Show("You need to select a ROM before running a TAS.");
             return;
@@ -1804,7 +1804,7 @@ public partial class TriCNESGUI : Form
                     EMU.ControllerPort2 = 0;
                     TriCTASTimeline.Inputs[TasTimeline.frameIndex] = realtimeInputs;
                     int row = TasTimeline.frameIndex - TasTimeline.TopFrame;
-                    if (row >= 0 && row < 40)
+                    if (row is >= 0 and < 40)
                     {
                         TasTimeline.RecalculateTimelineRow(row, realtimeInputs);
                         TasTimeline.RedrawTimelineRow(row, false);

@@ -1431,7 +1431,7 @@ public class Emulator
         }
 
         // Updating the scroll registers during screen rendering
-        if (PPU_Scanline < 240 || PPU_Scanline == 261)// if this is the pre-render line, or any line before vblank
+        if (PPU_Scanline is < 240 or 261)// if this is the pre-render line, or any line before vblank
         {
             if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
             {
@@ -1589,10 +1589,10 @@ public class Emulator
             PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
         }
 
-        if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
+        if ((PPU_Scanline is < 240 or 261))// if this is the pre-render line, or any line before vblank
         {
             // Sprite evaluation
-            if (PPU_Scanline < 241 || PPU_Scanline == 261)
+            if (PPU_Scanline is < 241 or 261)
             {
                 PPU_Render_SpriteEvaluation(); // fill in secondary OAM, and set up various arrays of sprite properties.
             }
@@ -1635,7 +1635,7 @@ public class Emulator
             {
                 if (PPU_WasRenderingBefore2001Write && (PPU_Update2001Value & 0x08) == 0 && (PPU_Update2001Value & 0x10) == 0)
                 {
-                    if ((PPU_Scanline < 240 || PPU_Scanline == 261)) // if this is the pre-render line, or any line before vblank
+                    if ((PPU_Scanline is < 240 or 261)) // if this is the pre-render line, or any line before vblank
                     {
                         if (!PPU_PendingOAMCorruption) // due to OAM corruption occurring inside OAM evaluation before this even occurs, make sure OAM isn't already corrupt
                         {
@@ -1662,9 +1662,9 @@ public class Emulator
         PrevPrevDotColor = PrevDotColor;
         PrevDotColor = DotColor; // These variables here just record the color, and swap them through these variables so it can be used 3 cycles after it was chosen.
         PPU_Render_CommitShiftRegistersAndBitPlanes();
-        if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
+        if ((PPU_Scanline is < 240 or 261))// if this is the pre-render line, or any line before vblank
         {
-            if ((PPU_Dot >= 0 && PPU_Dot < 257) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
+            if (PPU_Dot is >= 0 and < 257 or > 320 and <= 336) // if this is a visible pixel, or preparing the start of next scanline
             {
                 if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
                 {
@@ -1679,7 +1679,7 @@ public class Emulator
                 }
             }
 
-            if ((PPU_Dot > 0 && PPU_Dot <= 257)) // if this is a visible pixel, or preparing the start of next scanline
+            if ((PPU_Dot is > 0 and <= 257)) // if this is a visible pixel, or preparing the start of next scanline
             {
                 if (PPU_Scanline < 241)
                 {
@@ -1761,9 +1761,9 @@ public class Emulator
     void _EmulateHalfPPU()
     {
         // Oh boy, it's time for half PPU cycles.
-        if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
+        if ((PPU_Scanline is < 240 or 261))// if this is the pre-render line, or any line before vblank
         {
-            if ((PPU_Dot > 0 && PPU_Dot <= 257) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
+            if (PPU_Dot is > 0 and <= 257 or > 320 and <= 336) // if this is a visible pixel, or preparing the start of next scanline
             {
                 if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
                 {
@@ -1773,9 +1773,9 @@ public class Emulator
         }
 
         PPU_Render_CommitShiftRegistersAndBitPlanes_HalfDot();
-        if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
+        if ((PPU_Scanline is < 240 or 261))// if this is the pre-render line, or any line before vblank
         {
-            if ((PPU_Dot >= 0 && PPU_Dot < 257) || (PPU_Dot >= 320 && PPU_Dot < 336)) // if this is a visible pixel, or preparing the start of next scanline
+            if (PPU_Dot is >= 0 and < 257 or >= 320 and < 336) // if this is a visible pixel, or preparing the start of next scanline
             {
                 if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
                 {
@@ -1930,7 +1930,7 @@ public class Emulator
         if (scanline < 241 || ((scanline == 241 && dot < 277)) || scanline == 261)
         {
 
-            if (dot >= 1 && dot <= 256) // visible pixels.
+            if (dot is >= 1 and <= 256) // visible pixels.
             {
                 if (scanline == 261)
                 {
@@ -1965,7 +1965,7 @@ public class Emulator
                 boarderedDot = dot + 64;
                 boarderedScanline = scanline;
             }
-            else if (dot >= 257 && dot <= 267) // right boarder
+            else if (dot is >= 257 and <= 267) // right boarder
             {
                 if (scanline == 261)
                 {
@@ -1999,35 +1999,35 @@ public class Emulator
                 boarderedDot = dot + 64;
                 boarderedScanline = scanline;
             }
-            else if (dot >= 268 && dot <= 276) // front porch
+            else if (dot is >= 268 and <= 276) // front porch
             {
                 // black.
                 chosenColor = 0x0F;
                 boarderedDot = dot + 64;
                 boarderedScanline = scanline;
             }
-            else if (dot >= 277 && dot <= 301) // horizontal sync
+            else if (dot is >= 277 and <= 301) // horizontal sync
             {
                 // black.
                 chosenColor = 0x0F;
                 boarderedDot = dot - 277;
                 boarderedScanline = scanline + 1;
             }
-            else if (dot >= 302 && dot <= 305) // back porch
+            else if (dot is >= 302 and <= 305) // back porch
             {
                 // black.
                 chosenColor = 0x0F;
                 boarderedDot = dot - 277;
                 boarderedScanline = scanline + 1;
             }
-            else if (dot >= 306 && dot <= 320) // colorburst
+            else if (dot is >= 306 and <= 320) // colorburst
             {
                 // extremely dark olive.
                 chosenColor = Signal_COLORBURST;
                 boarderedDot = dot - 277;
                 boarderedScanline = scanline + 1;
             }
-            else if (dot >= 321 && dot <= 325) // back porch
+            else if (dot is >= 321 and <= 325) // back porch
             {
                 // black.
                 chosenColor = 0x0F;
@@ -2113,7 +2113,7 @@ public class Emulator
         }
         else
         {
-            if (scanline >= 245 && scanline <= 247)
+            if (scanline is >= 245 and <= 247)
             {
                 // black.
                 chosenColor = 0x0F;
@@ -2131,7 +2131,7 @@ public class Emulator
             else
             {
                 // colorburst happens on this line too.
-                if (dot >= 306 && dot <= 320) // colorburst
+                if (dot is >= 306 and <= 320) // colorburst
                 {
                     // extremely dark olive.
                     chosenColor = Signal_COLORBURST;
@@ -2632,7 +2632,7 @@ public class Emulator
             }
         }
 
-        if ((PPU_Dot >= 0 && PPU_Dot <= 64)) // Dots 1 through 64, not on the pre-render line. (and also dot 0 for OAM corruption purposes)
+        if ((PPU_Dot is >= 0 and <= 64)) // Dots 1 through 64, not on the pre-render line. (and also dot 0 for OAM corruption purposes)
         {
 
             // this step is clearing secondary OAM, and writing FF to each byte in the array.
@@ -2714,7 +2714,7 @@ public class Emulator
                 }
             }
         }
-        else if ((PPU_Dot >= 65 && PPU_Dot <= 256)) // Dots 65 through 256, not on the pre-render line
+        else if ((PPU_Dot is >= 65 and <= 256)) // Dots 65 through 256, not on the pre-render line
         {
             if (PPU_Dot == 65)
             {
@@ -2928,12 +2928,12 @@ public class Emulator
                             OAM2Address += 4;
                         }
 
-                        if (PPUClock == 0 || PPUClock == 3)
+                        if (PPUClock is 0 or 3)
                         {
                             PPU_OAMCorruptionIndex = (byte)(OAM2Address); // this value will be used when rendering is re-enabled and the corruption occurs
                         }
 
-                        if (PPUClock == 1 || PPUClock == 2)
+                        if (PPUClock is 1 or 2)
                         {
                             PPU_OAMCorruptionIndex = (byte)(OAM2Address); // this value will be used when rendering is re-enabled and the corruption occurs
                         }
@@ -2948,7 +2948,7 @@ public class Emulator
                 }
             }
         }
-        else if (PPU_Dot >= 257 && PPU_Dot <= 320) // this also happens on the pre-render line.
+        else if (PPU_Dot is >= 257 and <= 320) // this also happens on the pre-render line.
         {
             PPU_CurrentScanlineContainsSpriteZero = PPU_NextScanlineContainsSpriteZero;
 
@@ -9340,7 +9340,7 @@ public class Emulator
             // Ram mirroring! Only addresses $0000 through $07FF exist in RAM, so ignore bits 11 and 12
             return RAM[Address & 0x7FF];
         }
-        else if (Address >= 0x2000 && Address < 0x4000)
+        else if (Address is >= 0x2000 and < 0x4000)
         {
             // PPU registers. most of these aren't meant to be read.
             Address = (ushort)(Address & 0x2007);
@@ -9372,7 +9372,7 @@ public class Emulator
                     return ObservePPU(PPU_ReadWriteAddress);
             }
         }
-        else if (Address >= 0x4000 && Address <= 0x401F) // observe the APU registers
+        else if (Address is >= 0x4000 and <= 0x401F) // observe the APU registers
         {
             //addressBus
             byte Reg = (byte)(Address & 0x1F);
@@ -9391,7 +9391,7 @@ public class Emulator
                 InternalBus |= (byte)((APU_LengthCounter_Pulse1 != 0) ? 0x01 : 0);
                 return InternalBus; // reading from $4015 can not affect the databus
             }
-            else if (Reg == 0x16 || Reg == 0x17)
+            else if (Reg is 0x16 or 0x17)
             {
                 return (byte)((((Reg == 0x16) ? (ControllerShiftRegister1 & 0x80) : (ControllerShiftRegister2 & 0x80)) == 0 ? 0 : 1) | (dataBus & 0xE0));
             }
@@ -9422,7 +9422,7 @@ public class Emulator
             dataBus = RAM[Address & 0x7FF];
             DataPinsAreNotFloating = true;
         }
-        else if (Address >= 0x2000 && Address < 0x4000)
+        else if (Address is >= 0x2000 and < 0x4000)
         {
             // PPU registers. most of these aren't meant to be read.
             Address = (ushort)(Address & 0x2007);
@@ -9535,7 +9535,7 @@ public class Emulator
                     if (PPU_Data_StateMachine == 9)
                     {
                         PPU_Data_StateMachine = 0; // start it at 0
-                        if (PPUClock == 1 || PPUClock == 0)
+                        if (PPUClock is 1 or 0)
                         {
                             // and if this is phase 0 or 1, the buffer is updated later.
                             PPU_Data_StateMachine_UpdateVRAMBufferLate = true;
@@ -9566,7 +9566,7 @@ public class Emulator
             MapperFetch(Address, Cart.MemoryMapper);
         }
 
-        if (addressBus >= 0x4000 && addressBus <= 0x401F) // If APU registers are active, bus conflicts can occur. Or perhaps you are intentionally reading from the APU registers...
+        if (addressBus is >= 0x4000 and <= 0x401F) // If APU registers are active, bus conflicts can occur. Or perhaps you are intentionally reading from the APU registers...
         {
             //addressBus
             byte Reg = (byte)(Address & 0x1F);
@@ -9593,7 +9593,7 @@ public class Emulator
 
                 return InternalBus; // reading from $4015 can not affect the databus
             }
-            else if (Reg == 0x16 || Reg == 0x17)
+            else if (Reg is 0x16 or 0x17)
             {
                 byte ControllerRead = (byte)((((Reg == 0x16) ? (ControllerShiftRegister1 & 0x80) : (ControllerShiftRegister2 & 0x80)) == 0 ? 0 : 1) | (dataBus & 0xE0));
 
@@ -9766,11 +9766,11 @@ public class Emulator
                         {
                             Cart.Mapper_9_Latch0_FE = true;
                         }
-                        else if (Address >= 0x1FD8 && Address <= 0x1FDF)
+                        else if (Address is >= 0x1FD8 and <= 0x1FDF)
                         {
                             Cart.Mapper_9_Latch1_FE = false;
                         }
-                        else if (Address >= 0x1FE8 && Address <= 0x1FEF)
+                        else if (Address is >= 0x1FE8 and <= 0x1FEF)
                         {
                             Cart.Mapper_9_Latch1_FE = true;
                         }
@@ -10271,14 +10271,14 @@ public class Emulator
                         if ((Cart.Mapper_4_8000 & 0x20) != 0)
                         {
                             // MMC6 differs from MMC3 since there's only 1Kib of PRG RAM
-                            if (Address >= 0x7000 && Address <= 0x71FF)
+                            if (Address is >= 0x7000 and <= 0x71FF)
                             {
                                 if ((Cart.Mapper_4_PRGRAMProtect & 0x20) != 0)
                                 {
                                     return Cart.PRGRAM[Address & 0x3FF];
                                 }
                             }
-                            else if (Address >= 0x7200 && Address <= 0x73FF)
+                            else if (Address is >= 0x7200 and <= 0x73FF)
                             {
                                 if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
                                 {
@@ -10520,7 +10520,7 @@ public class Emulator
                         if ((Cart.Mapper_4_8000 & 0x20) != 0)
                         {
                             // MMC6 differs from MMC3 since there's only 1Kib of PRG RAM
-                            if (Address >= 0x7000 && Address <= 0x71FF)
+                            if (Address is >= 0x7000 and <= 0x71FF)
                             {
                                 if ((Cart.Mapper_4_PRGRAMProtect & 0x20) != 0)
                                 {
@@ -10528,7 +10528,7 @@ public class Emulator
                                     dataBus = Cart.PRGRAM[Address & 0x3FF];
                                 }
                             }
-                            else if (Address >= 0x7200 && Address <= 0x73FF)
+                            else if (Address is >= 0x7200 and <= 0x73FF)
                             {
                                 if ((Cart.Mapper_4_PRGRAMProtect & 0x80) != 0)
                                 {
@@ -10637,11 +10637,11 @@ public class Emulator
     {
         if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline < 240)
         {
-            if (PPU_Dot == 0 || PPU_Dot > 320)
+            if (PPU_Dot is 0 or > 320)
             {
                 return OAM2[0];
             }
-            else if (PPU_Dot > 0 && PPU_Dot <= 64)
+            else if (PPU_Dot is > 0 and <= 64)
             {
                 return 0xFF;
             }
@@ -10681,7 +10681,7 @@ public class Emulator
             // $2000 through $3FFF writes to the PPU registers
             StorePPURegisters(Address, Input);
         }
-        else if (Address >= 0x4000 && Address <= 0x4015)
+        else if (Address is >= 0x4000 and <= 0x4015)
         {
             // Writing to $4000 through $4015 are APU registers
             switch (Address)
@@ -10947,7 +10947,7 @@ public class Emulator
                 if (temp_rendering && !temp_renderingFromInput)
                 {
                     // we are disabling rendering inside vblank
-                    if (PPU_Scanline < 241 || PPU_Scanline == 261)
+                    if (PPU_Scanline is < 241 or 261)
                     {
                         PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = true; // used in the next cycle of sprite evaluation
                         if ((PPU_Dot & 7) < 2 && PPU_Dot <= 250)
@@ -10962,13 +10962,13 @@ public class Emulator
                 }
                 else if (!temp_rendering && temp_renderingFromInput)
                 {
-                    if (PPU_Scanline < 241 || PPU_Scanline == 261)
+                    if (PPU_Scanline is < 241 or 261)
                     {
                         // if re-enabling rendering outside vblank
                         if (PPU_PendingOAMCorruption)
                         {
                             // If OAM corruption is going to occur
-                            if (PPUClock == 1 || PPUClock == 2)
+                            if (PPUClock is 1 or 2)
                             {
                                 // if on clock alignment 1 or 2, it doesn't happen!
                                 PPU_OAMCorruptionRenderingEnabledOutOfVBlank = true;
@@ -11126,7 +11126,7 @@ public class Emulator
 
                 ushort Address = PPU_ReadWriteAddress;
                 // This if statement is only relevent in an edge case. Read-Modify-Write instructions to $2007 are *complicated*.
-                if (PPU_Data_StateMachine == 3 || PPU_Data_StateMachine == 6) // This write follows another read/write cycle
+                if (PPU_Data_StateMachine is 3 or 6) // This write follows another read/write cycle
                 {
                     // during Read-Modify-Write instructions to $2007, there's alignment specific side effects.
                     PPU_VRAM_MysteryAddress = (ushort)(Address & 0xFF00 | In);
@@ -11275,7 +11275,7 @@ public class Emulator
                         // MMC6 differs from MMC3 since there's only 1Kib of PRG RAM
                         if ((Cart.Mapper_4_8000 & 0x20) != 0)
                         {
-                            if (Address >= 0x7000 && Address <= 0x71FF)
+                            if (Address is >= 0x7000 and <= 0x71FF)
                             {
                                 if ((Cart.Mapper_4_PRGRAMProtect & 0x10) != 0)
                                 {
@@ -11283,7 +11283,7 @@ public class Emulator
 
                                 }
                             }
-                            else if (Address >= 0x7200 && Address <= 0x73FF)
+                            else if (Address is >= 0x7200 and <= 0x73FF)
                             {
                                 if ((Cart.Mapper_4_PRGRAMProtect & 0x40) != 0)
                                 {

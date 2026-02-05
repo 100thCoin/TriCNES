@@ -1314,7 +1314,7 @@ public partial class TriCTASTimeline : Form
         {
             TimelineTempSavestates[deletion] = []; // remove temp savestate for this frame
             int row = deletion - TopFrame;
-            if (row >= 0 && row < 40)
+            if (row is >= 0 and < 40)
             {
                 UpdateTimelineRowStatus(row);
                 RedrawTimelineRow(row, false);
