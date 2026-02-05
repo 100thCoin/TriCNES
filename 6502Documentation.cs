@@ -26,19 +26,13 @@ namespace TriCNES
             CycleByCycle = d;
             InstructionDocumentation = i;
         }
-
-
     }
-
-
 
     public static class Documentation
     {
 
         // This class is exlusively referenced for debugging and trace logging information.
         // It's also possible I mistyped some numbers here and there, and probably shouldn't be 100% trusted.
-
-
 
         //cycle information from https://www.atarihq.com/danb/files/64doc.txt
 
@@ -56,7 +50,6 @@ namespace TriCNES
         static int stackPChanges = 2048;
         static int pcChanges = 4096;
         static int memChanges = 8192;
-
 
         static string[] CycleDocs =
         {
@@ -391,7 +384,6 @@ namespace TriCNES
             //75 SED
             "Set Decimal\n\nDFlag = true"
 
-
         };
 
         // this table is referenced in the debugging stuff.
@@ -430,7 +422,6 @@ namespace TriCNES
             new Op(0x1D,"ORA","a,x"     ,3,nFlag | zFlag | aChanges                     ,CycleDocs[18],InstructionDocs[1]),
             new Op(0x1E,"ASL","a,x"     ,3,nFlag | zFlag | cFlag | memChanges           ,CycleDocs[19],InstructionDocs[4]),
             new Op(0x1F,"SLO","a,x"     ,3,nFlag | zFlag | cFlag | aChanges | memChanges,CycleDocs[19],InstructionDocs[5]),
-
 
             new Op(0x20,"JSR","a"       ,3,stackPChanges | pcChanges                    ,CycleDocs[5] ,InstructionDocs[10]),
             new Op(0x21,"AND","(d,x)"   ,2,nFlag | zFlag | aChanges                     ,CycleDocs[22],InstructionDocs[11]),
@@ -663,33 +654,7 @@ namespace TriCNES
             new Op(0xFE,"INC","a,x"     ,3,memChanges | nFlag | zFlag                           ,CycleDocs[19],InstructionDocs[72]),
             new Op(0xFF,"ISC","a,x"     ,3,aChanges | memChanges | nFlag | zFlag | cFlag | vFlag,CycleDocs[19],InstructionDocs[71])
 
-
             };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     }
 }

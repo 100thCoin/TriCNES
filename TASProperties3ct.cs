@@ -67,13 +67,13 @@ namespace TriCNES
                     CartridgeArray[i].Mapper_1_CHR0 = 0;              //0xA000
                     CartridgeArray[i].Mapper_1_CHR1 = 0;              //0xC000
                     CartridgeArray[i].Mapper_1_PRG = 0;               //0xE000
-                    CartridgeArray[i].Mapper_1_PB=false;
+                    CartridgeArray[i].Mapper_1_PB = false;
 
                     // Mapper 2, UxROM
                     CartridgeArray[i].Mapper_2_BankSelect = 0; // any write to ROM
 
                     // Mapper 3, CNROM
-                    CartridgeArray[i].Mapper_3_CHRBank=0; // any write to ROM
+                    CartridgeArray[i].Mapper_3_CHRBank = 0; // any write to ROM
 
                     // Mapper 4, MMC3
                     CartridgeArray[i].Mapper_4_8000 = 0;      // The value written to $8000 (or any even address between $8000 and $9FFE)
@@ -86,7 +86,7 @@ namespace TriCNES
                     CartridgeArray[i].Mapper_4_CHR_1K8 = 0;
                     CartridgeArray[i].Mapper_4_CHR_1KC = 0;
                     CartridgeArray[i].Mapper_4_IRQLatch = 0;
-                    CartridgeArray[i].Mapper_4_IRQCounter=0;
+                    CartridgeArray[i].Mapper_4_IRQCounter = 0;
                     CartridgeArray[i].Mapper_4_EnableIRQ = false;
                     CartridgeArray[i].Mapper_4_ReloadIRQCounter = false;
                     CartridgeArray[i].Mapper_4_NametableMirroring = false; // MMC3 has it's own way of controlling how the namtables are mirrored.
@@ -106,19 +106,20 @@ namespace TriCNES
                     CartridgeArray[i].Mapper_69_CHR_1K6 = 0;
                     CartridgeArray[i].Mapper_69_CHR_1K7 = 0;
                     CartridgeArray[i].Mapper_69_Bank_6 = 0;
-                    CartridgeArray[i].Mapper_69_Bank_6_isRAM=false;
-                    CartridgeArray[i].Mapper_69_Bank_6_isRAMEnabled=false;
-                    CartridgeArray[i].Mapper_69_Bank_8=0;
-                    CartridgeArray[i].Mapper_69_Bank_A=0;
-                    CartridgeArray[i].Mapper_69_Bank_C=0;
+                    CartridgeArray[i].Mapper_69_Bank_6_isRAM = false;
+                    CartridgeArray[i].Mapper_69_Bank_6_isRAMEnabled = false;
+                    CartridgeArray[i].Mapper_69_Bank_8 = 0;
+                    CartridgeArray[i].Mapper_69_Bank_A = 0;
+                    CartridgeArray[i].Mapper_69_Bank_C = 0;
                     CartridgeArray[i].Mapper_69_NametableMirroring = 0; // 0 = Vertical              1 = Horizontal            2 = One Screen Mirroring from $2000 ("1ScA")            3 = One Screen Mirroring from $2400 ("1ScB")
                     CartridgeArray[i].Mapper_69_EnableIRQ = false;
                     CartridgeArray[i].Mapper_69_EnableIRQCounterDecrement = false;
-                    CartridgeArray[i].Mapper_69_IRQCounter =0; // When enabled the 16-bit IRQ counter is decremented once per CPU cycle. When the IRQ counter is decremented from $0000 to $FFFF an IRQ is generated.
+                    CartridgeArray[i].Mapper_69_IRQCounter = 0; // When enabled the 16-bit IRQ counter is decremented once per CPU cycle. When the IRQ counter is decremented from $0000 to $FFFF an IRQ is generated.
 
                     i++;
                 }
             }
+
             MainGUI.Start3CTTAS();
         }
 
@@ -132,7 +133,7 @@ namespace TriCNES
             if (Directory.Exists(AppDomain.CurrentDomain.BaseDirectory + @"roms\"))
             {
                 Dir += @"roms\";
-                if(Directory.GetFiles(Dir).Length == 0)
+                if (Directory.GetFiles(Dir).Length == 0)
                 {
                     MessageBox.Show("Loading a .3ct TAS requires your roms to be located in the TriCNES roms folder.");
                     return;
@@ -145,15 +146,16 @@ namespace TriCNES
             int count = int.Parse(l);
             CartridgeArray = new Cartridge[count];
             int i = 0;
-            while(i < count)
+            while (i < count)
             {
                 l = SR.ReadLine();
-                if(File.Exists(Dir+l))
+                if (File.Exists(Dir + l))
                 {
-                    if(i ==0)
+                    if (i == 0)
                     {
                         BackupCart = new Cartridge(Dir + l);
                     }
+
                     if (MainGUI.EMU != null && MainGUI.EMU.Cart.Name == (Dir + l))
                     {
                         CartridgeArray[i] = MainGUI.EMU.Cart; // If running a TAS from RESET, we want to use the currently loaded cartridge
@@ -168,6 +170,7 @@ namespace TriCNES
                     MessageBox.Show("TriCNES roms folder is smissing a required ROM for this TAS!\n\nMissing ROM: \"" + l + "\"");
                     return;
                 }
+
                 i++;
             }
             // if all carts are now loaded.
@@ -184,14 +187,12 @@ namespace TriCNES
 
                 string s = l.Substring(0, l.IndexOf(" "));
                 CyclesToSwapOn.Add(int.Parse(s));
-                s = l.Remove(0,s.Length+1);
+                s = l.Remove(0, s.Length + 1);
                 CartsToSwapIn.Add(int.Parse(s));
                 l = SR.ReadLine();
             }
 
-
             b_RunTAS.Enabled = true;
         }
-
     }
 }

@@ -16,7 +16,7 @@ namespace TriCNES
         public TriCHexEditor()
         {
             InitializeComponent();
-            hexBitmap = new Bitmap(312,512);
+            hexBitmap = new Bitmap(312, 512);
             G = Graphics.FromImage(hexBitmap);
             Font_Consolas = new Font("Consolas", 8);
             Scope = "RAM";
@@ -39,7 +39,7 @@ namespace TriCNES
             MaxRows = (Size.Height - 115) / 15;
             hexBitmap = new Bitmap(312, Size.Height - 88);
             pb_hexView.Size = new Size(312, Size.Height - 88);
-            vScrollBar1.Size = new Size(vScrollBar1.Width,Size.Height-108);
+            vScrollBar1.Size = new Size(vScrollBar1.Width, Size.Height - 108);
             vScrollBar1.LargeChange = MaxRows;
             G = Graphics.FromImage(hexBitmap);
             RefreshEntireHexView();
@@ -71,7 +71,7 @@ namespace TriCNES
             {
                 this.Invoke(upd);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
 
             }
@@ -79,7 +79,7 @@ namespace TriCNES
 
         public void RefreshEntireHexView()
         {
-            if(MainGUI.EMU == null)
+            if (MainGUI.EMU == null)
             {
                 return;
             }
@@ -87,118 +87,131 @@ namespace TriCNES
             vScrollBar1.Enabled = MaxRows < vScrollBar1.Maximum;
             vScrollBar1.Update();
 
-            G.FillRectangle(Brushes.WhiteSmoke,new Rectangle(0,0, 312, Size.Height - 88));
+            G.FillRectangle(Brushes.WhiteSmoke, new Rectangle(0, 0, 312, Size.Height - 88));
             G.DrawString(Scope + ":", Font_Consolas, Brushes.Black, new Point(0, 0));
             for (int x = 0; x < 0x10; x++)
             {
                 G.DrawString(" " + x.ToString("X"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 16));
             }
+
             switch (scopeType)
             {
                 case ScopeType.RAM:
+                {
+                    int i = Scroll * 0x10;
+                    int y = 0;
+                    while (i < 0x800 && y < MaxRows)
                     {
-                        int i = Scroll*0x10;
-                        int y = 0;
-                        while(i < 0x800 && y < MaxRows)
+                        // print $xy0:
+                        G.DrawString("$" + (i).ToString("X3") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
+                        for (int x = 0; x < 0x10; x++)
                         {
-                            // print $xy0:
-                            G.DrawString("$" + (i).ToString("X3") + ":", Font_Consolas, Brushes.Black, new Point(0, 32+y*15));
-                            for(int x=0; x < 0x10; x++)
-                            {
-                                G.DrawString(MainGUI.EMU.RAM[i].ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x*15, 32 + y * 15));
-                                i++;
-                            }
-                            y++;
+                            G.DrawString(MainGUI.EMU.RAM[i].ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
+                            i++;
                         }
+
+                        y++;
                     }
-                    break;
+                }
+
+                break;
                 case ScopeType.CPU_Address_Space:
+                {
+                    int i = Scroll * 0x10;
+                    int y = 0;
+                    while (i < 0x10000 && y < MaxRows)
                     {
-                        int i = Scroll * 0x10;
-                        int y = 0;
-                        while (i < 0x10000 && y < MaxRows)
-                        {
-                            // print $xyz0:
-                            G.DrawString("$" + (i).ToString("X4") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
+                        // print $xyz0:
+                        G.DrawString("$" + (i).ToString("X4") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
 
-                            for (int x = 0; x < 0x10; x++)
-                            {
-                                G.DrawString(MainGUI.EMU.Observe((ushort)i).ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
-                                i++;
-                            }
-                            y++;
+                        for (int x = 0; x < 0x10; x++)
+                        {
+                            G.DrawString(MainGUI.EMU.Observe((ushort)i).ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
+                            i++;
                         }
+
+                        y++;
                     }
-                    break;
+                }
+
+                break;
                 case ScopeType.VRAM:
+                {
+                    int i = Scroll * 0x10;
+                    int y = 0;
+                    while (i < 0x800 && y < MaxRows)
                     {
-                        int i = Scroll * 0x10;
-                        int y = 0;
-                        while (i < 0x800 && y < MaxRows)
+                        // print $xy0:
+                        G.DrawString("$" + (i).ToString("X3") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
+                        for (int x = 0; x < 0x10; x++)
                         {
-                            // print $xy0:
-                            G.DrawString("$" + (i).ToString("X3") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
-                            for (int x = 0; x < 0x10; x++)
-                            {
-                                G.DrawString(MainGUI.EMU.VRAM[i].ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
-                                i++;
-                            }
-                            y++;
+                            G.DrawString(MainGUI.EMU.VRAM[i].ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
+                            i++;
                         }
-                    }
-                    break;
-                case ScopeType.PPU_Address_Space:
-                    {
-                        int i = Scroll * 0x10;
-                        int y = 0;
-                        while (i < 0x4000 && y < MaxRows)
-                        {
-                            // print $xyz0:
-                            G.DrawString("$" + (i).ToString("X4") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
 
-                            for (int x = 0; x < 0x10; x++)
-                            {
-                                G.DrawString(MainGUI.EMU.ObservePPU((ushort)i).ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
-                                i++;
-                            }
-                            y++;
-                        }
+                        y++;
                     }
-                    break;
+                }
+
+                break;
+                case ScopeType.PPU_Address_Space:
+                {
+                    int i = Scroll * 0x10;
+                    int y = 0;
+                    while (i < 0x4000 && y < MaxRows)
+                    {
+                        // print $xyz0:
+                        G.DrawString("$" + (i).ToString("X4") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
+
+                        for (int x = 0; x < 0x10; x++)
+                        {
+                            G.DrawString(MainGUI.EMU.ObservePPU((ushort)i).ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
+                            i++;
+                        }
+
+                        y++;
+                    }
+                }
+
+                break;
                 case ScopeType.OAM:
+                {
+                    int i = Scroll * 0x10;
+                    int y = 0;
+                    while (i < 0x100 && y < MaxRows)
                     {
-                        int i = Scroll * 0x10;
-                        int y = 0;
-                        while (i < 0x100 && y < MaxRows)
+                        // print $xy0:
+                        G.DrawString("$" + (i).ToString("X3") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
+                        for (int x = 0; x < 0x10; x++)
                         {
-                            // print $xy0:
-                            G.DrawString("$" + (i).ToString("X3") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
-                            for (int x = 0; x < 0x10; x++)
-                            {
-                                G.DrawString(MainGUI.EMU.OAM[i].ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
-                                i++;
-                            }
-                            y++;
+                            G.DrawString(MainGUI.EMU.OAM[i].ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
+                            i++;
                         }
+
+                        y++;
                     }
-                    break;
+                }
+
+                break;
                 case ScopeType.Palette_RAM:
+                {
+                    int i = Scroll * 0x10;
+                    int y = 0;
+                    while (i < 0x20 && y < MaxRows)
                     {
-                        int i = Scroll * 0x10;
-                        int y = 0;
-                        while (i < 0x20 && y < MaxRows)
+                        // print $xy0:
+                        G.DrawString("$" + (i).ToString("X3") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
+                        for (int x = 0; x < 0x10; x++)
                         {
-                            // print $xy0:
-                            G.DrawString("$" + (i).ToString("X3") + ":", Font_Consolas, Brushes.Black, new Point(0, 32 + y * 15));
-                            for (int x = 0; x < 0x10; x++)
-                            {
-                                G.DrawString(MainGUI.EMU.PaletteRAM[i].ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
-                                i++;
-                            }
-                            y++;
+                            G.DrawString(MainGUI.EMU.PaletteRAM[i].ToString("X2"), Font_Consolas, Brushes.Black, new Point(42 + x * 15, 32 + y * 15));
+                            i++;
                         }
+
+                        y++;
                     }
-                    break;
+                }
+
+                break;
             }
 
             pb_hexView.Image = hexBitmap;
@@ -217,7 +230,7 @@ namespace TriCNES
             oAMToolStripMenuItem.Checked = st == ScopeType.OAM;
             paletteRAMToolStripMenuItem.Checked = st == ScopeType.Palette_RAM;
             scopeType = st;
-            switch(st)
+            switch (st)
             {
                 case ScopeType.RAM:
                     vScrollBar1.Maximum = 0x80; Scope = "RAM"; break;
@@ -232,6 +245,7 @@ namespace TriCNES
                 case ScopeType.Palette_RAM:
                     vScrollBar1.Maximum = 0x2; Scope = "Palette RAM"; break;
             }
+
             RefreshEntireHexView();
         }
 

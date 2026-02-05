@@ -83,16 +83,19 @@ namespace TriCNES
                     }
                 }
             }
+
             if (PendingSaveState)
             {
                 PendingSaveState = false;
                 Savestate = EMU.SaveState();
             }
+
             if (PendingLoadState && Savestate != null && Savestate.Count > 0)
             {
                 PendingLoadState = false;
                 EMU.LoadState(Savestate);
             }
+
             if (TraceLogger != null)
             {
                 EMU.Logging = TraceLogger.Logging;
@@ -100,17 +103,19 @@ namespace TriCNES
                 {
                     EMU.DebugLog = new StringBuilder();
                 }
+
                 EMU.DebugRange_Low = TraceLogger.RangeLow;
                 EMU.DebugRange_High = TraceLogger.RangeHigh;
                 EMU.OnlyDebugInRange = TraceLogger.OnlyDebugInRange();
                 EMU.LoggingPPU = TraceLogger.LogPPUCycles();
             }
-            else if(EMU.Logging)
+            else if (EMU.Logging)
             {
                 EMU.Logging = false;
                 EMU.DebugLog = new StringBuilder();
             }
-            if(HexExditor != null)
+
+            if (HexExditor != null)
             {
                 HexExditor.Update();
             }
@@ -129,11 +134,13 @@ namespace TriCNES
                     }
                 }
             }
+
             if (NametableViewer != null && !NametableViewer.IsDisposed)
             {
                 RenderNametable();
                 NametableViewer.Update(NametableBitmap.Bitmap);
             }
+
             if (pb_Screen.InvokeRequired)
             {
                 pb_Screen.BeginInvoke(new MethodInvoker(
@@ -161,6 +168,7 @@ namespace TriCNES
                             pb_Screen.Image = EMU.Screen.Bitmap;
                         }
                     }
+
                     pb_Screen.Update();
                 }));
             }
@@ -188,15 +196,15 @@ namespace TriCNES
                         pb_Screen.Image = EMU.Screen.Bitmap;
                     }
                 }
+
                 pb_Screen.Update();
             }
-            
         }
 
         bool[] ControllerInputs()
         {
             bool[] joystickButtons = new bool[8];
-            
+
             int c = SDL.SDL_NumJoysticks();
             if (c != 0)
             {
@@ -218,6 +226,7 @@ namespace TriCNES
                     joystickButtons[i] = false;
                 }
             }
+
             return joystickButtons;
         }
 
@@ -226,14 +235,46 @@ namespace TriCNES
             bool[] joystickButtons = ControllerInputs();
 
             byte controller1 = 0;
-            if (joystickButtons[7] || Keyboard.IsKeyDown(Key.X)) { controller1 |= 0x80; }
-            if (joystickButtons[6] || Keyboard.IsKeyDown(Key.Z)) { controller1 |= 0x40; }
-            if (joystickButtons[5] || Keyboard.IsKeyDown(Key.RightShift)) { controller1 |= 0x20; }
-            if (joystickButtons[4] || Keyboard.IsKeyDown(Key.Enter)) { controller1 |= 0x10; }
-            if (joystickButtons[3] || Keyboard.IsKeyDown(Key.Up)) { controller1 |= 0x08; }
-            if (joystickButtons[2] || Keyboard.IsKeyDown(Key.Down)) { controller1 |= 0x04; }
-            if (joystickButtons[1] || Keyboard.IsKeyDown(Key.Left)) { controller1 |= 0x02; }
-            if (joystickButtons[0] || Keyboard.IsKeyDown(Key.Right)) { controller1 |= 0x01; }
+            if (joystickButtons[7] || Keyboard.IsKeyDown(Key.X))
+            {
+                controller1 |= 0x80;
+            }
+
+            if (joystickButtons[6] || Keyboard.IsKeyDown(Key.Z))
+            {
+                controller1 |= 0x40;
+            }
+
+            if (joystickButtons[5] || Keyboard.IsKeyDown(Key.RightShift))
+            {
+                controller1 |= 0x20;
+            }
+
+            if (joystickButtons[4] || Keyboard.IsKeyDown(Key.Enter))
+            {
+                controller1 |= 0x10;
+            }
+
+            if (joystickButtons[3] || Keyboard.IsKeyDown(Key.Up))
+            {
+                controller1 |= 0x08;
+            }
+
+            if (joystickButtons[2] || Keyboard.IsKeyDown(Key.Down))
+            {
+                controller1 |= 0x04;
+            }
+
+            if (joystickButtons[1] || Keyboard.IsKeyDown(Key.Left))
+            {
+                controller1 |= 0x02;
+            }
+
+            if (joystickButtons[0] || Keyboard.IsKeyDown(Key.Right))
+            {
+                controller1 |= 0x01;
+            }
+
             return controller1;
         }
 
@@ -241,33 +282,40 @@ namespace TriCNES
         void ClockEmulator(CancellationToken ct)
         {
             int frameCount = 0;
-            
+
             while (!ct.IsCancellationRequested)
             {
                 if (Form.ActiveForm != null)
                 {
-                    if (Keyboard.IsKeyDown(Key.Q)) { PendingSaveState = true; }
-                    if (Keyboard.IsKeyDown(Key.W)) { PendingLoadState = true; }
-                                        
+                    if (Keyboard.IsKeyDown(Key.Q))
+                    {
+                        PendingSaveState = true;
+                    }
+
+                    if (Keyboard.IsKeyDown(Key.W))
+                    {
+                        PendingLoadState = true;
+                    }
+
                     EMU.ControllerPort1 = RealtimeInputs();
                 }
+
                 RunUpkeep();
                 EMU._CoreFrameAdvance();
                 RunPostFramePhase();
                 frameCount++;
             }
-            
         }
 
         DirectBitmap NametableBitmap;
         public Bitmap RenderNametable()
         {
 
-
             if (NametableBitmap != null)
             {
                 NametableBitmap.Dispose();
             }
+
             NametableBitmap = new DirectBitmap(512, 480);
             if (EMU.Cart == null)
             {
@@ -300,10 +348,12 @@ namespace TriCNES
                             {
                                 pal = pal >> 2;
                             }
+
                             if ((y & 3) >= 2)
                             {
                                 pal = pal >> 4;
                             }
+
                             pal = pal & 3;
                             while (py < 8)
                             {
@@ -319,13 +369,16 @@ namespace TriCNES
                                     {
                                         k = EMU.FetchPPU((ushort)(0x3F00 + k + pal * 4));
                                     }
+
                                     int col = unchecked((int)Emulator.NesPalInts[k & 0x3F]);
                                     NametableBitmap.SetPixel(tx * 0x100 + x * 8 + px, ty * 0xF0 + y * 8 + py, col);
                                     px++;
                                 }
+
                                 px = 0;
                                 py++;
                             }
+
                             py = 0;
                             x++;
                         }
@@ -333,9 +386,11 @@ namespace TriCNES
                         x = 0;
                         y++;
                     }
+
                     y = 0;
                     tx++;
                 }
+
                 tx = 0;
                 ty++;
             }
@@ -361,6 +416,7 @@ namespace TriCNES
                     NametableBitmap.SetPixel((X + 511 + i) & 511, (Y + 240) % 480, Color.White);
                     i++;
                 }
+
                 i = 0;
                 while (i <= 241)
                 {
@@ -369,6 +425,7 @@ namespace TriCNES
                     i++;
                 }
             }
+
             if (NametableViewer.OverlayScreen())
             {
                 int X = ((EMU.PPU_TempVRAMAddress & 0b11111) << 3) | EMU.PPU_FineXScroll | ((EMU.PPU_TempVRAMAddress & 0b10000000000) >> 2);
@@ -381,6 +438,7 @@ namespace TriCNES
                     }
                 }
             }
+
             return NametableBitmap.Bitmap;
         }
 
@@ -400,6 +458,7 @@ namespace TriCNES
                     EMU.Cart = CartArray[CartsToSwapIn[j]]; // swap the cartridge to the next one in the list
                     j++;
                 }
+
                 EMU._CoreCycleAdvance();
                 i++;
             }
@@ -410,7 +469,6 @@ namespace TriCNES
                 EMU._CoreFrameAdvance();
                 RunPostFramePhase();
             }
-            
         }
 
         private void loadROMToolStripMenuItem_Click(object sender, EventArgs e)
@@ -420,6 +478,7 @@ namespace TriCNES
             {
                 InitDirectory += @"roms\";
             }
+
             OpenFileDialog ofd = new OpenFileDialog()
             {
                 FileName = "",
@@ -435,11 +494,13 @@ namespace TriCNES
                     cancel.Cancel();
                     EmuClock.Join();
                 }
+
                 if (EMU != null)
                 {
                     EMU.Dispose();
                     GC.Collect();
                 }
+
                 filePath = ofd.FileName;
                 EMU = new Emulator();
                 EMU.PPU_DecodeSignal = settings_ntsc;
@@ -464,6 +525,7 @@ namespace TriCNES
             {
                 InitDirectory += @"tas\";
             }
+
             OpenFileDialog ofd = new OpenFileDialog()
             {
                 FileName = "",
@@ -486,6 +548,7 @@ namespace TriCNES
                     TASPropertiesForm.Close();
                     TASPropertiesForm.Dispose();
                 }
+
                 TASPropertiesForm = new TASProperties();
                 TASPropertiesForm.TasFilePath = ofd.FileName;
                 TASPropertiesForm.MainGUI = this;
@@ -532,70 +595,74 @@ namespace TriCNES
             {
                 case ".bk2":
                 case ".tasproj":
+                {
+                    int i = 0;
+                    while (i < EMU.RAM.Length) //bizhawk RAM pattern
                     {
-                        int i = 0;
-                        while (i < EMU.RAM.Length) //bizhawk RAM pattern
+                        if ((i & 7) > 4)
                         {
-                            if ((i & 7) > 4)
-                            {
-                                EMU.RAM[i] = 0xFF;
-                            }
-                            else
-                            {
-                                EMU.RAM[i] = 0;
-                            }
-                            i++;
-                        }
-                    }
-                    break;
-                case ".fm2":
-                case ".fm3":
-                    {
-                        if (TASPropertiesForm.UseFCEUXFrame0Timing())
-                        {
-                            // FCEUX incorrectly starts at the beginning of scanline 240, and cycle 0 is *after* the reset instruction.
-                            // However, I think there's some other incorrect timing going on with FCEUX, and in order to sync TASes, I need to start at scanline 239, dot 312
-                            EMU.PPU_Scanline = 239;
-                            EMU.PPU_Dot = 312;
-                            // but of course, by starting here, the VBlank flag will be incorrectly set early.
-                            EMU.SyncFM2 = true; // so this bool prevents that.
-                            EMU.TAS_InputSequenceIndex--; // since this runs an extra vblank, this needs to be offset by 1
+                            EMU.RAM[i] = 0xFF;
                         }
                         else
                         {
-                            EMU.TAS_InputSequenceIndex++;
-                            EMU.PPU_Dot = 0;
+                            EMU.RAM[i] = 0;
                         }
-                        // FCEUX also starts with this RAM pattern
-                        int i = 0;
-                        while (i < EMU.RAM.Length) //bizhawk RAM pattern
-                        {
-                            if ((i & 7) > 4)
-                            {
-                                EMU.RAM[i] = 0xFF;
-                            }
-                            else
-                            {
-                                EMU.RAM[i] = 0;
-                            }
-                            i++;
-                        }
+
+                        i++;
                     }
-                    break;
-                case ".r08":
+                }
+
+                break;
+                case ".fm2":
+                case ".fm3":
+                {
+                    if (TASPropertiesForm.UseFCEUXFrame0Timing())
                     {
-                        // This following comment block can be removed if you want to set up RAM for the Bad Apple TAS's .r08 file.
-                        /*
-                        string s = "0000000000000C000000000000000000E2000000001D1E000000000001000000984820BEFE68A8A5F7A6F8600000000010400000000000000000000000000000A2A58EFF07A216EA8EFD07020000000020200091318A11319131C8C430D0F14C40000000000000000101030000000000000000000000000000000000000000000000000000F000000000020000A0A000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000101000000000000000000000000000100000000000000000000000000000000000035000000008E002001008A4820BEFE68AA0C000000004C4000000001A804D9B4B4070004DAB4B4030004DBB4B4030005DCB4B4030004DDB4B4030004DEB4B4030004DFB4B4030004E0B4B4030004E1B4B4030004E2B4B4030004E3B4B4030004E4B4B4030004E5B4B4030004E6B4C886A080F5D000D00B00003F2FC7F8C8FE0024000F5200FB0400A9018D164085C04A8D1640AD16404A26C090F8A5C060A202206B0195C1CA10F8A000206B0191C2C8C4C190F6206B01F0E5206B0185C3206B0185C26CC200FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB003AFB00FB00FB00FB10D2A27DA07DF50400040004D93525D8F70000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8410000F8410000F8250000F8250000F8410000F8410000F8250000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000D900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000787A2021047F1918470000000000000000000000000000000000000000040400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000F722CC891000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001600A5";
-                        int i = 0;
-                        while (i < 0x800)
-                        {
-                            EMU.RAM[i] = byte.Parse(s.Substring(i * 2, 2), System.Globalization.NumberStyles.HexNumber);
-                            i++;
-                        }
-                        */
-                        break;
+                        // FCEUX incorrectly starts at the beginning of scanline 240, and cycle 0 is *after* the reset instruction.
+                        // However, I think there's some other incorrect timing going on with FCEUX, and in order to sync TASes, I need to start at scanline 239, dot 312
+                        EMU.PPU_Scanline = 239;
+                        EMU.PPU_Dot = 312;
+                        // but of course, by starting here, the VBlank flag will be incorrectly set early.
+                        EMU.SyncFM2 = true; // so this bool prevents that.
+                        EMU.TAS_InputSequenceIndex--; // since this runs an extra vblank, this needs to be offset by 1
                     }
+                    else
+                    {
+                        EMU.TAS_InputSequenceIndex++;
+                        EMU.PPU_Dot = 0;
+                    }
+                    // FCEUX also starts with this RAM pattern
+                    int i = 0;
+                    while (i < EMU.RAM.Length) //bizhawk RAM pattern
+                    {
+                        if ((i & 7) > 4)
+                        {
+                            EMU.RAM[i] = 0xFF;
+                        }
+                        else
+                        {
+                            EMU.RAM[i] = 0;
+                        }
+
+                        i++;
+                    }
+                }
+
+                break;
+                case ".r08":
+                {
+                    // This following comment block can be removed if you want to set up RAM for the Bad Apple TAS's .r08 file.
+                    /*
+                    string s = "0000000000000C000000000000000000E2000000001D1E000000000001000000984820BEFE68A8A5F7A6F8600000000010400000000000000000000000000000A2A58EFF07A216EA8EFD07020000000020200091318A11319131C8C430D0F14C40000000000000000101030000000000000000000000000000000000000000000000000000F000000000020000A0A000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000101000000000000000000000000000100000000000000000000000000000000000035000000008E002001008A4820BEFE68AA0C000000004C4000000001A804D9B4B4070004DAB4B4030004DBB4B4030005DCB4B4030004DDB4B4030004DEB4B4030004DFB4B4030004E0B4B4030004E1B4B4030004E2B4B4030004E3B4B4030004E4B4B4030004E5B4B4030004E6B4C886A080F5D000D00B00003F2FC7F8C8FE0024000F5200FB0400A9018D164085C04A8D1640AD16404A26C090F8A5C060A202206B0195C1CA10F8A000206B0191C2C8C4C190F6206B01F0E5206B0185C3206B0185C26CC200FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB00FB003AFB00FB00FB00FB10D2A27DA07DF50400040004D93525D8F70000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8410000F8410000F8250000F8250000F8410000F8410000F8250000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000F8010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000D900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000787A2021047F1918470000000000000000000000000000000000000000040400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000F722CC891000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001600A5";
+                    int i = 0;
+                    while (i < 0x800)
+                    {
+                        EMU.RAM[i] = byte.Parse(s.Substring(i * 2, 2), System.Globalization.NumberStyles.HexNumber);
+                        i++;
+                    }
+                    */
+                    break;
+                }
             }
 
             cancel = new CancellationTokenSource();
@@ -614,6 +681,7 @@ namespace TriCNES
                 EmuClock.Join();
                 EMU.Dispose();
             }
+
             if (TASPropertiesForm3ct.FromRESET())
             {
                 if (EMU == null)
@@ -621,6 +689,7 @@ namespace TriCNES
                     MessageBox.Show("The emulator needs to be powered on before running from RESET.");
                     return;
                 }
+
                 EMU.Reset();
             }
             else
@@ -630,12 +699,14 @@ namespace TriCNES
                     EMU.Dispose();
                     GC.Collect();
                 }
+
                 EMU = new Emulator();
                 EMU.PPU_DecodeSignal = settings_ntsc;
                 EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
                 EMU.PPU_ShowScreenBorders = settings_border;
                 EMU.PPUClock = settings_alignment;
             }
+
             cancel = new CancellationTokenSource();
             EmuClock = new Thread(() => ClockEmulator3CT(cancel.Token));
             EmuClock.IsBackground = true;
@@ -649,6 +720,7 @@ namespace TriCNES
             {
                 InitDirectory += @"tas\";
             }
+
             OpenFileDialog ofd = new OpenFileDialog()
             {
                 FileName = "",
@@ -664,6 +736,7 @@ namespace TriCNES
                     TASPropertiesForm3ct.Close();
                     TASPropertiesForm3ct.Dispose();
                 }
+
                 TASPropertiesForm3ct = new TASProperties3ct();
                 TASPropertiesForm3ct.TasFilePath = ofd.FileName;
                 TASPropertiesForm3ct.MainGUI = this;
@@ -704,8 +777,10 @@ namespace TriCNES
         private void pb_Screen_DragEnter(object sender, DragEventArgs e)
         {
             var filenames = (string[])e.Data.GetData(DataFormats.FileDrop, false);
-            if (Path.GetExtension(filenames[0]) == ".nes" || Path.GetExtension(filenames[0]) == ".NES") e.Effect = DragDropEffects.All;
-            else e.Effect = DragDropEffects.None;
+            if (Path.GetExtension(filenames[0]) == ".nes" || Path.GetExtension(filenames[0]) == ".NES")
+                e.Effect = DragDropEffects.All;
+            else
+                e.Effect = DragDropEffects.None;
         }
 
         private void pb_Screen_DragDrop(object sender, DragEventArgs e)
@@ -749,22 +824,27 @@ namespace TriCNES
                 cancel.Cancel();
                 EmuClock.Join();
             }
+
             if (TASPropertiesForm != null)
             {
                 TASPropertiesForm.Dispose();
             }
+
             if (TASPropertiesForm3ct != null)
             {
                 TASPropertiesForm3ct.Dispose();
             }
+
             if (TraceLogger != null)
             {
                 TraceLogger.Dispose();
             }
+
             if (NametableViewer != null)
             {
                 NametableViewer.Dispose();
             }
+
             Application.Exit();
         }
 
@@ -817,6 +897,7 @@ namespace TriCNES
                 EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
                 EMU.PPU_ShowScreenBorders = settings_border;
             }
+
             settings_alignment = Alignment;
         }
 
@@ -830,6 +911,7 @@ namespace TriCNES
                 EMU.PPU_DecodeSignal = true;
                 EMU.PPU_ShowRawNTSCSignal = false;
             }
+
             settings_ntsc = true;
             settings_ntscRaw = false;
         }
@@ -844,6 +926,7 @@ namespace TriCNES
                 EMU.PPU_DecodeSignal = false;
                 EMU.PPU_ShowRawNTSCSignal = false;
             }
+
             settings_ntsc = false;
             settings_ntscRaw = false;
         }
@@ -858,6 +941,7 @@ namespace TriCNES
                 EMU.PPU_DecodeSignal = true;
                 EMU.PPU_ShowRawNTSCSignal = true;
             }
+
             settings_ntsc = true;
             settings_ntscRaw = true;
         }
@@ -939,11 +1023,12 @@ namespace TriCNES
 
         private void traceLoggerToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if(TraceLogger != null)
+            if (TraceLogger != null)
             {
                 TraceLogger.Focus();
                 return;
             }
+
             TraceLogger = new TriCTraceLogger();
             TraceLogger.MainGUI = this;
             TraceLogger.Init();
@@ -959,6 +1044,7 @@ namespace TriCNES
             {
                 EMU.PPU_ShowScreenBorders = true;
             }
+
             settings_border = true;
             ResizeWindow(ScreenMult);
         }
@@ -971,17 +1057,19 @@ namespace TriCNES
             {
                 EMU.PPU_ShowScreenBorders = false;
             }
+
             settings_border = false;
             ResizeWindow(ScreenMult);
         }
 
         private void nametableViewerToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if(NametableViewer != null)
+            if (NametableViewer != null)
             {
                 NametableViewer.Focus();
                 return;
             }
+
             NametableViewer = new TriCNTViewer();
             NametableViewer.MainGUI = this;
             NametableViewer.Show();
@@ -995,6 +1083,7 @@ namespace TriCNES
                 HexExditor.Focus();
                 return;
             }
+
             HexExditor = new TriCHexEditor();
             HexExditor.MainGUI = this;
             HexExditor.Show();
@@ -1018,11 +1107,12 @@ namespace TriCNES
 
         private void tASTimelineToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if(TasTimeline != null)
+            if (TasTimeline != null)
             {
                 TasTimeline.Focus();
                 return;
             }
+
             bool EMUExists = (EMU != null);
             if (!EMUExists)
             {
@@ -1031,6 +1121,7 @@ namespace TriCNES
                 {
                     InitDirectory += @"roms\";
                 }
+
                 OpenFileDialog ofd = new OpenFileDialog()
                 {
                     FileName = "",
@@ -1046,6 +1137,7 @@ namespace TriCNES
                         cancel.Cancel();
                         EmuClock.Join();
                     }
+
                     filePath = ofd.FileName;
                     TasTimeline = new TriCTASTimeline(this);
                     TasTimeline.Show();
@@ -1072,91 +1164,199 @@ namespace TriCNES
             {
                 case ".bk2":
                 case ".tasproj":
+                {
+                    // .bk2 files are actually just .zip files!
+                    // Let's yoink "Input Log.txt" from this .bk2 file
+                    StringReader InputLog = new StringReader(new string(new StreamReader(ZipFile.OpenRead(TasFilePath).Entries.Where(x => x.Name.Equals("Input Log.txt", StringComparison.InvariantCulture)).FirstOrDefault().Open(), Encoding.UTF8).ReadToEnd().ToArray()));
+                    // now to parse the input log!
+                    InputLog.ReadLine(); // "[Input]"
+                    string key = InputLog.ReadLine(); // "LogKey: ... "
+                    bool Bk2_Port1 = key.Contains("P1");
+                    bool Bk2_Port2 = key.Contains("P2");
+                    string ln = InputLog.ReadLine();
+                    ushort u = 0;
+                    while (ln != null && ln.Length > 3)
                     {
-                        // .bk2 files are actually just .zip files!
-                        // Let's yoink "Input Log.txt" from this .bk2 file
-                        StringReader InputLog = new StringReader(new string(new StreamReader(ZipFile.OpenRead(TasFilePath).Entries.Where(x => x.Name.Equals("Input Log.txt", StringComparison.InvariantCulture)).FirstOrDefault().Open(), Encoding.UTF8).ReadToEnd().ToArray()));
-                        // now to parse the input log!
-                        InputLog.ReadLine(); // "[Input]"
-                        string key = InputLog.ReadLine(); // "LogKey: ... "
-                        bool Bk2_Port1 = key.Contains("P1");
-                        bool Bk2_Port2 = key.Contains("P2");
-                        string ln = InputLog.ReadLine();
-                        ushort u = 0;
-                        while (ln != null && ln.Length > 3)
+                        int pipeIndex = ln.Substring(1, ln.Length - 1).IndexOf('|') + 1;
+                        char[] lnCharArray = ln.ToCharArray();
+                        bool reset = lnCharArray[pipeIndex - 1] == 'r';
+                        u = 0;
+                        if (Bk2_Port1)
                         {
-                            int pipeIndex = ln.Substring(1, ln.Length - 1).IndexOf('|') + 1;
-                            char[] lnCharArray = ln.ToCharArray();
-                            bool reset = lnCharArray[pipeIndex - 1] == 'r';
-                            u = 0;
-                            if (Bk2_Port1)
-                            {
-                                u |= (ushort)(lnCharArray[pipeIndex + 1] == 'U' ? 0x08 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 2] == 'D' ? 0x04 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 3] == 'L' ? 0x02 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 4] == 'R' ? 0x01 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 5] == 'S' ? 0x10 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 6] == 's' ? 0x20 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 7] == 'B' ? 0x40 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 8] == 'A' ? 0x80 : 0);
-                            }
-                            else if (Bk2_Port2) // Are there any NES TASes that only feature controller 2?
-                            {
-                                u |= (ushort)(lnCharArray[pipeIndex + 1] == 'U' ? 0x0800 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 2] == 'D' ? 0x0400 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 3] == 'L' ? 0x0200 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 4] == 'R' ? 0x0100 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 5] == 'S' ? 0x1000 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 6] == 's' ? 0x2000 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 7] == 'B' ? 0x4000 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 8] == 'A' ? 0x8000 : 0);
-                            }
-                            if (Bk2_Port1 && Bk2_Port2)
-                            {
-                                pipeIndex = ln.Substring(pipeIndex + 1, ln.Length - 1 - pipeIndex).IndexOf('|') + pipeIndex + 1;
-                                u |= (ushort)(lnCharArray[pipeIndex + 1] == 'U' ? 0x0800 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 2] == 'D' ? 0x0400 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 3] == 'L' ? 0x0200 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 4] == 'R' ? 0x0100 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 5] == 'S' ? 0x1000 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 6] == 's' ? 0x2000 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 7] == 'B' ? 0x4000 : 0);
-                                u |= (ushort)(lnCharArray[pipeIndex + 8] == 'A' ? 0x8000 : 0);
-                            }
-                            TASInputs.Add(u);
-                            ln = InputLog.ReadLine();
-                            if (ln == "[/Input]")
+                            u |= (ushort)(lnCharArray[pipeIndex + 1] == 'U' ? 0x08 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 2] == 'D' ? 0x04 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 3] == 'L' ? 0x02 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 4] == 'R' ? 0x01 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 5] == 'S' ? 0x10 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 6] == 's' ? 0x20 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 7] == 'B' ? 0x40 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 8] == 'A' ? 0x80 : 0);
+                        }
+                        else if (Bk2_Port2) // Are there any NES TASes that only feature controller 2?
+                        {
+                            u |= (ushort)(lnCharArray[pipeIndex + 1] == 'U' ? 0x0800 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 2] == 'D' ? 0x0400 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 3] == 'L' ? 0x0200 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 4] == 'R' ? 0x0100 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 5] == 'S' ? 0x1000 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 6] == 's' ? 0x2000 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 7] == 'B' ? 0x4000 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 8] == 'A' ? 0x8000 : 0);
+                        }
+
+                        if (Bk2_Port1 && Bk2_Port2)
+                        {
+                            pipeIndex = ln.Substring(pipeIndex + 1, ln.Length - 1 - pipeIndex).IndexOf('|') + pipeIndex + 1;
+                            u |= (ushort)(lnCharArray[pipeIndex + 1] == 'U' ? 0x0800 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 2] == 'D' ? 0x0400 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 3] == 'L' ? 0x0200 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 4] == 'R' ? 0x0100 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 5] == 'S' ? 0x1000 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 6] == 's' ? 0x2000 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 7] == 'B' ? 0x4000 : 0);
+                            u |= (ushort)(lnCharArray[pipeIndex + 8] == 'A' ? 0x8000 : 0);
+                        }
+
+                        TASInputs.Add(u);
+                        ln = InputLog.ReadLine();
+                        if (ln == "[/Input]")
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                break;
+                case ".fm2":
+                {
+                    // change the alignment to use FCEUX's
+
+                    // header info of varying size
+                    // Every line of a header ends in $0A
+                    // Every header section is named. Example: $0A "romFileName"
+                    // Since the input log begins with "|" and none of the header section names begin with "|", I can assume $0A"|" is the start of the input log
+                    bool fm2_UsePort0 = false;
+                    bool fm2_UsePort1 = false;
+
+                    int i = 0;
+                    while (i < ByteArray.Length)
+                    {
+                        // parse for "port0 ?"
+                        if (ByteArray[i] == 0x0A &&
+                            ByteArray[i + 1] == 0x70 &&
+                            ByteArray[i + 2] == 0x6F &&
+                            ByteArray[i + 3] == 0x72 &&
+                            ByteArray[i + 4] == 0x74 &&
+                            ByteArray[i + 5] == 0x30 &&
+                            ByteArray[i + 6] == 0x20
+                            )
+                        {
+                            fm2_UsePort0 = ByteArray[i + 7] == 0x31;
+                        }
+                        // parse for "port1 ?"
+                        if (ByteArray[i] == 0x0A &&
+                            ByteArray[i + 1] == 0x70 &&
+                            ByteArray[i + 2] == 0x6F &&
+                            ByteArray[i + 3] == 0x72 &&
+                            ByteArray[i + 4] == 0x74 &&
+                            ByteArray[i + 5] == 0x31 &&
+                            ByteArray[i + 6] == 0x20
+                            )
+                        {
+                            fm2_UsePort1 = ByteArray[i + 7] == 0x31;
+                        }
+
+                        if (ByteArray[i] == 0x0A && ByteArray[i + 1] == 0x7C)
+                        {
+                            break;
+                        }
+
+                        i++;
+                    }
+
+                    ushort u = 0;
+
+                    int Port0Index = 0;
+                    int Port1Index = 0;
+
+                    while (i < ByteArray.Length)
+                    {
+                        if (ByteArray[i] == 0x0A)
+                        {
+                            if (i == ByteArray.Length - 1)
                             {
                                 break;
                             }
-                        }
-                    }
-                    break;
-                case ".fm2":
-                    {
-                        // change the alignment to use FCEUX's
 
-                        // header info of varying size
-                        // Every line of a header ends in $0A
-                        // Every header section is named. Example: $0A "romFileName"
-                        // Since the input log begins with "|" and none of the header section names begin with "|", I can assume $0A"|" is the start of the input log
-                        bool fm2_UsePort0 = false;
-                        bool fm2_UsePort1 = false;
-
-                        int i = 0;
-                        while (i < ByteArray.Length)
-                        {
-                            // parse for "port0 ?"
-                            if (ByteArray[i] == 0x0A &&
-                                ByteArray[i + 1] == 0x70 &&
-                                ByteArray[i + 2] == 0x6F &&
-                                ByteArray[i + 3] == 0x72 &&
-                                ByteArray[i + 4] == 0x74 &&
-                                ByteArray[i + 5] == 0x30 &&
-                                ByteArray[i + 6] == 0x20
-                                )
+                            if (fm2_UsePort0)
                             {
-                                fm2_UsePort0 = ByteArray[i + 7] == 0x31;
+                                Port0Index = i + 4;
+                                if (fm2_UsePort1)
+                                {
+                                    Port1Index = i + 0xD;
+                                }
+                            }
+                            else if (fm2_UsePort1)
+                            {
+                                Port1Index = i + 0x6;
+                            }
+
+                            u = 0;
+                            if (fm2_UsePort0)
+                            {
+                                u |= (ushort)(ByteArray[Port0Index] == 0x2E ? 0 : 1);
+                                u |= (ushort)(ByteArray[Port0Index + 1] == 0x2E ? 0 : 2);
+                                u |= (ushort)(ByteArray[Port0Index + 2] == 0x2E ? 0 : 4);
+                                u |= (ushort)(ByteArray[Port0Index + 3] == 0x2E ? 0 : 8);
+                                u |= (ushort)(ByteArray[Port0Index + 4] == 0x2E ? 0 : 0x10);
+                                u |= (ushort)(ByteArray[Port0Index + 5] == 0x2E ? 0 : 0x20);
+                                u |= (ushort)(ByteArray[Port0Index + 6] == 0x2E ? 0 : 0x40);
+                                u |= (ushort)(ByteArray[Port0Index + 7] == 0x2E ? 0 : 0x80);
+                            }
+
+                            if (fm2_UsePort1)
+                            {
+                                u |= (ushort)(ByteArray[Port1Index] == 0x2E ? 0 : 0x100);
+                                u |= (ushort)(ByteArray[Port1Index + 1] == 0x2E ? 0 : 0x200);
+                                u |= (ushort)(ByteArray[Port1Index + 2] == 0x2E ? 0 : 0x400);
+                                u |= (ushort)(ByteArray[Port1Index + 3] == 0x2E ? 0 : 0x800);
+                                u |= (ushort)(ByteArray[Port1Index + 4] == 0x2E ? 0 : 0x1000);
+                                u |= (ushort)(ByteArray[Port1Index + 5] == 0x2E ? 0 : 0x2000);
+                                u |= (ushort)(ByteArray[Port1Index + 6] == 0x2E ? 0 : 0x4000);
+                                u |= (ushort)(ByteArray[Port1Index + 7] == 0x2E ? 0 : 0x8000);
+                            }
+
+                            TASInputs.Add(u);
+
+                        }
+
+                        i++;
+                    }
+                }
+
+                break;
+                case ".fm3":
+                {
+                    // similar to fm2, this has a header of varying length.
+                    // But it also contains significantly more metadata after the input log.
+                    // we need to parse $0A"length "
+                    bool fm3_UsePort0 = false;
+                    bool fm3_UsePort1 = false;
+                    int i = 0;
+                    while (i < ByteArray.Length)
+                    {
+                        if (ByteArray[i] == 0x0A)
+                        {
+                            if (ByteArray[i] == 0x0A &&
+                            ByteArray[i + 1] == 0x70 &&
+                            ByteArray[i + 2] == 0x6F &&
+                            ByteArray[i + 3] == 0x72 &&
+                            ByteArray[i + 4] == 0x74 &&
+                            ByteArray[i + 5] == 0x30 &&
+                            ByteArray[i + 6] == 0x20
+                            )
+                            {
+                                fm3_UsePort0 = ByteArray[i + 7] == 0x31;
                             }
                             // parse for "port1 ?"
                             if (ByteArray[i] == 0x0A &&
@@ -1168,270 +1368,190 @@ namespace TriCNES
                                 ByteArray[i + 6] == 0x20
                                 )
                             {
-                                fm2_UsePort1 = ByteArray[i + 7] == 0x31;
+                                fm3_UsePort1 = ByteArray[i + 7] == 0x31;
                             }
-
-                            if (ByteArray[i] == 0x0A && ByteArray[i + 1] == 0x7C)
-                            {
-                                break;
-                            }
-                            i++;
-                        }
-
-                        ushort u = 0;
-
-                        int Port0Index = 0;
-                        int Port1Index = 0;
-
-                        while (i < ByteArray.Length)
-                        {
+                            // check if this is the header info for "length"
                             if (ByteArray[i] == 0x0A)
                             {
-                                if (i == ByteArray.Length - 1)
+                                if (ByteArray[i + 1] == 0x6C &&
+                                    ByteArray[i + 2] == 0x65 &&
+                                    ByteArray[i + 3] == 0x6E &&
+                                    ByteArray[i + 4] == 0x67 &&
+                                    ByteArray[i + 5] == 0x74 &&
+                                    ByteArray[i + 6] == 0x68 &&
+                                    ByteArray[i + 7] == 0x20)
                                 {
-                                    break;
-                                }
-                                if (fm2_UsePort0)
-                                {
-                                    Port0Index = i + 4;
-                                    if (fm2_UsePort1)
+                                    // okay, so the length is in ascii...
+                                    // let's figure out where the next $0A character is
+                                    int next0A = i + 8;
+                                    while (next0A < ByteArray.Length)
                                     {
-                                        Port1Index = i + 0xD;
-                                    }
-                                }
-                                else if (fm2_UsePort1)
-                                {
-                                    Port1Index = i + 0x6;
-                                }
-
-                                u = 0;
-                                if (fm2_UsePort0)
-                                {
-                                    u |= (ushort)(ByteArray[Port0Index] == 0x2E ? 0 : 1);
-                                    u |= (ushort)(ByteArray[Port0Index + 1] == 0x2E ? 0 : 2);
-                                    u |= (ushort)(ByteArray[Port0Index + 2] == 0x2E ? 0 : 4);
-                                    u |= (ushort)(ByteArray[Port0Index + 3] == 0x2E ? 0 : 8);
-                                    u |= (ushort)(ByteArray[Port0Index + 4] == 0x2E ? 0 : 0x10);
-                                    u |= (ushort)(ByteArray[Port0Index + 5] == 0x2E ? 0 : 0x20);
-                                    u |= (ushort)(ByteArray[Port0Index + 6] == 0x2E ? 0 : 0x40);
-                                    u |= (ushort)(ByteArray[Port0Index + 7] == 0x2E ? 0 : 0x80);
-                                }
-                                if (fm2_UsePort1)
-                                {
-                                    u |= (ushort)(ByteArray[Port1Index] == 0x2E ? 0 : 0x100);
-                                    u |= (ushort)(ByteArray[Port1Index + 1] == 0x2E ? 0 : 0x200);
-                                    u |= (ushort)(ByteArray[Port1Index + 2] == 0x2E ? 0 : 0x400);
-                                    u |= (ushort)(ByteArray[Port1Index + 3] == 0x2E ? 0 : 0x800);
-                                    u |= (ushort)(ByteArray[Port1Index + 4] == 0x2E ? 0 : 0x1000);
-                                    u |= (ushort)(ByteArray[Port1Index + 5] == 0x2E ? 0 : 0x2000);
-                                    u |= (ushort)(ByteArray[Port1Index + 6] == 0x2E ? 0 : 0x4000);
-                                    u |= (ushort)(ByteArray[Port1Index + 7] == 0x2E ? 0 : 0x8000);
-                                }
-                                TASInputs.Add(u);
-
-                            }
-                            i++;
-                        }
-                    }
-                    break;
-                case ".fm3":
-                    {
-                        // similar to fm2, this has a header of varying length.
-                        // But it also contains significantly more metadata after the input log.
-                        // we need to parse $0A"length "
-                        bool fm3_UsePort0 = false;
-                        bool fm3_UsePort1 = false;
-                        int i = 0;
-                        while (i < ByteArray.Length)
-                        {
-                            if (ByteArray[i] == 0x0A)
-                            {
-                                if (ByteArray[i] == 0x0A &&
-                                ByteArray[i + 1] == 0x70 &&
-                                ByteArray[i + 2] == 0x6F &&
-                                ByteArray[i + 3] == 0x72 &&
-                                ByteArray[i + 4] == 0x74 &&
-                                ByteArray[i + 5] == 0x30 &&
-                                ByteArray[i + 6] == 0x20
-                                )
-                                {
-                                    fm3_UsePort0 = ByteArray[i + 7] == 0x31;
-                                }
-                                // parse for "port1 ?"
-                                if (ByteArray[i] == 0x0A &&
-                                    ByteArray[i + 1] == 0x70 &&
-                                    ByteArray[i + 2] == 0x6F &&
-                                    ByteArray[i + 3] == 0x72 &&
-                                    ByteArray[i + 4] == 0x74 &&
-                                    ByteArray[i + 5] == 0x31 &&
-                                    ByteArray[i + 6] == 0x20
-                                    )
-                                {
-                                    fm3_UsePort1 = ByteArray[i + 7] == 0x31;
-                                }
-                                // check if this is the header info for "length"
-                                if (ByteArray[i] == 0x0A)
-                                {
-                                    if (ByteArray[i + 1] == 0x6C &&
-                                        ByteArray[i + 2] == 0x65 &&
-                                        ByteArray[i + 3] == 0x6E &&
-                                        ByteArray[i + 4] == 0x67 &&
-                                        ByteArray[i + 5] == 0x74 &&
-                                        ByteArray[i + 6] == 0x68 &&
-                                        ByteArray[i + 7] == 0x20)
-                                    {
-                                        // okay, so the length is in ascii...
-                                        // let's figure out where the next $0A character is
-                                        int next0A = i + 8;
-                                        while (next0A < ByteArray.Length)
+                                        if (ByteArray[next0A] == 0x0A)
                                         {
-                                            if (ByteArray[next0A] == 0x0A)
-                                            {
-                                                break;
-                                            }
-                                            next0A++;
-                                        }
-                                        // okay, so the string from i+8 though next0A is the length.
-                                        byte[] StringArray = new byte[next0A - (i + 8)];
-                                        Array.Copy(ByteArray, i + 8, StringArray, 0, StringArray.Length);
-                                        int InputLogLength = int.Parse(Encoding.Default.GetString(StringArray));
-                                        i = next0A + 2;
-                                        int tempMul = 1;
-                                        if (fm3_UsePort0) { tempMul++; }
-                                        if (fm3_UsePort1) { tempMul++; }
-                                        int InputLogByteLength = InputLogLength * tempMul;
-                                        // first byte is always zero?
-                                        // next byte is controller 1 (if enabled)
-                                        // next byte is controller 2 (if enabled)
-                                        ushort u = 0;
-                                        while (i < next0A + 2 + InputLogByteLength)
-                                        {
-                                            i++;// dummy byte (?)
-                                            u = 0;
-                                            if (fm3_UsePort0) { u = ByteArray[i]; i++; }
-                                            if (fm3_UsePort1) { u |= (ushort)(ByteArray[i] << 8); i++; }
-                                            TASInputs.Add(u);
+                                            break;
                                         }
 
+                                        next0A++;
+                                    }
+                                    // okay, so the string from i+8 though next0A is the length.
+                                    byte[] StringArray = new byte[next0A - (i + 8)];
+                                    Array.Copy(ByteArray, i + 8, StringArray, 0, StringArray.Length);
+                                    int InputLogLength = int.Parse(Encoding.Default.GetString(StringArray));
+                                    i = next0A + 2;
+                                    int tempMul = 1;
+                                    if (fm3_UsePort0)
+                                    {
+                                        tempMul++;
                                     }
 
+                                    if (fm3_UsePort1)
+                                    {
+                                        tempMul++;
+                                    }
+
+                                    int InputLogByteLength = InputLogLength * tempMul;
+                                    // first byte is always zero?
+                                    // next byte is controller 1 (if enabled)
+                                    // next byte is controller 2 (if enabled)
+                                    ushort u = 0;
+                                    while (i < next0A + 2 + InputLogByteLength)
+                                    {
+                                        i++;// dummy byte (?)
+                                        u = 0;
+                                        if (fm3_UsePort0)
+                                        {
+                                            u = ByteArray[i];
+                                            i++;
+                                        }
+
+                                        if (fm3_UsePort1)
+                                        {
+                                            u |= (ushort)(ByteArray[i] << 8);
+                                            i++;
+                                        }
+
+                                        TASInputs.Add(u);
+                                    }
                                 }
-
                             }
-                            i++;
-
                         }
 
-
-
+                        i++;
                     }
-                    break;
+                }
+
+                break;
                 case ".fmv":
+                {
+                    int i = 0x90; // there's a 144 byte header
+                    bool fmv_UseController2 = (ByteArray[5] & 0b00010000) != 0;
+                    if (fmv_UseController2)
                     {
-                        int i = 0x90; // there's a 144 byte header
-                        bool fmv_UseController2 = (ByteArray[5] & 0b00010000) != 0;
-                        if (fmv_UseController2)
-                        {
-                            while (i < ByteArray.Length)
-                            {
-                                ushort u = (ushort)(FamtasiaInput2Standard(ByteArray[i]) | (FamtasiaInput2Standard(ByteArray[i + 1]) << 8));
-                                TASInputs.Add(u);
-                                i += 2;
-                            }
-                        }
-                        else
-                        {
-                            while (i < ByteArray.Length)
-                            {
-                                TASInputs.Add(FamtasiaInput2Standard(ByteArray[i]));
-                                i++;
-                            }
-                        }
-                    }
-                    break;
-                case ".3c2":
-                case ".r08":
-                    {
-                        // the .r08 file format is conveniently already in the format I want for my emulator.
-                        // I also pretty much format my own .3c2 format in the exact same way.
-                        byte b = 0;
-                        byte b2 = 0;
-                        int i = 0;
                         while (i < ByteArray.Length)
                         {
-                            b = ByteArray[i];
-                            b2 = ByteArray[i + 1];
-                            TASInputs.Add((ushort)(b | (b2 << 8)));
+                            ushort u = (ushort)(FamtasiaInput2Standard(ByteArray[i]) | (FamtasiaInput2Standard(ByteArray[i + 1]) << 8));
+                            TASInputs.Add(u);
                             i += 2;
                         }
-                        TASInputs.Add(0); // append a zero to the end for safe measure.
                     }
-                    break;
-                case ".3c3":
+                    else
                     {
-                        // .3c3 is the format for my TAS timeline.
-                        // The big differences are:
-                        // - .3c3 saves the savestate information
-                        // - .3c3 saves the "lag frame" information as well. (So every frame is 3 bytes now.)
-
-                        // .3c3 has a 8 byte header.
-                        // It's just little-endian 32-bit integers.
-                        // The first one determines how many bytes are in every savestate.
-                        // the second one determinines how many frames there are in this TAS.
-                        // I guess that means there's a limit of 2,147,483,647 frames in a .3c3 TAS file. God help me if I ever feel compelled to challenge this.
-
-                        int SavestateLength = ByteArray[0] | (ByteArray[1] << 8) | (ByteArray[2] << 16) | (ByteArray[3] << 24);
-                        int rerecords = ByteArray[4] | (ByteArray[5] << 8) | (ByteArray[6] << 16) | (ByteArray[7] << 24);
-                        int frameCount = ByteArray[8] | (ByteArray[9] << 8) | (ByteArray[10] << 16) | (ByteArray[11] << 24);
-
-                        List<List<byte>> saveStates = new List<List<byte>>();
-                        List<List<byte>> saveStates2 = new List<List<byte>>();
-                        List<bool> lagFrames = new List<bool>();
-
-                        byte b = 0;
-                        byte b2 = 0;
-                        int i = 12;
-                        while (i < frameCount * 3 + 12)
-                        {
-                            b = ByteArray[i];
-                            b2 = ByteArray[i + 1];
-                            TASInputs.Add((ushort)(b | (b2 << 8)));
-                            saveStates.Add(new List<byte>());
-                            saveStates2.Add(new List<byte>());
-                            lagFrames.Add(ByteArray[i + 2] == 1);
-                            i += 3;
-                        }
-
-                        // and from here until you reach the end of the file, the data is arranged in the following format:
-                        // [32-bit int declaring the frame number, and 'n' bytes for the save state at that frame.]
-
                         while (i < ByteArray.Length)
                         {
-                            // read the 4 byte header.
-                            int frameIndex = ByteArray[i] | (ByteArray[i + 1] << 8) | (ByteArray[i + 2] << 16) | (ByteArray[i + 3] << 24);
-                            i += 4;
-                            int j = 0;
-                            while (j < SavestateLength)
-                            {
-                                saveStates[frameIndex].Add(ByteArray[i]);
-                                i++;
-                                j++;
-                            }
-                        }
-
-                        if (TasTimeline != null)
-                        {
-                            TriCTASTimeline.TimelineSavestates = saveStates;
-                            TriCTASTimeline.TimelineTempSavestates = saveStates2; // the empty list.
-                            TriCTASTimeline.LagFrames = lagFrames;
-                            TasTimeline.highestFrameEmulatedEver = frameCount - 1;
-                            TasTimeline.frameEmulated = frameCount - 1;
-                            TasTimeline.Rerecords = rerecords;
+                            TASInputs.Add(FamtasiaInput2Standard(ByteArray[i]));
+                            i++;
                         }
                     }
-                    break;
-                    // TODO: ask if the .tasd file format is a thing yet
+                }
+
+                break;
+                case ".3c2":
+                case ".r08":
+                {
+                    // the .r08 file format is conveniently already in the format I want for my emulator.
+                    // I also pretty much format my own .3c2 format in the exact same way.
+                    byte b = 0;
+                    byte b2 = 0;
+                    int i = 0;
+                    while (i < ByteArray.Length)
+                    {
+                        b = ByteArray[i];
+                        b2 = ByteArray[i + 1];
+                        TASInputs.Add((ushort)(b | (b2 << 8)));
+                        i += 2;
+                    }
+
+                    TASInputs.Add(0); // append a zero to the end for safe measure.
+                }
+
+                break;
+                case ".3c3":
+                {
+                    // .3c3 is the format for my TAS timeline.
+                    // The big differences are:
+                    // - .3c3 saves the savestate information
+                    // - .3c3 saves the "lag frame" information as well. (So every frame is 3 bytes now.)
+
+                    // .3c3 has a 8 byte header.
+                    // It's just little-endian 32-bit integers.
+                    // The first one determines how many bytes are in every savestate.
+                    // the second one determinines how many frames there are in this TAS.
+                    // I guess that means there's a limit of 2,147,483,647 frames in a .3c3 TAS file. God help me if I ever feel compelled to challenge this.
+
+                    int SavestateLength = ByteArray[0] | (ByteArray[1] << 8) | (ByteArray[2] << 16) | (ByteArray[3] << 24);
+                    int rerecords = ByteArray[4] | (ByteArray[5] << 8) | (ByteArray[6] << 16) | (ByteArray[7] << 24);
+                    int frameCount = ByteArray[8] | (ByteArray[9] << 8) | (ByteArray[10] << 16) | (ByteArray[11] << 24);
+
+                    List<List<byte>> saveStates = new List<List<byte>>();
+                    List<List<byte>> saveStates2 = new List<List<byte>>();
+                    List<bool> lagFrames = new List<bool>();
+
+                    byte b = 0;
+                    byte b2 = 0;
+                    int i = 12;
+                    while (i < frameCount * 3 + 12)
+                    {
+                        b = ByteArray[i];
+                        b2 = ByteArray[i + 1];
+                        TASInputs.Add((ushort)(b | (b2 << 8)));
+                        saveStates.Add(new List<byte>());
+                        saveStates2.Add(new List<byte>());
+                        lagFrames.Add(ByteArray[i + 2] == 1);
+                        i += 3;
+                    }
+
+                    // and from here until you reach the end of the file, the data is arranged in the following format:
+                    // [32-bit int declaring the frame number, and 'n' bytes for the save state at that frame.]
+
+                    while (i < ByteArray.Length)
+                    {
+                        // read the 4 byte header.
+                        int frameIndex = ByteArray[i] | (ByteArray[i + 1] << 8) | (ByteArray[i + 2] << 16) | (ByteArray[i + 3] << 24);
+                        i += 4;
+                        int j = 0;
+                        while (j < SavestateLength)
+                        {
+                            saveStates[frameIndex].Add(ByteArray[i]);
+                            i++;
+                            j++;
+                        }
+                    }
+
+                    if (TasTimeline != null)
+                    {
+                        TriCTASTimeline.TimelineSavestates = saveStates;
+                        TriCTASTimeline.TimelineTempSavestates = saveStates2; // the empty list.
+                        TriCTASTimeline.LagFrames = lagFrames;
+                        TasTimeline.highestFrameEmulatedEver = frameCount - 1;
+                        TasTimeline.frameEmulated = frameCount - 1;
+                        TasTimeline.Rerecords = rerecords;
+                    }
+                }
+
+                break;
+                // TODO: ask if the .tasd file format is a thing yet
             }
+
             return TASInputs;
         }
         byte FamtasiaInput2Standard(byte input)
@@ -1461,11 +1581,13 @@ namespace TriCNES
                 cancel.Cancel();
                 EmuClock.Join();
             }
+
             if (EMU != null)
             {
                 EMU.Dispose();
                 GC.Collect();
             }
+
             Timeline_Paused = true;
             EMU = new Emulator();
             EMU.PPU_DecodeSignal = settings_ntsc;
@@ -1514,6 +1636,7 @@ namespace TriCNES
                         EMU.Dispose();
                         GC.Collect();
                     }
+
                     EMU = new Emulator();
                     EMU.PPU_DecodeSignal = settings_ntsc;
                     EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
@@ -1521,12 +1644,13 @@ namespace TriCNES
                     EMU.PPUClock = settings_alignment;
                     Cartridge Cart = new Cartridge(filePath);
                     EMU.Cart = Cart;
-                    if(Timeline_PendingClockFiltering)
+                    if (Timeline_PendingClockFiltering)
                     {
                         Timeline_PendingClockFiltering = false;
                         EMU.TASTimelineClockFiltering = true;
                     }
                 }
+
                 if (Timeline_PendingArbitrarySavestate)
                 {
                     Timeline_PendingArbitrarySavestate = false; // pretty much only ever set when loading a TAS.
@@ -1548,6 +1672,7 @@ namespace TriCNES
                     Timeline_PendingFrameAdvance = true;
                     Timeline_PendingPause = !Timeline_Paused;
                 }
+
                 bool rewinding = false;
                 if ((ControllerHotkeys[3] && ControllerHotkeys[1]) || (!Timeline_HotkeyHeld_LTrigger && ControllerHotkeys[3]))
                 {
@@ -1566,22 +1691,26 @@ namespace TriCNES
                     Timeline_Paused = true;
                     TasTimeline.ChangePlayPauseButtonText("Paused");
                 }
+
                 if (Timeline_PendingResume)
                 {
                     Timeline_PendingResume = false;
                     Timeline_Paused = false;
                     TasTimeline.ChangePlayPauseButtonText("Running");
                 }
+
                 if (Timeline_PendingMouseDown)
                 {
                     Timeline_PendingMouseDown = false;
                     TasTimeline.TimelineMouseDownEvent();
                 }
+
                 if (Timeline_PendingMouseHeld)
                 {
                     Timeline_PendingMouseHeld = false;
                     TasTimeline.TimelineMouseHeldEvent();
                 }
+
                 if (Timeline_PendingLoadState)
                 {
                     Timeline_PendingLoadState = false;
@@ -1589,6 +1718,7 @@ namespace TriCNES
                     Savestate = Timeline_LoadState;
                     TasTimeline.frameIndex = Timeline_PendingFrameNumber;
                 }
+
                 if (Timeline_PendingResetScreen)
                 {
                     Timeline_PendingResetScreen = false;
@@ -1596,11 +1726,19 @@ namespace TriCNES
                     delegate ()
                     {
                         Bitmap b = new Bitmap(pb_Screen.Image);
-                        for (int x = 0; x < b.Width; x++) { for (int y = 0; y < b.Height; y++) { b.SetPixel(x, y, Color.Black); } }
+                        for (int x = 0; x < b.Width; x++)
+                        {
+                            for (int y = 0; y < b.Height; y++)
+                            {
+                                b.SetPixel(x, y, Color.Black);
+                            }
+                        }
+
                         pb_Screen.Image = b;
                         pb_Screen.Update();
                     }));
                 }
+
                 bool FrameAdvance = false;
                 if (Timeline_PendingFrameAdvance)
                 {
@@ -1611,7 +1749,7 @@ namespace TriCNES
                 if (Timeline_AutoPlayUntilTarget && TasTimeline.frameIndex >= Timeline_AutoPlayTarget)
                 {
                     Timeline_AutoPlayUntilTarget = false;
-                }                
+                }
 
                 RunUpkeep();
                 if (Timeline_Paused && !FrameAdvance && !Timeline_AutoPlayUntilTarget)
@@ -1634,6 +1772,7 @@ namespace TriCNES
                             List<byte> state = new List<byte>();
                             TriCTASTimeline.TimelineSavestates.Add(state);
                         }
+
                         if (TriCTASTimeline.TimelineSavestates[TasTimeline.frameIndex].Count > 0)
                         {
                             // if this savestate is not empty
@@ -1670,6 +1809,7 @@ namespace TriCNES
                             TasTimeline.RecalculateTimelineRow(row, realtimeInputs);
                             TasTimeline.RedrawTimelineRow(row, false);
                         }
+
                         if (TasTimeline.frameIndex < TasTimeline.frameEmulated)
                         {
                             TasTimeline.MarkStale(TasTimeline.frameIndex);
@@ -1693,7 +1833,7 @@ namespace TriCNES
                         //Timeline_PendingFrameAdvance = true; // keep running until a non-lag frame.
                     }
                 }
-            }   
+            }
         }
 
         public bool[] OtherControllerHotkeys()
@@ -1718,9 +1858,9 @@ namespace TriCNES
                     joystickButtons[i] = false;
                 }
             }
+
             return joystickButtons;
         }
-
     }
 
     /// <summary>
@@ -1743,5 +1883,4 @@ namespace TriCNES
             base.OnPaint(paintEventArgs);
         }
     }
-
 }

@@ -67,46 +67,53 @@ namespace TriCNES
             {
                 case ".bk2":
                 case ".tasproj":
-                    {
-                        cb_CpuClock.SelectedIndex = 8;
-                        cb_CpuClock.Update();
-                    }
-                    break;
+                {
+                    cb_CpuClock.SelectedIndex = 8;
+                    cb_CpuClock.Update();
+                }
+
+                break;
                 case ".fm2":
-                    {
-                        cb_fceuxFrame0.Enabled = true;
-                        // change the alignment to use FCEUX's
-                        cb_CpuClock.SelectedIndex = 0;
-                        cb_CpuClock.Update();
-                    }
-                    break;
+                {
+                    cb_fceuxFrame0.Enabled = true;
+                    // change the alignment to use FCEUX's
+                    cb_CpuClock.SelectedIndex = 0;
+                    cb_CpuClock.Update();
+                }
+
+                break;
                 case ".fm3":
-                    {
- 
-                    }
-                    break;
+                {
+
+                }
+
+                break;
                 case ".fmv":
-                    {
-                        l_FamtasiaWarning.Visible = true;
-                    }
-                    break;
+                {
+                    l_FamtasiaWarning.Visible = true;
+                }
+
+                break;
                 case ".r08":
-                    {
+                {
 
-                    }
-                    break;
+                }
+
+                break;
                 case ".3c2":
-                    {
+                {
 
-                    }
-                    break;
+                }
+
+                break;
                 case ".3c3":
-                    {
+                {
 
-                    }
-                    break;
+                }
 
-                    // TODO: ask if the .tasd file format is a thing yet
+                break;
+
+                // TODO: ask if the .tasd file format is a thing yet
             }
 
             TASInputs = MainGUI.ParseTasFile(TasFilePath);
@@ -118,7 +125,6 @@ namespace TriCNES
         private void b_RunTAS_Click(object sender, EventArgs e)
         {
             MainGUI.StartTAS();
-
 
         }
     }
