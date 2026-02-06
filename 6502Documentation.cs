@@ -6,26 +6,15 @@ using System.Threading.Tasks;
 
 namespace TriCNES;
 
-public class Op
+public class Op(byte c, string m, string mo, int l, int a, string d, string i)
 {
-    public byte code;
-    public string mnemonic;
-    public string mode;
-    public int length;
-    public int affectedFlags;
-    public string CycleByCycle;
-    public string InstructionDocumentation;
-
-    public Op(byte c, string m, string mo, int l, int a, string d, string i)
-    {
-        code = c;
-        mnemonic = m;
-        mode = mo;
-        length = l;
-        affectedFlags = a;
-        CycleByCycle = d;
-        InstructionDocumentation = i;
-    }
+    public byte code = c;
+    public string mnemonic = m;
+    public string mode = mo;
+    public int length = l;
+    public int affectedFlags = a;
+    public string CycleByCycle = d;
+    public string InstructionDocumentation = i;
 }
 
 public static class Documentation

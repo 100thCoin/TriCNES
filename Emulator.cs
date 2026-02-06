@@ -1304,36 +1304,36 @@ public class Emulator
                 // if the state machine *is* interrupted, this runs
                 else
                     if (!PPU_Data_StateMachine_Read && PPU_Data_StateMachine_PerformMysteryWrite)
+                {
+                    // the mystery write
+
+                    // Here's how the mystery write behaves:
+                    // Suppose we're writing a value of $ZZ to address $2007, and the PPU Read/Write address is at address $YYXX
+                    // The mystery write will store $ZZ at address $YYZZ
+                    // In addition to that, $XX (The low byte of the read/write address) is also written to $YYXX
+
+                    // This only occurs if there's 2 consecutive CPU cycles that access $2007
+
+                    // The mystery writes cannot write to palettes. Instead, write the modified value read from palette RAM to the following address.
+                    if (PPU_VRAM_MysteryAddress >= 0x3F00)
                     {
-                        // the mystery write
 
-                        // Here's how the mystery write behaves:
-                        // Suppose we're writing a value of $ZZ to address $2007, and the PPU Read/Write address is at address $YYXX
-                        // The mystery write will store $ZZ at address $YYZZ
-                        // In addition to that, $XX (The low byte of the read/write address) is also written to $YYXX
+                        StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_VRAM_MysteryAddress);
+                        PPU_AddressBus = PPU_ReadWriteAddress;
 
-                        // This only occurs if there's 2 consecutive CPU cycles that access $2007
-
-                        // The mystery writes cannot write to palettes. Instead, write the modified value read from palette RAM to the following address.
-                        if (PPU_VRAM_MysteryAddress >= 0x3F00)
-                        {
-
-                            StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_VRAM_MysteryAddress);
-                            PPU_AddressBus = PPU_ReadWriteAddress;
-
-                        }
-                        else
-                        {
-                            // As far as I know, the PPU can only make 1 write per cycle... The exact timing here might be wrong, but the end result of the behavior emulated here seems to match my console.
-                            StorePPUData((ushort)(PPU_VRAM_MysteryAddress), (byte)PPU_VRAM_MysteryAddress);
-                            StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_ReadWriteAddress);
-                            PPU_AddressBus = PPU_ReadWriteAddress;
-                        }
-
-                        // That second write can be overwritten in the next steps depending on the CPU/PPU alignment.
-                        // My current understanding is: if the mystery write happens, that other extra write happens too.
-                        // but again, I'm not certain on the timing. Do these actually both happen on the same cycle?
                     }
+                    else
+                    {
+                        // As far as I know, the PPU can only make 1 write per cycle... The exact timing here might be wrong, but the end result of the behavior emulated here seems to match my console.
+                        StorePPUData((ushort)(PPU_VRAM_MysteryAddress), (byte)PPU_VRAM_MysteryAddress);
+                        StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_ReadWriteAddress);
+                        PPU_AddressBus = PPU_ReadWriteAddress;
+                    }
+
+                    // That second write can be overwritten in the next steps depending on the CPU/PPU alignment.
+                    // My current understanding is: if the mystery write happens, that other extra write happens too.
+                    // but again, I'm not certain on the timing. Do these actually both happen on the same cycle?
+                }
                 // the PPU Read/Write address is incremented 1 cycle after the write occurs.
             }
 

@@ -29,34 +29,23 @@ public partial class TriCTASTimeline : Form
     public Brush Brush_RedCellP1_Stale;
     public Brush Brush_RedCellP2_Stale;
 
-    struct Vector2
+    struct Vector2(int X, int Y)
     {
-        public int x;
-        public int y;
-        public Vector2(int X, int Y)
-        {
-            x = X;
-            y = Y;
-        }
+        public int x = X;
+        public int y = Y;
+
         public override string ToString()
         {
             return x.ToString() + ", " + y.ToString();
         }
     }
 
-    public struct TimelineCell
+    public struct TimelineCell(bool t)
     {
-        public bool Checked;
-        public bool LagFrame;
-        public bool Stale;
-        public bool Emulated;
-        public TimelineCell(bool t)
-        {
-            Checked = false;
-            LagFrame = false;
-            Stale = false;
-            Emulated = false;
-        }
+        public bool Checked = false;
+        public bool LagFrame = false;
+        public bool Stale = false;
+        public bool Emulated = false;
     }
     public int SavestateLength;
     public int Rerecords;
