@@ -16,7 +16,7 @@ public partial class TriCNTViewer : Form
     public TriCNTViewer()
     {
         InitializeComponent();
-        FormClosing += new FormClosingEventHandler(TriCNTViewer_Closing);
+        FormClosing += new(TriCNTViewer_Closing);
     }
 
     private void TriCNTViewer_Closing(Object sender, FormClosingEventArgs e)

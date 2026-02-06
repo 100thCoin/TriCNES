@@ -18,7 +18,7 @@ public partial class TriCTraceLogger : Form
     public TriCTraceLogger()
     {
         InitializeComponent();
-        FormClosing += new FormClosingEventHandler(TriCTraceLogger_Closing);
+        FormClosing += new(TriCTraceLogger_Closing);
     }
 
     private void TriCTraceLogger_Closing(Object sender, FormClosingEventArgs e)

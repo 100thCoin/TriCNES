@@ -65,7 +65,7 @@ public partial class TriCTASTimeline : Form
         MainGUI = Maingui;
         InitializeComponent();
         Inputs = [0];
-        Font_Consolas = new Font("Consolas", 8);
+        Font_Consolas = new("Consolas", 8);
         Brush_LeftColumn = new SolidBrush(Color.LightGray);
         Brush_LeftColumn_Saved = new SolidBrush(Color.Wheat);
         Brush_LeftColumn_TempSaved = new SolidBrush(Color.LemonChiffon);
@@ -83,7 +83,7 @@ public partial class TriCTASTimeline : Form
 
         Start();
 
-        timelineBitmap = new Bitmap(80 + 16 * 16 + 1, 41 * 16 + 1);
+        timelineBitmap = new(80 + 16 * 16 + 1, 41 * 16 + 1);
         G = Graphics.FromImage(timelineBitmap);
         pb_Timeline.Image = timelineBitmap;
         pb_Timeline.MouseDown += mouseDownEvent;
@@ -125,25 +125,25 @@ public partial class TriCTASTimeline : Form
     {
         Rectangle[] GridOverlay =
         [
-            new Rectangle(0,0,80,16),
-            new Rectangle(80 + 16*0,0,16,16),
-            new Rectangle(80 + 16*1,0,16,16),
-            new Rectangle(80 + 16*2,0,16,16),
-            new Rectangle(80 + 16*3,0,16,16),
-            new Rectangle(80 + 16*4,0,16,16),
-            new Rectangle(80 + 16*5,0,16,16),
-            new Rectangle(80 + 16*6,0,16,16),
-            new Rectangle(80 + 16*7,0,16,16),
-            new Rectangle(80 + 16*8,0,16,16),
-            new Rectangle(80 + 16*9,0,16,16),
-            new Rectangle(80 + 16*10,0,16,16),
-            new Rectangle(80 + 16*11,0,16,16),
-            new Rectangle(80 + 16*12,0,16,16),
-            new Rectangle(80 + 16*13,0,16,16),
-            new Rectangle(80 + 16*14,0,16,16),
-            new Rectangle(80 + 16*15,0,16,16)
+            new(0,0,80,16),
+            new(80 + 16*0,0,16,16),
+            new(80 + 16*1,0,16,16),
+            new(80 + 16*2,0,16,16),
+            new(80 + 16*3,0,16,16),
+            new(80 + 16*4,0,16,16),
+            new(80 + 16*5,0,16,16),
+            new(80 + 16*6,0,16,16),
+            new(80 + 16*7,0,16,16),
+            new(80 + 16*8,0,16,16),
+            new(80 + 16*9,0,16,16),
+            new(80 + 16*10,0,16,16),
+            new(80 + 16*11,0,16,16),
+            new(80 + 16*12,0,16,16),
+            new(80 + 16*13,0,16,16),
+            new(80 + 16*14,0,16,16),
+            new(80 + 16*15,0,16,16)
         ];
-        G.FillRectangle(Brush_LeftColumn, new Rectangle(0, 0, 80 + 16 * 16, 16));
+        G.FillRectangle(Brush_LeftColumn, new(0, 0, 80 + 16 * 16, 16));
         G.DrawRectangles(Pens.Black, GridOverlay);
         G.DrawString(ClockFiltering ? "Input #" : "Frame #", Font_Consolas, Brushes.Black, 0, 0);
         G.DrawString("A", Font_Consolas, Brushes.Black, 80 + 16 * 0, 0);
@@ -194,7 +194,7 @@ public partial class TriCTASTimeline : Form
                 Row = 39;
             }
 
-            Vector2 mousePos = new Vector2(Column, Row);
+            Vector2 mousePos = new(Column, Row);
 
             if (mouseHeld_initPos.y >= 0)
             {
@@ -210,10 +210,10 @@ public partial class TriCTASTimeline : Form
 
                     for (int i = spos; i <= tpos; i++)
                     {
-                        bool state = GetCellInputStatus(new Vector2(mouseHeld_initPos.x, i));
+                        bool state = GetCellInputStatus(new(mouseHeld_initPos.x, i));
                         if (state != mouseHeld_setInput)
                         {
-                            ushort input = SetCellInputStatus(new Vector2(mouseHeld_initPos.x, i), mouseHeld_setInput);
+                            ushort input = SetCellInputStatus(new(mouseHeld_initPos.x, i), mouseHeld_setInput);
                             TimelineGrid[i][mouseHeld_initPos.x + 1].Checked = mouseHeld_setInput;
 
                             RecalculateTimelineRow(i, input);
@@ -264,7 +264,7 @@ public partial class TriCTASTimeline : Form
             Row = 39;
         }
 
-        mouseHeld_initPos = new Vector2(Column, Row);
+        mouseHeld_initPos = new(Column, Row);
 
         MainGUI.Timeline_PendingMouseDown = true;
     }
@@ -506,7 +506,7 @@ public partial class TriCTASTimeline : Form
             TimelineCell[] t = new TimelineCell[17];
             for (int j = 0; j < t.Length; j++)
             {
-                t[0] = new TimelineCell(false);
+                t[0] = new(false);
             }
 
             TimelineGrid.Add(t);
@@ -694,7 +694,7 @@ public partial class TriCTASTimeline : Form
             InitDirectory += @"tas\";
         }
 
-        OpenFileDialog ofd = new OpenFileDialog()
+        OpenFileDialog ofd = new()
         {
             FileName = "",
             Filter =
@@ -745,7 +745,7 @@ public partial class TriCTASTimeline : Form
             InitDirectory += @"tas\";
         }
 
-        SaveFileDialog sfd = new SaveFileDialog()
+        SaveFileDialog sfd = new()
         {
             FileName = "",
             Filter = "TriCNES TAS File (.3c2)|*.3c2",
@@ -775,7 +775,7 @@ public partial class TriCTASTimeline : Form
             InitDirectory += @"tas\";
         }
 
-        SaveFileDialog sfd = new SaveFileDialog()
+        SaveFileDialog sfd = new()
         {
             FileName = "",
             Filter = "TriCNES TAS File (.3c3)|*.3c3",
@@ -841,7 +841,7 @@ public partial class TriCTASTimeline : Form
             InitDirectory += @"tas\";
         }
 
-        SaveFileDialog sfd = new SaveFileDialog()
+        SaveFileDialog sfd = new()
         {
             FileName = "",
             Filter = "Replay Device (.r08)|*.r08",
@@ -993,45 +993,45 @@ public partial class TriCTASTimeline : Form
             int rowp1 = row + 1;
             Rectangle[] GridOverlay =
             [
-                new Rectangle(0,rowp1*16,80,16),
-                new Rectangle(80 + 16*0,rowp1*16,16,16),
-                new Rectangle(80 + 16*1,rowp1*16,16,16),
-                new Rectangle(80 + 16*2,rowp1*16,16,16),
-                new Rectangle(80 + 16*3,rowp1*16,16,16),
-                new Rectangle(80 + 16*4,rowp1*16,16,16),
-                new Rectangle(80 + 16*5,rowp1*16,16,16),
-                new Rectangle(80 + 16*6,rowp1*16,16,16),
-                new Rectangle(80 + 16*7,rowp1*16,16,16),
-                new Rectangle(80 + 16*8,rowp1*16,16,16),
-                new Rectangle(80 + 16*9,rowp1*16,16,16),
-                new Rectangle(80 + 16*10,rowp1*16,16,16),
-                new Rectangle(80 + 16*11,rowp1*16,16,16),
-                new Rectangle(80 + 16*12,rowp1*16,16,16),
-                new Rectangle(80 + 16*13,rowp1*16,16,16),
-                new Rectangle(80 + 16*14,rowp1*16,16,16),
-                new Rectangle(80 + 16*15,rowp1*16,16,16)
+                new(0,rowp1*16,80,16),
+                new(80 + 16*0,rowp1*16,16,16),
+                new(80 + 16*1,rowp1*16,16,16),
+                new(80 + 16*2,rowp1*16,16,16),
+                new(80 + 16*3,rowp1*16,16,16),
+                new(80 + 16*4,rowp1*16,16,16),
+                new(80 + 16*5,rowp1*16,16,16),
+                new(80 + 16*6,rowp1*16,16,16),
+                new(80 + 16*7,rowp1*16,16,16),
+                new(80 + 16*8,rowp1*16,16,16),
+                new(80 + 16*9,rowp1*16,16,16),
+                new(80 + 16*10,rowp1*16,16,16),
+                new(80 + 16*11,rowp1*16,16,16),
+                new(80 + 16*12,rowp1*16,16,16),
+                new(80 + 16*13,rowp1*16,16,16),
+                new(80 + 16*14,rowp1*16,16,16),
+                new(80 + 16*15,rowp1*16,16,16)
             ];
             if (frameIndex - TopFrame == row)
             {
-                G.FillRectangle(Brush_HighlightedCell, new Rectangle(0, rowp1 * 16, 80 + 16 * 16, 16));
+                G.FillRectangle(Brush_HighlightedCell, new(0, rowp1 * 16, 80 + 16 * 16, 16));
             }
             else if (!TimelineGrid[row][0].Emulated)
             {
-                G.FillRectangle(Brush_LeftColumn, new Rectangle(0, rowp1 * 16, 80, 16));
-                G.FillRectangle(Brush_WhiteCellP1, new Rectangle(80, rowp1 * 16, 16 * 8, 16));
-                G.FillRectangle(Brush_WhiteCellP2, new Rectangle(80 + 16 * 8, rowp1 * 16, 16 * 8, 16));
+                G.FillRectangle(Brush_LeftColumn, new(0, rowp1 * 16, 80, 16));
+                G.FillRectangle(Brush_WhiteCellP1, new(80, rowp1 * 16, 16 * 8, 16));
+                G.FillRectangle(Brush_WhiteCellP2, new(80 + 16 * 8, rowp1 * 16, 16 * 8, 16));
             }
             else if (TimelineGrid[row][0].Stale)
             {
-                G.FillRectangle(Brush_LeftColumn, new Rectangle(0, rowp1 * 16, 80, 16));
-                G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP1_Stale : Brush_GreenCellP1_Stale, new Rectangle(80, rowp1 * 16, 16 * 8, 16));
-                G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP2_Stale : Brush_GreenCellP2_Stale, new Rectangle(80 + 16 * 8, rowp1 * 16, 16 * 8, 16));
+                G.FillRectangle(Brush_LeftColumn, new(0, rowp1 * 16, 80, 16));
+                G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP1_Stale : Brush_GreenCellP1_Stale, new(80, rowp1 * 16, 16 * 8, 16));
+                G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP2_Stale : Brush_GreenCellP2_Stale, new(80 + 16 * 8, rowp1 * 16, 16 * 8, 16));
             }
             else
             {
-                G.FillRectangle(TimelineSavestates[row + TopFrame].Count == SavestateLength ? Brush_LeftColumn_Saved : TimelineTempSavestates[row + TopFrame].Count == SavestateLength ? Brush_LeftColumn_TempSaved : Brush_LeftColumn, new Rectangle(0, rowp1 * 16, 80, 16));
-                G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP1 : Brush_GreenCellP1, new Rectangle(80, rowp1 * 16, 16 * 8, 16));
-                G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP2 : Brush_GreenCellP2, new Rectangle(80 + 16 * 8, rowp1 * 16, 16 * 8, 16));
+                G.FillRectangle(TimelineSavestates[row + TopFrame].Count == SavestateLength ? Brush_LeftColumn_Saved : TimelineTempSavestates[row + TopFrame].Count == SavestateLength ? Brush_LeftColumn_TempSaved : Brush_LeftColumn, new(0, rowp1 * 16, 80, 16));
+                G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP1 : Brush_GreenCellP1, new(80, rowp1 * 16, 16 * 8, 16));
+                G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP2 : Brush_GreenCellP2, new(80 + 16 * 8, rowp1 * 16, 16 * 8, 16));
             }
 
             G.DrawRectangles(Pens.Black, GridOverlay);

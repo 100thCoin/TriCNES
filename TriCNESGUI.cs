@@ -24,9 +24,9 @@ public partial class TriCNESGUI : Form
     public TriCNESGUI()
     {
         InitializeComponent();
-        pb_Screen.DragEnter += new DragEventHandler(pb_Screen_DragEnter);
-        pb_Screen.DragDrop += new DragEventHandler(pb_Screen_DragDrop);
-        FormClosing += new FormClosingEventHandler(TriCNESGUI_Closing);
+        pb_Screen.DragEnter += new(pb_Screen_DragEnter);
+        pb_Screen.DragDrop += new(pb_Screen_DragDrop);
+        FormClosing += new(TriCNESGUI_Closing);
         SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER);
         SDL.SDL_GameControllerEventState(SDL.SDL_ENABLE);
         SDL.SDL_GameControllerUpdate();
@@ -101,7 +101,7 @@ public partial class TriCNESGUI : Form
             EMU.Logging = TraceLogger.Logging;
             if (EMU.DebugLog == null)
             {
-                EMU.DebugLog = new StringBuilder();
+                EMU.DebugLog = new();
             }
 
             EMU.DebugRange_Low = TraceLogger.RangeLow;
@@ -112,7 +112,7 @@ public partial class TriCNESGUI : Form
         else if (EMU.Logging)
         {
             EMU.Logging = false;
-            EMU.DebugLog = new StringBuilder();
+            EMU.DebugLog = new();
         }
 
         if (HexExditor != null)
@@ -130,7 +130,7 @@ public partial class TriCNESGUI : Form
                 TraceLogger.Update();
                 if (TraceLogger.ClearEveryFrame())
                 {
-                    EMU.DebugLog = new StringBuilder();
+                    EMU.DebugLog = new();
                 }
             }
         }
@@ -316,7 +316,7 @@ public partial class TriCNESGUI : Form
             NametableBitmap.Dispose();
         }
 
-        NametableBitmap = new DirectBitmap(512, 480);
+        NametableBitmap = new(512, 480);
         if (EMU.Cart == null)
         {
             return NametableBitmap.Bitmap;
@@ -479,7 +479,7 @@ public partial class TriCNESGUI : Form
             InitDirectory += @"roms\";
         }
 
-        OpenFileDialog ofd = new OpenFileDialog()
+        OpenFileDialog ofd = new()
         {
             FileName = "",
             Filter = "NES ROM files (*.nes)|*.nes",
@@ -502,15 +502,15 @@ public partial class TriCNESGUI : Form
             }
 
             filePath = ofd.FileName;
-            EMU = new Emulator();
+            EMU = new();
             EMU.PPU_DecodeSignal = settings_ntsc;
             EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
             EMU.PPU_ShowScreenBorders = settings_border;
             EMU.PPUClock = settings_alignment;
-            Cartridge Cart = new Cartridge(filePath);
+            Cartridge Cart = new(filePath);
             EMU.Cart = Cart;
-            cancel = new CancellationTokenSource();
-            EmuClock = new Thread(() => ClockEmulator(cancel.Token));
+            cancel = new();
+            EmuClock = new(() => ClockEmulator(cancel.Token));
             EmuClock.SetApartmentState(ApartmentState.STA);
             EmuClock.IsBackground = true;
             EmuClock.Start();
@@ -526,7 +526,7 @@ public partial class TriCNESGUI : Form
             InitDirectory += @"tas\";
         }
 
-        OpenFileDialog ofd = new OpenFileDialog()
+        OpenFileDialog ofd = new()
         {
             FileName = "",
             Filter =
@@ -549,7 +549,7 @@ public partial class TriCNESGUI : Form
                 TASPropertiesForm.Dispose();
             }
 
-            TASPropertiesForm = new TASProperties();
+            TASPropertiesForm = new();
             TASPropertiesForm.TasFilePath = ofd.FileName;
             TASPropertiesForm.MainGUI = this;
             TASPropertiesForm.Init();
@@ -578,12 +578,12 @@ public partial class TriCNESGUI : Form
             GC.Collect();
         }
 
-        EMU = new Emulator();
+        EMU = new();
         EMU.PPU_DecodeSignal = settings_ntsc;
         EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
         EMU.PPU_ShowScreenBorders = settings_border;
 
-        Cartridge Cart = new Cartridge(filePath);
+        Cartridge Cart = new(filePath);
         EMU.Cart = Cart;
         EMU.TAS_ReadingTAS = true;
         EMU.TAS_InputLog = TASPropertiesForm.TasInputLog;
@@ -665,8 +665,8 @@ public partial class TriCNESGUI : Form
             }
         }
 
-        cancel = new CancellationTokenSource();
-        EmuClock = new Thread(() => ClockEmulator(cancel.Token));
+        cancel = new();
+        EmuClock = new(() => ClockEmulator(cancel.Token));
         EmuClock.SetApartmentState(ApartmentState.STA);
         EmuClock.IsBackground = true;
         EmuClock.Start();
@@ -700,15 +700,15 @@ public partial class TriCNESGUI : Form
                 GC.Collect();
             }
 
-            EMU = new Emulator();
+            EMU = new();
             EMU.PPU_DecodeSignal = settings_ntsc;
             EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
             EMU.PPU_ShowScreenBorders = settings_border;
             EMU.PPUClock = settings_alignment;
         }
 
-        cancel = new CancellationTokenSource();
-        EmuClock = new Thread(() => ClockEmulator3CT(cancel.Token));
+        cancel = new();
+        EmuClock = new(() => ClockEmulator3CT(cancel.Token));
         EmuClock.IsBackground = true;
         EmuClock.Start();
     }
@@ -721,7 +721,7 @@ public partial class TriCNESGUI : Form
             InitDirectory += @"tas\";
         }
 
-        OpenFileDialog ofd = new OpenFileDialog()
+        OpenFileDialog ofd = new()
         {
             FileName = "",
             Filter =
@@ -737,7 +737,7 @@ public partial class TriCNESGUI : Form
                 TASPropertiesForm3ct.Dispose();
             }
 
-            TASPropertiesForm3ct = new TASProperties3ct();
+            TASPropertiesForm3ct = new();
             TASPropertiesForm3ct.TasFilePath = ofd.FileName;
             TASPropertiesForm3ct.MainGUI = this;
             TASPropertiesForm3ct.Init();
@@ -758,7 +758,7 @@ public partial class TriCNESGUI : Form
     {
         if (EMU != null)
         {
-            Emulator Emu2 = new Emulator();
+            Emulator Emu2 = new();
             Emu2.PPU_DecodeSignal = settings_ntsc;
             EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
             Emu2.PPU_ShowScreenBorders = settings_border;
@@ -800,17 +800,17 @@ public partial class TriCNESGUI : Form
         var filenames = (string[])e.Data.GetData(DataFormats.FileDrop, false);
         string filename = filenames[0];
         filePath = filename;
-        EMU = new Emulator();
+        EMU = new();
         EMU.PPU_DecodeSignal = settings_ntsc;
         EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
         EMU.PPU_ShowScreenBorders = settings_border;
         EMU.PPUClock = settings_alignment;
 
-        Cartridge Cart = new Cartridge(filePath);
+        Cartridge Cart = new(filePath);
 
         EMU.Cart = Cart;
-        cancel = new CancellationTokenSource();
-        EmuClock = new Thread(() => ClockEmulator(cancel.Token));
+        cancel = new();
+        EmuClock = new(() => ClockEmulator(cancel.Token));
         EmuClock.SetApartmentState(ApartmentState.STA);
         EmuClock.IsBackground = true;
         EmuClock.Start();
@@ -888,7 +888,7 @@ public partial class TriCNESGUI : Form
     {
         if (EMU != null)
         {
-            Emulator Emu2 = new Emulator();
+            Emulator Emu2 = new();
             Emu2.Cart = EMU.Cart;
             EMU = Emu2;
             EMU.PPUClock = Alignment;
@@ -959,10 +959,10 @@ public partial class TriCNESGUI : Form
             }
         }
 
-        Size pbs = new Size();
+        Size pbs = new();
         pbs.Width = w * scale;
         pbs.Height = h * scale;
-        Size ws = new Size();
+        Size ws = new();
         ws.Width = w * scale + 16;
         ws.Height = h * scale + 66;
         MinimumSize = ws;
@@ -1029,7 +1029,7 @@ public partial class TriCNESGUI : Form
             return;
         }
 
-        TraceLogger = new TriCTraceLogger();
+        TraceLogger = new();
         TraceLogger.MainGUI = this;
         TraceLogger.Init();
         TraceLogger.Show();
@@ -1070,7 +1070,7 @@ public partial class TriCNESGUI : Form
             return;
         }
 
-        NametableViewer = new TriCNTViewer();
+        NametableViewer = new();
         NametableViewer.MainGUI = this;
         NametableViewer.Show();
         NametableViewer.Location = Location;
@@ -1084,7 +1084,7 @@ public partial class TriCNESGUI : Form
             return;
         }
 
-        HexExditor = new TriCHexEditor();
+        HexExditor = new();
         HexExditor.MainGUI = this;
         HexExditor.Show();
         HexExditor.Location = Location;
@@ -1122,7 +1122,7 @@ public partial class TriCNESGUI : Form
                 InitDirectory += @"roms\";
             }
 
-            OpenFileDialog ofd = new OpenFileDialog()
+            OpenFileDialog ofd = new()
             {
                 FileName = "",
                 Filter = "NES ROM files (*.nes)|*.nes",
@@ -1139,14 +1139,14 @@ public partial class TriCNESGUI : Form
                 }
 
                 filePath = ofd.FileName;
-                TasTimeline = new TriCTASTimeline(this);
+                TasTimeline = new(this);
                 TasTimeline.Show();
                 TasTimeline.Location = Location;
             }
         }
         else
         {
-            TasTimeline = new TriCTASTimeline(this);
+            TasTimeline = new(this);
             TasTimeline.Show();
             TasTimeline.Location = Location;
         }
@@ -1167,7 +1167,7 @@ public partial class TriCNESGUI : Form
             {
                 // .bk2 files are actually just .zip files!
                 // Let's yoink "Input Log.txt" from this .bk2 file
-                StringReader InputLog = new StringReader(new string(new StreamReader(ZipFile.OpenRead(TasFilePath).Entries.Where(x => x.Name.Equals("Input Log.txt", StringComparison.InvariantCulture)).FirstOrDefault().Open(), Encoding.UTF8).ReadToEnd().ToArray()));
+                StringReader InputLog = new(new(new StreamReader(ZipFile.OpenRead(TasFilePath).Entries.Where(x => x.Name.Equals("Input Log.txt", StringComparison.InvariantCulture)).FirstOrDefault().Open(), Encoding.UTF8).ReadToEnd().ToArray()));
                 // now to parse the input log!
                 InputLog.ReadLine(); // "[Input]"
                 string key = InputLog.ReadLine(); // "LogKey: ... "
@@ -1589,15 +1589,15 @@ public partial class TriCNESGUI : Form
         }
 
         Timeline_Paused = true;
-        EMU = new Emulator();
+        EMU = new();
         EMU.PPU_DecodeSignal = settings_ntsc;
         EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
         EMU.PPU_ShowScreenBorders = settings_border;
         EMU.PPUClock = settings_alignment;
-        Cartridge Cart = new Cartridge(filePath);
+        Cartridge Cart = new(filePath);
         EMU.Cart = Cart;
-        cancel = new CancellationTokenSource();
-        EmuClock = new Thread(() => ClockTimelineEmulator(cancel.Token));
+        cancel = new();
+        EmuClock = new(() => ClockTimelineEmulator(cancel.Token));
         EmuClock.SetApartmentState(ApartmentState.STA);
         EmuClock.IsBackground = true;
         EmuClock.Start();
@@ -1637,12 +1637,12 @@ public partial class TriCNESGUI : Form
                     GC.Collect();
                 }
 
-                EMU = new Emulator();
+                EMU = new();
                 EMU.PPU_DecodeSignal = settings_ntsc;
                 EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
                 EMU.PPU_ShowScreenBorders = settings_border;
                 EMU.PPUClock = settings_alignment;
-                Cartridge Cart = new Cartridge(filePath);
+                Cartridge Cart = new(filePath);
                 EMU.Cart = Cart;
                 if (Timeline_PendingClockFiltering)
                 {
@@ -1725,7 +1725,7 @@ public partial class TriCNESGUI : Form
                 pb_Screen.Invoke(new MethodInvoker(
                 delegate ()
                 {
-                    Bitmap b = new Bitmap(pb_Screen.Image);
+                    Bitmap b = new(pb_Screen.Image);
                     for (int x = 0; x < b.Width; x++)
                     {
                         for (int y = 0; y < b.Height; y++)

@@ -141,7 +141,7 @@ public partial class TASProperties3ct : Form
         }
         // rom folder isn't empty!
 
-        StringReader SR = new StringReader(File.ReadAllText(tb_FilePath.Text));
+        StringReader SR = new(File.ReadAllText(tb_FilePath.Text));
         string l = SR.ReadLine();
         int count = int.Parse(l);
         CartridgeArray = new Cartridge[count];
@@ -153,7 +153,7 @@ public partial class TASProperties3ct : Form
             {
                 if (i == 0)
                 {
-                    BackupCart = new Cartridge(Dir + l);
+                    BackupCart = new(Dir + l);
                 }
 
                 if (MainGUI.EMU != null && MainGUI.EMU.Cart.Name == (Dir + l))
@@ -162,7 +162,7 @@ public partial class TASProperties3ct : Form
                 }
                 else
                 {
-                    CartridgeArray[i] = new Cartridge(Dir + l);
+                    CartridgeArray[i] = new(Dir + l);
                 }
             }
             else

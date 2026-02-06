@@ -243,10 +243,10 @@ public class Emulator
     ];
 
     int chosenColor; // During screen rendering, this value is the index into the color array.
-    public DirectBitmap Screen = new DirectBitmap(256, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
-    public DirectBitmap NTSCScreen = new DirectBitmap(256 * 8, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
-    public DirectBitmap BorderedScreen = new DirectBitmap(341, 262); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
-    public DirectBitmap BorderedNTSCScreen = new DirectBitmap(341 * 8, 262); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+    public DirectBitmap Screen = new(256, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+    public DirectBitmap NTSCScreen = new(256 * 8, 240); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+    public DirectBitmap BorderedScreen = new(341, 262); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
+    public DirectBitmap BorderedNTSCScreen = new(341 * 8, 262); // This uses a class called "DirectBitmap". It's pretty much just the same as Bitmap, but I don't need to unlock/lock the bits, so it's faster.
 
     //Debugging
     public bool Logging;    // If set, the tracelogger will record all instructions ran.
@@ -3297,7 +3297,7 @@ public class Emulator
                                     if (S.Length > 0)
                                     {
                                         S = S.Substring(0, S.Length - 2); // trim off \n
-                                        DebugLog = new StringBuilder(S);
+                                        DebugLog = new(S);
                                         DebugLog.Append(" ! Sprite Zero Hit ! (Dot " + PPU_Dot + ")\r\n");
 
                                     }
@@ -12060,7 +12060,7 @@ public class Emulator
 
         if (DebugLog == null)
         {
-            DebugLog = new StringBuilder();
+            DebugLog = new();
         }
 
         string instruction = Documentation.OpDocs[opCode].mnemonic + " ";
@@ -13048,7 +13048,7 @@ public class DirectBitmap : IDisposable
         Height = height;
         Bits = new Int32[width * height];
         BitsHandle = GCHandle.Alloc(Bits, GCHandleType.Pinned);
-        Bitmap = new Bitmap(width, height, width * 4, PixelFormat.Format32bppPArgb, BitsHandle.AddrOfPinnedObject());
+        Bitmap = new(width, height, width * 4, PixelFormat.Format32bppPArgb, BitsHandle.AddrOfPinnedObject());
     }
 
     public void SetPixel(int x, int y, Color color)

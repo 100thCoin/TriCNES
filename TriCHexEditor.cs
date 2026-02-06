@@ -16,9 +16,9 @@ public partial class TriCHexEditor : Form
     public TriCHexEditor()
     {
         InitializeComponent();
-        hexBitmap = new Bitmap(312, 512);
+        hexBitmap = new(312, 512);
         G = Graphics.FromImage(hexBitmap);
-        Font_Consolas = new Font("Consolas", 8);
+        Font_Consolas = new("Consolas", 8);
         Scope = "RAM";
         Resize += TriCHexEditor_Resize;
         vScrollBar1.ValueChanged += Scrollbar_ValueChanged;
@@ -37,9 +37,9 @@ public partial class TriCHexEditor : Form
     private void TriCHexEditor_Resize(object sender, EventArgs e)
     {
         MaxRows = (Size.Height - 115) / 15;
-        hexBitmap = new Bitmap(312, Size.Height - 88);
-        pb_hexView.Size = new Size(312, Size.Height - 88);
-        vScrollBar1.Size = new Size(vScrollBar1.Width, Size.Height - 108);
+        hexBitmap = new(312, Size.Height - 88);
+        pb_hexView.Size = new(312, Size.Height - 88);
+        vScrollBar1.Size = new(vScrollBar1.Width, Size.Height - 108);
         vScrollBar1.LargeChange = MaxRows;
         G = Graphics.FromImage(hexBitmap);
         RefreshEntireHexView();
@@ -87,7 +87,7 @@ public partial class TriCHexEditor : Form
         vScrollBar1.Enabled = MaxRows < vScrollBar1.Maximum;
         vScrollBar1.Update();
 
-        G.FillRectangle(Brushes.WhiteSmoke, new Rectangle(0, 0, 312, Size.Height - 88));
+        G.FillRectangle(Brushes.WhiteSmoke, new(0, 0, 312, Size.Height - 88));
         G.DrawString(Scope + ":", Font_Consolas, Brushes.Black, new Point(0, 0));
         for (int x = 0; x < 0x10; x++)
         {
