@@ -46,8 +46,8 @@ namespace TriCNES
         static int zFlag = 2;
         static int iFlag = 4;
         static int dFlag = 8;
-        static int bFlag = 16;
-        static int tFlag = 32;
+
+
         static int vFlag = 64;
         static int nFlag = 128;
         static int aChanges = 256;
@@ -398,7 +398,7 @@ namespace TriCNES
         // basically, for each index into this array, you can fetch an opcode's name, addressing mode, what flags/registers it can modify, documentation, and the number of cycles before a read/write.
 
         public static Op[] OpDocs = {
-            new Op(0x00,"BRK","i"       ,2,bFlag | stackPChanges | pcChanges            ,CycleDocs[0] ,InstructionDocs[0]),
+            new Op(0x00,"BRK","i"       ,2,stackPChanges | pcChanges            ,CycleDocs[0] ,InstructionDocs[0]),
             new Op(0x01,"ORA","(d,x)"   ,2,nFlag | zFlag | aChanges                     ,CycleDocs[22],InstructionDocs[1]),
             new Op(0x02,"HLT","i"       ,1,0                                            ,CycleDocs[29],InstructionDocs[2]),
             new Op(0x03,"SLO","(d,x)"   ,2,nFlag | zFlag | cFlag | aChanges | memChanges,CycleDocs[23],InstructionDocs[5]),
@@ -431,7 +431,6 @@ namespace TriCNES
             new Op(0x1E,"ASL","a,x"     ,3,nFlag | zFlag | cFlag | memChanges           ,CycleDocs[19],InstructionDocs[4]),
             new Op(0x1F,"SLO","a,x"     ,3,nFlag | zFlag | cFlag | aChanges | memChanges,CycleDocs[19],InstructionDocs[5]),
 
-
             new Op(0x20,"JSR","a"       ,3,stackPChanges | pcChanges                    ,CycleDocs[5] ,InstructionDocs[10]),
             new Op(0x21,"AND","(d,x)"   ,2,nFlag | zFlag | aChanges                     ,CycleDocs[22],InstructionDocs[11]),
             new Op(0x22,"HLT","i"       ,1,0                                            ,CycleDocs[29],InstructionDocs[2]),
@@ -440,7 +439,7 @@ namespace TriCNES
             new Op(0x25,"AND","d"       ,2,nFlag | zFlag | aChanges                     ,CycleDocs[12],InstructionDocs[11]),
             new Op(0x26,"ROL","d"       ,2,nFlag | zFlag | cFlag | memChanges           ,CycleDocs[13],InstructionDocs[14]),
             new Op(0x27,"RLA","d"       ,2,nFlag | zFlag | cFlag | aChanges             ,CycleDocs[13],InstructionDocs[12]),
-            new Op(0x28,"PLP","i"       ,1,cFlag|zFlag|iFlag|dFlag|bFlag|tFlag|vFlag|nFlag,CycleDocs[4],InstructionDocs[15]),
+            new Op(0x28,"PLP","i"       ,1,cFlag|zFlag|iFlag|dFlag|vFlag|nFlag,CycleDocs[4],InstructionDocs[15]),
             new Op(0x29,"AND","#v"      ,2,nFlag | zFlag | aChanges                     ,CycleDocs[7] ,InstructionDocs[11]),
             new Op(0x2A,"ROL","A"       ,1,nFlag | zFlag | cFlag | aChanges             ,CycleDocs[6] ,InstructionDocs[14]),
             new Op(0x2B,"ANC","#v"      ,2,nFlag | zFlag | cFlag | aChanges             ,CycleDocs[7] ,InstructionDocs[7]),
@@ -662,8 +661,6 @@ namespace TriCNES
             new Op(0xFD,"SBC","a,x"     ,3,aChanges | nFlag | zFlag | cFlag | vFlag             ,CycleDocs[18],InstructionDocs[70]),
             new Op(0xFE,"INC","a,x"     ,3,memChanges | nFlag | zFlag                           ,CycleDocs[19],InstructionDocs[72]),
             new Op(0xFF,"ISC","a,x"     ,3,aChanges | memChanges | nFlag | zFlag | cFlag | vFlag,CycleDocs[19],InstructionDocs[71])
-
-
             };
 
 

@@ -2259,9 +2259,9 @@ namespace TriCNES
                 {
                     if (PPU_ShowRawNTSCSignal)
                     {
-                        R = NTSC_Samples[i] * 12;
-                        G = NTSC_Samples[i] * 12;
-                        B = NTSC_Samples[i] * 12;
+                        R = NTSC_Samples[i+8] * 12;
+                        G = NTSC_Samples[i+8] * 12;
+                        B = NTSC_Samples[i+8] * 12;
                         if (R < 0) { R = 0; }
                         if (R > 1) { R = 1; }
                         if (G < 0) { G = 0; }
@@ -8731,7 +8731,7 @@ namespace TriCNES
                         return PPUBus;
                     case 0x2004:
                         // Read from OAM
-                        return (byte)(ReadOAM() & 0xE3);
+                        return (byte)(ReadOAM());
                     case 0x2005:
                         // write only. Return the PPU databus.
                         return PPUBus;
@@ -11259,7 +11259,7 @@ namespace TriCNES
 
                 string TempLine_PPU = LogLine + "\t$2000:" + Observe(0x2000).ToString("X2") + "\t$2001:" + Observe(0x2001).ToString("X2") + "\t$2002:" + Observe(0x2002).ToString("X2") + "\tR/W Addr:" + PPU_ReadWriteAddress.ToString("X4") + "\tPPUAddrLatch:" + PPUAddrLatch + "\tPPU AddressBus: " + PPU_AddressBus.ToString("X4");
                 string TempLine_PPU2 = LogLine + "\tVRAMAddress:" + PPU_ReadWriteAddress.ToString("X4") + "\tPPUReadBuffer:" + PPU_VRAMAddressBuffer.ToString("X2");
-                string TempLine_PPU3 = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\tv: " + PPU_ReadWriteAddress.ToString("X4");
+                string TempLine_PPU3 = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\todd:" + PPU_OddFrame.ToString() + "\tv: " + PPU_ReadWriteAddress.ToString("X4");
 
                 string TempLine_MMC3IRQ = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\tIRQTimer:" + Cart.Mapper_4_IRQCounter + "\tIRQLatch: " + Cart.Mapper_4_IRQLatch + "\tIRQEnabled: " + Cart.Mapper_4_EnableIRQ + "\tDoIRQ: " + DoIRQ + "\tPPU_ADDR_Prev: " + PPU_ADDR_Prev.ToString("X4");
 

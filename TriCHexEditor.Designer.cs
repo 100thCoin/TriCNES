@@ -40,6 +40,8 @@
             this.pPUAddressSpaceToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.oAMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.paletteRAMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.copyToClipboardToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             ((System.ComponentModel.ISupportInitialize)(this.pb_hexView)).BeginInit();
             this.menuStrip1.SuspendLayout();
             this.SuspendLayout();
@@ -64,6 +66,7 @@
             // menuStrip1
             // 
             this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.fileToolStripMenuItem,
             this.settingsToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
@@ -89,7 +92,7 @@
             this.oAMToolStripMenuItem,
             this.paletteRAMToolStripMenuItem});
             this.scopeToolStripMenuItem.Name = "scopeToolStripMenuItem";
-            this.scopeToolStripMenuItem.Size = new System.Drawing.Size(106, 22);
+            this.scopeToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.scopeToolStripMenuItem.Text = "Scope";
             // 
             // rAMToolStripMenuItem
@@ -136,6 +139,21 @@
             this.paletteRAMToolStripMenuItem.Text = "Palette RAM";
             this.paletteRAMToolStripMenuItem.Click += new System.EventHandler(this.paletteRAMToolStripMenuItem_Click);
             // 
+            // fileToolStripMenuItem
+            // 
+            this.fileToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.copyToClipboardToolStripMenuItem});
+            this.fileToolStripMenuItem.Name = "fileToolStripMenuItem";
+            this.fileToolStripMenuItem.Size = new System.Drawing.Size(37, 20);
+            this.fileToolStripMenuItem.Text = "File";
+            // 
+            // copyToClipboardToolStripMenuItem
+            // 
+            this.copyToClipboardToolStripMenuItem.Name = "copyToClipboardToolStripMenuItem";
+            this.copyToClipboardToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.copyToClipboardToolStripMenuItem.Text = "Copy to Clipboard";
+            this.copyToClipboardToolStripMenuItem.Click += new System.EventHandler(this.copyToClipboardToolStripMenuItem_Click);
+            // 
             // TriCHexEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -170,5 +188,7 @@
         private System.Windows.Forms.ToolStripMenuItem pPUAddressSpaceToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem oAMToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem paletteRAMToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem copyToClipboardToolStripMenuItem;
     }
 }

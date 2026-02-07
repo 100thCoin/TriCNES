@@ -264,5 +264,29 @@ namespace TriCNES
         {
             ChangeScope(ScopeType.Palette_RAM);
         }
+
+        private void copyToClipboardToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            StringBuilder sb = new StringBuilder();
+            for(int i = 0; i < vScrollBar1.Maximum*0x10;i++)
+            {
+                switch (scopeType)
+                {
+                    case ScopeType.RAM:
+                        sb.Append(MainGUI.EMU.RAM[i].ToString("X2") + " "); break;
+                    case ScopeType.CPU_Address_Space:
+                        sb.Append(MainGUI.EMU.Observe((ushort)i).ToString("X2") + " "); break;
+                    case ScopeType.VRAM:
+                        sb.Append(MainGUI.EMU.VRAM[i].ToString("X2") + " "); break;
+                    case ScopeType.PPU_Address_Space:
+                        sb.Append(MainGUI.EMU.ObservePPU((ushort)i).ToString("X2") + " "); break;
+                    case ScopeType.OAM:
+                        sb.Append(MainGUI.EMU.OAM[i].ToString("X2") + " "); break;
+                    case ScopeType.Palette_RAM:
+                        sb.Append(MainGUI.EMU.PaletteRAM[i].ToString("X2") + " "); break;
+                }
+            }
+            Clipboard.SetText(sb.ToString());
+        }
     }
 }

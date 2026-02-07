@@ -765,6 +765,14 @@ namespace TriCNES
             {
                 NametableViewer.Dispose();
             }
+            if(TasTimeline != null)
+            {
+                TasTimeline.Dispose();
+            }
+            if (HexExditor != null)
+            {
+                HexExditor.Dispose();
+            }
             Application.Exit();
         }
 
