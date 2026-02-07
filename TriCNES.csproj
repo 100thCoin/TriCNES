@@ -42,6 +42,7 @@
     <Reference Include="PresentationCore" />
     <Reference Include="SDL2-CS, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>packages\ppy.SDL2-CS.1.0.82\lib\netstandard2.0\SDL2-CS.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -61,60 +62,60 @@
   <ItemGroup>
     <Compile Include="6502Documentation.cs" />
     <Compile Include="Emulator.cs" />
-    <Compile Include="TASProperties.cs">
+    <Compile Include="forms\TASProperties.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TASProperties.Designer.cs">
+    <Compile Include="forms\TASProperties.Designer.cs">
       <DependentUpon>TASProperties.cs</DependentUpon>
     </Compile>
-    <Compile Include="TASProperties3ct.cs">
+    <Compile Include="forms\TASProperties3ct.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TASProperties3ct.Designer.cs">
+    <Compile Include="forms\TASProperties3ct.Designer.cs">
       <DependentUpon>TASProperties3ct.cs</DependentUpon>
     </Compile>
-    <Compile Include="TriCHexEditor.cs">
+    <Compile Include="forms\TriCHexEditor.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TriCHexEditor.Designer.cs">
+    <Compile Include="forms\TriCHexEditor.Designer.cs">
       <DependentUpon>TriCHexEditor.cs</DependentUpon>
     </Compile>
-    <Compile Include="TriCNESGUI.cs">
+    <Compile Include="forms\TriCNESGUI.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TriCNESGUI.Designer.cs">
+    <Compile Include="forms\TriCNESGUI.Designer.cs">
       <DependentUpon>TriCNESGUI.cs</DependentUpon>
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TriCNTViewer.cs">
+    <Compile Include="forms\TriCNTViewer.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TriCNTViewer.Designer.cs">
+    <Compile Include="forms\TriCNTViewer.Designer.cs">
       <DependentUpon>TriCNTViewer.cs</DependentUpon>
     </Compile>
-    <Compile Include="TriCTASTimeline.cs">
+    <Compile Include="forms\TriCTASTimeline.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TriCTASTimeline.Designer.cs">
+    <Compile Include="forms\TriCTASTimeline.Designer.cs">
       <DependentUpon>TriCTASTimeline.cs</DependentUpon>
     </Compile>
-    <Compile Include="TriCTraceLogger.cs">
+    <Compile Include="forms\TriCTraceLogger.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TriCTraceLogger.Designer.cs">
+    <Compile Include="forms\TriCTraceLogger.Designer.cs">
       <DependentUpon>TriCTraceLogger.cs</DependentUpon>
     </Compile>
-    <EmbeddedResource Include="TASProperties.resx">
+    <EmbeddedResource Include="forms\TASProperties.resx">
       <DependentUpon>TASProperties.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="TASProperties3ct.resx">
+    <EmbeddedResource Include="forms\TASProperties3ct.resx">
       <DependentUpon>TASProperties3ct.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="TriCHexEditor.resx">
+    <EmbeddedResource Include="forms\TriCHexEditor.resx">
       <DependentUpon>TriCHexEditor.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="TriCNESGUI.resx">
+    <EmbeddedResource Include="forms\TriCNESGUI.resx">
       <DependentUpon>TriCNESGUI.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
@@ -126,13 +127,13 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <EmbeddedResource Include="TriCNTViewer.resx">
+    <EmbeddedResource Include="forms\TriCNTViewer.resx">
       <DependentUpon>TriCNTViewer.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="TriCTASTimeline.resx">
+    <EmbeddedResource Include="forms\TriCTASTimeline.resx">
       <DependentUpon>TriCTASTimeline.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="TriCTraceLogger.resx">
+    <EmbeddedResource Include="forms\TriCTraceLogger.resx">
       <DependentUpon>TriCTraceLogger.cs</DependentUpon>
     </EmbeddedResource>
     <None Include="app.config" />
@@ -156,5 +157,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
