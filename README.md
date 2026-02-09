@@ -1,6 +1,6 @@
 # TriCNES
 
-TriCNES, or "Coin's Contrabulous Cartswapulator", is a NES emulator designed for swapping NES cartridges between CPU cycles in order to try emulating a theoretical arbitrary code exploit for the Nintendo Entertainment System.
+TriCNES, or "Coin's Contrabulous Cartswapulator", is a Nintendo Entertainment System emulator written by Chris "100th_Coin" Siebert with a focus on test-driven accuracy. This emulator was originally made in order to experiment with a theorhetical arbitary code exploit I created titled "Intercycle Cartridge Swapping" where the NES cartridge is replaced every CPU cycle in order to run custom code. Intercycle Cartridge Swapping was later verified to work on real hardware by Youtube user Decrazyo.  
 
 This NES emulator was built from the ground up starting from a blank .net winforms project
 
@@ -14,13 +14,16 @@ This emulator only supports the following mapper chips:
 * 1: MMC1
 * 2: UxROM
 * 3: CNROM
-* 4: MMC3
+* 4: MMC3 (MMC6 support in the dev build)
 * 7: AOROM
+* 9: MMC2 (dev build)
 * 69: Sunsoft FME-7
 
 # Supported TAS file types
 
 Due to varying emulator accuracy, this emulator is not guaranteed to sync all TAS files. Despite this, it supports loading inputs from the following formats:
+* .3c2 (TriCNES) (dev build)
+* .3c3 (TriCNES TAS Timeline) (dev build)
 * .bk2 (Bizhawk)
 * .tasproj (Bizhawk's TAStudio)
 * .fm2 (FCEUX)

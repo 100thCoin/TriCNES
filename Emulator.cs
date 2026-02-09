@@ -28,7 +28,9 @@ namespace TriCNES
         public byte[] CHRRAM;       // If this cartridge has character RAM, this array is used.
         public bool UsingCHRRAM;    // Header info: CHR RAM doesn't exist on all cartridges.
 
-        public byte[] PRGRAM;         // PRG RAM / Battery backed save RAM.
+        public byte[] PRGRAM;       // PRG RAM / Battery backed save RAM.
+        public bool AlternativeNametableArrangement; // Header info: Some mapper chips support "alternative nametable arrangements", which are mapper-specific.
+        public byte[] PRGVRAM;      // PRG VRAM, for the alternative nametable arrangements.
 
         public Cartridge(String filepath) // Constructor from file path
         {
@@ -55,6 +57,11 @@ namespace TriCNES
             CHRRAM = new byte[0x2000];            // CHR RAM always has 2 kibibytes
 
             NametableHorizontalMirroring = ((ROM[6] & 1) == 0); // The style in which the nametable is mirrored is part of the iNES header.
+            AlternativeNametableArrangement = ((ROM[6] & 8) != 0); // Some mappers support other arrangements.
+            if(AlternativeNametableArrangement)
+            {
+                PRGVRAM = new byte[0x800];
+            }
 
             Array.Copy(ROM, 0x10, PRGROM, 0, PRGROM.Length); // This sets up the PRG ROM array with the values from the .nes file
             Array.Copy(ROM, 0x10 + PRGROM.Length, CHRROM, 0, CHRROM.Length); // This sets up the CHR ROM array with the values from the .nes file
@@ -2159,6 +2166,7 @@ namespace TriCNES
             }
         }
         public bool PPU_ShowRawNTSCSignal;
+
         void RenderNTSCScanline()
         {
             byte phase = ntsc_signal_of_dot_0;
@@ -2186,12 +2194,14 @@ namespace TriCNES
                     double Y = 0;
                     double U = 0;
                     double V = 0;
+                    int k = 0;
                     for (int p = begin; p < end; ++p) // Collect and accumulate samples
                     {
                         float sample = bordered ? (Bordered_NTSC_Samples[p]) : (NTSC_Samples[p]);
                         Y += sample;
-                        U += sample * SinTable[(phase + p) % 12];
-                        V += sample * CosTable[(phase + p) % 12];
+                        U += (sample * SinTable[(phase + p) % 12]);
+                        V += (sample * CosTable[(phase + p) % 12]);
+                        k++;
                     }
 
                     //U *= (0.35355339 * 2);
@@ -9102,6 +9112,18 @@ namespace TriCNES
                     // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
                     return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
                 }
+                if(Cart.AlternativeNametableArrangement)
+                {
+                    if(Cart.MemoryMapper == 4)
+                    {
+                        if((Address & 0x800) != 0)
+                        {
+                            // using the extra PRG VRAM.
+                            Address &= 0x7FF;
+                            return Cart.PRGVRAM[Address];
+                        }
+                    }
+                }
                 Address &= 0x7FF;
                 return VRAM[Address];
             }
@@ -9201,6 +9223,18 @@ namespace TriCNES
                     // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
                     return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
                 }
+                if (Cart.AlternativeNametableArrangement)
+                {
+                    if (Cart.MemoryMapper == 4)
+                    {
+                        if ((Address & 0x800) != 0)
+                        {
+                            // using the extra PRG VRAM.
+                            Address &= 0x7FF;
+                            return Cart.PRGVRAM[Address];
+                        }
+                    }
+                }
                 Address &= 0x7FF;
                 return VRAM[Address];
             }
@@ -9261,14 +9295,18 @@ namespace TriCNES
                 case 4:
                 case 118:
                 case 119: // MMC3
-                    if (Cart.Mapper_4_NametableMirroring) //horizontal
+                    if (!Cart.AlternativeNametableArrangement)
                     {
-                        Address = (ushort)((Address & 0x33FF) | ((Address & 0x0800) >> 1)); // mask away $0C00, bit 10 becomes the former bit 11
+                        if (Cart.Mapper_4_NametableMirroring) //horizontal
+                        {
+                            Address = (ushort)((Address & 0x33FF) | ((Address & 0x0800) >> 1)); // mask away $0C00, bit 10 becomes the former bit 11
+                        }
+                        else //vertical
+                        {
+                            Address &= 0x37FF; // mask away $0800
+                        }
                     }
-                    else //vertical
-                    {
-                        Address &= 0x37FF; // mask away $0800
-                    }
+                    // Else, we're using a 4 nametablee arrangement. There is no mirroring.
                     break;
                 case 7: // AOROM
                     if ((Cart.Mapper_7_BankSelect & 0x10) == 0) // show nametable 0
@@ -10289,6 +10327,18 @@ namespace TriCNES
             }
             else // if this is not pointing to CHR RAM or palettes
             {
+                if (Cart.AlternativeNametableArrangement)
+                {
+                    if (Cart.MemoryMapper == 4)
+                    {
+                        if ((Address & 0x800) != 0)
+                        {
+                            // using the extra PRG VRAM.
+                            Cart.PRGVRAM[Address & 0x7FF] = In;
+                            return;
+                        }
+                    }
+                }
                 VRAM[Address & 0x7FF] = In;
 
             }
