@@ -1200,6 +1200,22 @@ namespace TriCNES
                                 {
                                     break;
                                 }
+                                if (ByteArray[i + 1] == 0x0A)
+                                {
+                                    // The .fm2 TAS file format supports empty rows. Formatting quirk?
+                                    i++;
+                                    continue;
+                                }
+                                if (ByteArray[i + 1] == 0x23)
+                                {
+                                    // The .fm2 TAS file format supports comments, in the following format:
+                                    //\n### Comment
+                                    // so basically, check for `#` as the next character.
+
+                                    // And now we skip until the next new line.
+                                    i++;
+                                    continue;
+                                }
                                 bool reset = (ByteArray[i + 2] & 1) == 1;
                                 if (fm2_UsePort0)
                                 {
