@@ -62,6 +62,7 @@ namespace TriCNES
             this.label_AutoSavestateThreshold = new System.Windows.Forms.Label();
             this.tb_AutoSavestateThreshold = new System.Windows.Forms.TextBox();
             this.cb_RecordInputs = new System.Windows.Forms.CheckBox();
+            this.cb_player2 = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.pb_Timeline)).BeginInit();
             this.menuStrip1.SuspendLayout();
             this.contextMenuStrip_Timeline.SuspendLayout();
@@ -72,13 +73,13 @@ namespace TriCNES
             // 
             this.pb_Timeline.Location = new System.Drawing.Point(12, 27);
             this.pb_Timeline.Name = "pb_Timeline";
-            this.pb_Timeline.Size = new System.Drawing.Size(337, 657);
+            this.pb_Timeline.Size = new System.Drawing.Size(353, 657);
             this.pb_Timeline.TabIndex = 7;
             this.pb_Timeline.TabStop = false;
             // 
             // timelineScrollbar
             // 
-            this.timelineScrollbar.Location = new System.Drawing.Point(352, 27);
+            this.timelineScrollbar.Location = new System.Drawing.Point(372, 27);
             this.timelineScrollbar.Name = "timelineScrollbar";
             this.timelineScrollbar.Size = new System.Drawing.Size(19, 657);
             this.timelineScrollbar.TabIndex = 2;
@@ -343,11 +344,24 @@ namespace TriCNES
         "verwrite older frames if you rewind.");
             this.cb_RecordInputs.UseVisualStyleBackColor = true;
             // 
+            // cb_player2
+            // 
+            this.cb_player2.AutoSize = true;
+            this.cb_player2.Location = new System.Drawing.Point(508, 89);
+            this.cb_player2.Name = "cb_player2";
+            this.cb_player2.Size = new System.Drawing.Size(64, 17);
+            this.cb_player2.TabIndex = 15;
+            this.cb_player2.Text = "Player 2";
+            this.Tooltip_.SetToolTip(this.cb_player2, "If checked, the inputs you provide will be recorded on the timeline.\r\nThis will o" +
+        "verwrite older frames if you rewind.");
+            this.cb_player2.UseVisualStyleBackColor = true;
+            // 
             // TriCTASTimeline
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(745, 743);
+            this.Controls.Add(this.cb_player2);
             this.Controls.Add(this.cb_RecordInputs);
             this.Controls.Add(this.label_AutoSavestateThreshold);
             this.Controls.Add(this.tb_AutoSavestateThreshold);
@@ -407,5 +421,6 @@ namespace TriCNES
         private ToolStripMenuItem cellFrequencyToolStripMenuItem;
         private ToolStripMenuItem perVBlankToolStripMenuItem;
         private ToolStripMenuItem perControllerStrobeToolStripMenuItem;
+        private CheckBox cb_player2;
     }
 }

@@ -255,8 +255,7 @@ namespace TriCNES
                 EMU._CoreFrameAdvance();
                 RunPostFramePhase();
                 frameCount++;
-            }
-            
+            }            
         }
 
         DirectBitmap NametableBitmap;
@@ -524,6 +523,7 @@ namespace TriCNES
             EMU.Cart = Cart;
             EMU.TAS_ReadingTAS = true;
             EMU.TAS_InputLog = TASPropertiesForm.TasInputLog;
+            EMU.TAS_ResetLog = TASPropertiesForm.TasResetLog;
             EMU.ClockFiltering = TASPropertiesForm.SubframeInputs();
             EMU.PPUClock = TASPropertiesForm.GetPPUClockPhase();
             EMU.CPUClock = TASPropertiesForm.GetCPUClockPhase();
@@ -1068,13 +1068,14 @@ namespace TriCNES
             }
         }
 
-        public List<ushort> ParseTasFile(string TasFilePath)
+        public List<ushort> ParseTasFile(string TasFilePath, out List<bool> Resets)
         {
             // determine file type
             string extension = Path.GetExtension(TasFilePath);
             // create list of inputs from the tas file, and make any settings changes if needed.
             byte[] ByteArray = File.ReadAllBytes(TasFilePath);
             List<ushort> TASInputs = new List<ushort>(); // Low byte is player 1, High byte is player 2.
+            List<bool> TASResets = new List<bool>();
 
             switch (extension)
             {
@@ -1132,6 +1133,7 @@ namespace TriCNES
                                 u |= (ushort)(lnCharArray[pipeIndex + 8] == 'A' ? 0x8000 : 0);
                             }
                             TASInputs.Add(u);
+                            TASResets.Add(reset);
                             ln = InputLog.ReadLine();
                             if (ln == "[/Input]")
                             {
@@ -1143,7 +1145,6 @@ namespace TriCNES
                 case ".fm2":
                     {
                         // change the alignment to use FCEUX's
-
                         // header info of varying size
                         // Every line of a header ends in $0A
                         // Every header section is named. Example: $0A "romFileName"
@@ -1199,6 +1200,7 @@ namespace TriCNES
                                 {
                                     break;
                                 }
+                                bool reset = (ByteArray[i + 2] & 1) == 1;
                                 if (fm2_UsePort0)
                                 {
                                     Port0Index = i + 4;
@@ -1236,6 +1238,7 @@ namespace TriCNES
                                     u |= (ushort)(ByteArray[Port1Index + 7] == 0x2E ? 0 : 0x8000);
                                 }
                                 TASInputs.Add(u);
+                                TASResets.Add(reset);
 
                             }
                             i++;
@@ -1314,11 +1317,13 @@ namespace TriCNES
                                         ushort u = 0;
                                         while (i < next0A + 2 + InputLogByteLength)
                                         {
+                                            bool reset = (ByteArray[i] & 1) == 1;
                                             i++;// dummy byte (?)
                                             u = 0;
                                             if (fm3_UsePort0) { u = ByteArray[i]; i++; }
                                             if (fm3_UsePort1) { u |= (ushort)(ByteArray[i] << 8); i++; }
                                             TASInputs.Add(u);
+                                            TASResets.Add(reset);
                                         }
 
                                     }
@@ -1358,10 +1363,41 @@ namespace TriCNES
                     }
                     break;
                 case ".3c2":
+                    {
+                        // The .3c2 format is pretty much identical to the .r08 file format, but with a 1-byte header.
+                        // Bit 0: 0 = Latch Filtering. 1 = Clock Filtering.
+                        // Bit 1: 0 = Only controller 1. 1 = Controller 1 and controller 2.
+                        // Bit 2: 0 = No reset button. 1 = The reset button is used in this TAS.
+
+                        bool UseController2 = (ByteArray[0] & 2) != 0;
+                        bool UseReset = (ByteArray[0] & 4) != 0;
+
+                        byte b = 0;
+                        byte b2 = 0;
+                        int i = 1;
+                        while (i < ByteArray.Length)
+                        {
+                            b = ByteArray[i];
+                            i++;
+                            if (UseController2)
+                            {
+                                b2 = ByteArray[i];
+                                i++;
+                            }
+                            TASInputs.Add((ushort)(b | (b2 << 8)));
+                            if (UseReset)
+                            {
+                                bool res = (ByteArray[i] & 0x80) == 0x80; // I use bit 7 for the reset button. (bit 0 is for lag frames in the .3c3 format.)
+                                TASResets.Add(res);
+                                i++;
+                            }
+                        }
+                        TASInputs.Add(0); // append a zero to the end for safe measure.
+                    }
+                    break;
                 case ".r08":
                     {
                         // the .r08 file format is conveniently already in the format I want for my emulator.
-                        // I also pretty much format my own .3c2 format in the exact same way.
                         byte b = 0;
                         byte b2 = 0;
                         int i = 0;
@@ -1382,15 +1418,23 @@ namespace TriCNES
                         // - .3c3 saves the savestate information
                         // - .3c3 saves the "lag frame" information as well. (So every frame is 3 bytes now.)
 
-                        // .3c3 has a 8 byte header.
-                        // It's just little-endian 32-bit integers.
+                        // .3c3 has a 16 byte header.
+                        // It's just little-endian 32-bit integers, and the same 1-byte header used in .3c2's.
                         // The first one determines how many bytes are in every savestate.
                         // the second one determinines how many frames there are in this TAS.
                         // I guess that means there's a limit of 2,147,483,647 frames in a .3c3 TAS file. God help me if I ever feel compelled to challenge this.
+                        // Then there's a handful of unused bytes. ByteArray[15] is the same format as the 1-byte header used in 3c2's.
+                        // Bit 0: 0 = Latch Filtering. 1 = Clock Filtering.
+                        // Bit 1: 0 = Only controller 1. 1 = Controller 1 and controller 2.
+                        // Bit 2: 0 = No reset button. 1 = The reset button is used in this TAS.
+
 
                         int SavestateLength = ByteArray[0] | (ByteArray[1] << 8) | (ByteArray[2] << 16) | (ByteArray[3] << 24);
                         int rerecords = ByteArray[4] | (ByteArray[5] << 8) | (ByteArray[6] << 16) | (ByteArray[7] << 24);
                         int frameCount = ByteArray[8] | (ByteArray[9] << 8) | (ByteArray[10] << 16) | (ByteArray[11] << 24);
+
+                        bool UseController2 = (ByteArray[15] & 2) != 0;
+                        bool UseReset = (ByteArray[15] & 4) != 0;
 
                         List<List<byte>> saveStates = new List<List<byte>>();
                         List<List<byte>> saveStates2 = new List<List<byte>>();
@@ -1398,16 +1442,28 @@ namespace TriCNES
 
                         byte b = 0;
                         byte b2 = 0;
-                        int i = 12;
-                        while (i < frameCount * 3 + 12)
+                        int i = 16;
+                        while (i < frameCount * 3 + 16)
                         {
                             b = ByteArray[i];
-                            b2 = ByteArray[i + 1];
+                            i++;
+                            if (UseController2)
+                            {
+                                b2 = ByteArray[i];
+                                i++;
+                            }
                             TASInputs.Add((ushort)(b | (b2 << 8)));
+                            bool lagframe = (ByteArray[i] & 1) == 1; // I use bit 0 for the lag frame info.
+                            lagFrames.Add(lagframe);
+                            if (UseReset)
+                            {
+                                bool res = (ByteArray[i] & 0x80) == 0x80; // I use bit 7 for the reset button.
+                                TASResets.Add(res);
+                            }
+                            i++;
                             saveStates.Add(new List<byte>());
                             saveStates2.Add(new List<byte>());
-                            lagFrames.Add(ByteArray[i + 2] == 1);
-                            i += 3;
+
                         }
 
                         // and from here until you reach the end of the file, the data is arranged in the following format:
@@ -1440,6 +1496,12 @@ namespace TriCNES
                     break;
                     // TODO: ask if the .tasd file format is a thing yet
             }
+            if (TASResets.Count == 0) // If not using Resets, we still want to initialize the Resets list, in case they are added to the TAS timeline at a later point.
+            {
+                TASResets = new List<bool>(new bool[TASInputs.Count]);
+            }
+
+            Resets = TASResets;
             return TASInputs;
         }
         byte FamtasiaInput2Standard(byte input)
@@ -1529,7 +1591,7 @@ namespace TriCNES
                     EMU.PPUClock = settings_alignment;
                     Cartridge Cart = new Cartridge(filePath);
                     EMU.Cart = Cart;
-                    if(Timeline_PendingClockFiltering)
+                    if (Timeline_PendingClockFiltering)
                     {
                         Timeline_PendingClockFiltering = false;
                         EMU.TASTimelineClockFiltering = true;
@@ -1619,7 +1681,7 @@ namespace TriCNES
                 if (Timeline_AutoPlayUntilTarget && TasTimeline.frameIndex >= Timeline_AutoPlayTarget)
                 {
                     Timeline_AutoPlayUntilTarget = false;
-                }                
+                }
 
                 RunUpkeep();
                 if (Timeline_Paused && !FrameAdvance && !Timeline_AutoPlayUntilTarget)
@@ -1669,13 +1731,22 @@ namespace TriCNES
                     if (TasTimeline.RecordInputs() && !rewinding)
                     {
                         byte realtimeInputs = RealtimeInputs();
-                        EMU.ControllerPort1 = realtimeInputs;
-                        EMU.ControllerPort2 = 0;
-                        TriCTASTimeline.Inputs[TasTimeline.frameIndex] = realtimeInputs;
+                        if (TasTimeline.Player2())
+                        {
+                            EMU.ControllerPort2 = realtimeInputs;
+                            EMU.ControllerPort1 = 0;
+                        }
+                        else
+                        {
+                            EMU.ControllerPort1 = realtimeInputs;
+                            EMU.ControllerPort2 = 0;
+                        }
+                        ushort rimputs = (ushort)((EMU.ControllerPort2 << 8) | EMU.ControllerPort1);
+                        TriCTASTimeline.Inputs[TasTimeline.frameIndex] = rimputs;
                         int row = TasTimeline.frameIndex - TasTimeline.TopFrame;
                         if (row >= 0 && row < 40)
                         {
-                            TasTimeline.RecalculateTimelineRow(row, realtimeInputs);
+                            TasTimeline.RecalculateTimelineRow(row, rimputs);
                             TasTimeline.RedrawTimelineRow(row, false);
                         }
                         if (TasTimeline.frameIndex < TasTimeline.frameEmulated)
@@ -1692,6 +1763,11 @@ namespace TriCNES
 
                     EMU._CoreFrameAdvance();
                     RunPostFramePhase();
+                    if (TasTimeline.frameIndex < TriCTASTimeline.Resets.Count && TriCTASTimeline.Resets[TasTimeline.frameIndex])
+                    {
+                        EMU.Reset();
+                    }
+
                     if (!EMU.TASTimelineClockFiltering || !EMU.LagFrame)
                     {
                         TasTimeline.FrameAdvance();
@@ -1701,7 +1777,7 @@ namespace TriCNES
                         //Timeline_PendingFrameAdvance = true; // keep running until a non-lag frame.
                     }
                 }
-            }   
+            }
         }
 
         public bool[] OtherControllerHotkeys()

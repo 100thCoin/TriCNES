@@ -531,7 +531,7 @@ namespace TriCNES
             CycleCountForCycleTAS++;
         }
 
-        void _EmulatorCore()
+        public void _EmulatorCore()
         {
             // master clock
             MasterClock++;
@@ -780,6 +780,10 @@ namespace TriCNES
                             }
                             if (ClockFiltering)
                             {
+                                if (TAS_InputSequenceIndex > 0 && TAS_InputSequenceIndex < TAS_ResetLog.Length && TAS_ResetLog[TAS_InputSequenceIndex])
+                                {
+                                    Reset();
+                                }
                                 TAS_InputSequenceIndex++; // Instead of using 1 input per frame, this just advances to the next input
                             }
 
@@ -1444,7 +1448,11 @@ namespace TriCNES
                     }
                     if (!ClockFiltering) // specifically for TASing stuff. Increment the index for the input log.
                     {
-                        // If this was using "SubFrame", TAS_InputSequenceIndex is incremented evnever the controller is strobed.
+                        if (TAS_ReadingTAS && TAS_InputSequenceIndex > 0 && TAS_InputSequenceIndex < TAS_ResetLog.Length && TAS_ResetLog[TAS_InputSequenceIndex])
+                        {
+                            Reset();
+                        }
+                        // If this was using "SubFrame", TAS_InputSequenceIndex is incremented whenever the controller is strobed.
                         // Instead, I increment the index here at the start of vblank.
                         TAS_InputSequenceIndex++;
                     }
@@ -9866,6 +9874,7 @@ namespace TriCNES
         public bool TAS_ReadingTAS;         // if we're reading inputs from a TAS, this will be set.
         public int TAS_InputSequenceIndex;  // which index from the TAS input log will be used for this current controller strobe?
         public ushort[] TAS_InputLog; // controller [22222222 11111111]
+        public bool[] TAS_ResetLog; // just a list of booleans determining if we should soft-reset on this frame or not.
         public bool ClockFiltering = false; // If set, TAS_InputSequenceIndex increments every time the controllers are strobed (or clocked, if the controller is held strobing). Otherwise, "latch filtering" is used, incrementing TAS_InputSequenceIndex once a frame.
         public bool SyncFM2; // This is set if we're running an FM2 TAS, which (due to FCEUX's very incorrect timing of the first frame after power on) I need to start execution on scanline 240, and prevent the vblank flag from being set.
         public void Store(byte Input, ushort Address)

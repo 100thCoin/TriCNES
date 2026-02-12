@@ -64,8 +64,7 @@ namespace TriCNES
         {
             MainGUI = Maingui;
             InitializeComponent();
-            Inputs = new List<ushort>();
-            Inputs.Add(0);
+
             Font_Consolas = new Font("Consolas", 8);
             Brush_LeftColumn = new SolidBrush(Color.LightGray);
             Brush_LeftColumn_Saved = new SolidBrush(Color.Wheat);
@@ -81,10 +80,13 @@ namespace TriCNES
             Brush_RedCellP2 = new SolidBrush(Color.FromArgb(255, 232, 190, 190));
             Brush_RedCellP1_Stale = new SolidBrush(Color.FromArgb(255, 220, 205, 205));
             Brush_RedCellP2_Stale = new SolidBrush(Color.FromArgb(255, 215, 195, 195));
+            Inputs = new List<ushort>();
 
             Start();
+            Inputs.Add(0);
+            Resets.Add(false);
 
-            timelineBitmap = new Bitmap(80 + 16 * 16 + 1, 41 * 16 + 1);
+            timelineBitmap = new Bitmap(80 + 16 * 17 + 1, 41 * 16 + 1);
             G = Graphics.FromImage(timelineBitmap);
             pb_Timeline.Image = timelineBitmap;
             pb_Timeline.MouseDown += mouseDownEvent;
@@ -99,17 +101,25 @@ namespace TriCNES
             loopTimer.Enabled = false;
             loopTimer.Elapsed += loopTimerEvent;
             loopTimer.AutoReset = true;
+
+            autosave = new System.Timers.Timer();
+            autosave.Interval = 60000;
+            autosave.Elapsed += autosaveEvent;
+            autosave.AutoReset = true;
+            autosave.Enabled = true;
+
+
             Shown += TriCTASTimeline_Shown;
         }
 
         private void mouseWheelEvent(object sender, MouseEventArgs e)
         {
             int result = timelineScrollbar.Value - Math.Sign(e.Delta);
-            if(result > timelineScrollbar.Maximum - timelineScrollbar.LargeChange +1)
+            if (result > timelineScrollbar.Maximum - timelineScrollbar.LargeChange + 1)
             {
-                result = timelineScrollbar.Maximum - timelineScrollbar.LargeChange +1;
+                result = timelineScrollbar.Maximum - timelineScrollbar.LargeChange + 1;
             }
-            else if(result < 0)
+            else if (result < 0)
             {
                 result = 0;
             }
@@ -141,9 +151,10 @@ namespace TriCNES
                 new Rectangle(80 + 16*12,0,16,16),
                 new Rectangle(80 + 16*13,0,16,16),
                 new Rectangle(80 + 16*14,0,16,16),
-                new Rectangle(80 + 16*15,0,16,16)
+                new Rectangle(80 + 16*15,0,16,16),
+                new Rectangle(80 + 16*16,0,16,16)
                 };
-            G.FillRectangle(Brush_LeftColumn, new Rectangle(0, 0, 80 + 16 * 16, 16));
+            G.FillRectangle(Brush_LeftColumn, new Rectangle(0, 0, 80 + 16 * 17, 16));
             G.DrawRectangles(Pens.Black, GridOverlay);
             G.DrawString(ClockFiltering ? "Input #" : "Frame #", Font_Consolas, Brushes.Black, 0, 0);
             G.DrawString("A", Font_Consolas, Brushes.Black, 80 + 16 * 0, 0);
@@ -162,6 +173,7 @@ namespace TriCNES
             G.DrawString("D", Font_Consolas, Brushes.Black, 80 + 16 * 13, 0);
             G.DrawString("L", Font_Consolas, Brushes.Black, 80 + 16 * 14, 0);
             G.DrawString("R", Font_Consolas, Brushes.Black, 80 + 16 * 15, 0);
+            G.DrawString("r", Font_Consolas, Brushes.Black, 80 + 16 * 16, 0);
             RefreshTimeline();
         }
 
@@ -169,10 +181,34 @@ namespace TriCNES
         public Bitmap timelineBitmap;
 
         private static System.Timers.Timer loopTimer;
+
+        private static System.Timers.Timer autosave;
+
         private void loopTimerEvent(Object source, ElapsedEventArgs e)
         {
             //this does whatever you want to happen while clicking on the button
-            MainGUI.Timeline_PendingMouseHeld = true;            
+            MainGUI.Timeline_PendingMouseHeld = true;
+        }
+
+        private void autosaveEvent(Object source, ElapsedEventArgs e)
+        {
+            if (Inputs.Count > 1000)
+            {
+                string InitDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                if (Directory.Exists(AppDomain.CurrentDomain.BaseDirectory + @"tas\"))
+                {
+                    InitDirectory += @"tas\";
+                }
+                InitDirectory += "autosave.3c2";
+                FileStream fs = File.OpenWrite(InitDirectory);
+                for (int i = 0; i < Inputs.Count; i++)
+                {
+                    fs.WriteByte((byte)Inputs[i]);
+                    fs.WriteByte((byte)(Inputs[i] >> 8));
+                }
+                fs.Close();
+            }
+
         }
 
         public void TimelineMouseHeldEvent()
@@ -204,14 +240,33 @@ namespace TriCNES
 
                         for (int i = spos; i <= tpos; i++)
                         {
-                            bool state = GetCellInputStatus(new Vector2(mouseHeld_initPos.x, i));
-                            if (state != mouseHeld_setInput)
+                            if (mouseHeld_initPos.x == 16)
                             {
-                                ushort input = SetCellInputStatus(new Vector2(mouseHeld_initPos.x, i), mouseHeld_setInput);
-                                TimelineGrid[i][mouseHeld_initPos.x + 1].Checked = mouseHeld_setInput;
-
-                                RecalculateTimelineRow(i, input);
+                                TimelineGrid[i][17].Checked = mouseHeld_setInput;
                                 RedrawTimelineRow(i, false);
+                                int frame = i + TopFrame;
+                                while (frame >= Inputs.Count)
+                                {
+                                    Inputs.Add(0);
+                                    Resets.Add(false);
+                                }
+                                if (Inputs.Count + 39 > timelineScrollbar.Maximum)
+                                {
+                                    timelineScrollbar.Maximum = Inputs.Count + 38;
+                                }
+                                Resets[frame] = mouseHeld_setInput;
+                            }
+                            else
+                            {
+                                bool state = GetCellInputStatus(new Vector2(mouseHeld_initPos.x, i));
+                                if (state != mouseHeld_setInput)
+                                {
+                                    ushort input = SetCellInputStatus(new Vector2(mouseHeld_initPos.x, i), mouseHeld_setInput);
+                                    TimelineGrid[i][mouseHeld_initPos.x + 1].Checked = mouseHeld_setInput;
+
+                                    RecalculateTimelineRow(i, input);
+                                    RedrawTimelineRow(i, false);
+                                }
                             }
                         }
                         int checkStale = spos + TopFrame;
@@ -236,7 +291,7 @@ namespace TriCNES
         public int TopFrame = 0;
 
         Vector2 mouseHeld_initPos;
-        bool mouseHeld_setInput; 
+        bool mouseHeld_setInput;
         private void mouseDownEvent(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Right)
@@ -248,7 +303,7 @@ namespace TriCNES
             int mouseY = MousePosition.Y - Top - pb_Timeline.Top - 48;
 
             int Column = mouseX >= 80 ? (mouseX - 80) / 16 : -1;
-            if (Column > 15) { Column = 15; }
+            if (Column > 16) { Column = 16; }
 
             int Row = mouseY >= 0 ? mouseY / 16 : -1;
             if (Row > 39) { Row = 39; }
@@ -262,21 +317,39 @@ namespace TriCNES
         public void TimelineMouseDownEvent()
         {
             MethodInvoker upd = delegate
-            {            
+            {
                 if (mouseHeld_initPos.y >= 0)
                 {
                     if (mouseHeld_initPos.x >= 0)
                     {
                         // we clicked on a cell
-                        // calculate if that cell had an input or not.
                         mouseHeld_setInput = !GetCellInputStatus(mouseHeld_initPos);
-                        ushort input = SetCellInputStatus(mouseHeld_initPos, mouseHeld_setInput);
-                        TimelineGrid[mouseHeld_initPos.y][mouseHeld_initPos.x + 1].Checked = mouseHeld_setInput;
-
-                        RecalculateTimelineRow(mouseHeld_initPos.y, input);
-                        RedrawTimelineRow(mouseHeld_initPos.y, false);
-
                         int frameClicked = TopFrame + mouseHeld_initPos.y;
+
+                        if (mouseHeld_initPos.x == 16)
+                        {
+                            TimelineGrid[mouseHeld_initPos.y][17].Checked = mouseHeld_setInput;
+                            RedrawTimelineRow(mouseHeld_initPos.y, false);
+                            while (frameClicked >= Inputs.Count)
+                            {
+                                Inputs.Add(0);
+                                Resets.Add(false);
+                            }
+                            if (Inputs.Count + 39 > timelineScrollbar.Maximum)
+                            {
+                                timelineScrollbar.Maximum = Inputs.Count + 38;
+                            }
+                            Resets[frameClicked] = mouseHeld_setInput;
+                        }
+                        else
+                        {
+                            // calculate if that cell had an input or not.
+                            ushort input = SetCellInputStatus(mouseHeld_initPos, mouseHeld_setInput);
+                            TimelineGrid[mouseHeld_initPos.y][mouseHeld_initPos.x + 1].Checked = mouseHeld_setInput;
+
+                            RecalculateTimelineRow(mouseHeld_initPos.y, input);
+                            RedrawTimelineRow(mouseHeld_initPos.y, false);
+                        }
                         if (frameClicked < frameEmulated)
                         {
                             MarkStale(frameClicked);
@@ -289,15 +362,15 @@ namespace TriCNES
                         // - If there exists a savestate for this frame, then simply laod it.
                         // - Otherwise, we haven't seen this frame yet. Load the last savestate in the list, then emulate to this frame.
                         int frameClicked = TopFrame + mouseHeld_initPos.y;
-                        if(frameClicked == frameIndex)
+                        if (frameClicked == frameIndex)
                         {
                             return; // we're already on that frame!
                         }
                         if (frameClicked < frameEmulated && (TimelineSavestates[frameClicked].Count == SavestateLength || TimelineTempSavestates[frameClicked].Count == SavestateLength))
                         {
                             int prevrow = frameIndex - TopFrame;
-                            frameIndex = frameClicked-1; // and we're good to go.
-                            if(frameIndex == -1)
+                            frameIndex = frameClicked - 1; // and we're good to go.
+                            if (frameIndex == -1)
                             {
                                 frameIndex = 0;
                                 MainGUI.Timeline_LoadState = TimelineSavestates[0];
@@ -319,7 +392,7 @@ namespace TriCNES
                                 UpdateTimelineRowStatus(prevrow);
                                 RedrawTimelineRow(prevrow, false);
                             }
-                            
+
 
                         }
                         else
@@ -327,7 +400,7 @@ namespace TriCNES
                             int row = frameIndex - TopFrame;
                             int prevFrame = frameIndex;
                             frameIndex = frameClicked;
-                            if(frameIndex > frameEmulated)
+                            if (frameIndex > frameEmulated)
                             {
                                 frameIndex = frameEmulated;
                             }
@@ -366,6 +439,7 @@ namespace TriCNES
                             while (frameIndex >= Inputs.Count)
                             {
                                 Inputs.Add(0);
+                                Resets.Add(false);
                             }
                             if (Inputs.Count + 39 > timelineScrollbar.Maximum)
                             {
@@ -407,15 +481,19 @@ namespace TriCNES
 
         bool GetCellInputStatus(Vector2 pos)
         {
-            if(pos.x < 0 || pos.y < 0)
+            if (pos.x < 0 || pos.y < 0)
             {
                 return false; // should never happen
             }
-            // get frame index
             int frame = pos.y + TopFrame;
-            if(frame >= Inputs.Count)
+            // get frame index
+            if (frame >= Inputs.Count)
             {
                 return false;
+            }
+            if (pos.x == 16)
+            {
+                return Resets[frame];
             }
             int shift = (7 - (pos.x & 7)) | (pos.x & 8);
             return ((Inputs[frame] >> shift) & 1) == 1;
@@ -437,10 +515,12 @@ namespace TriCNES
                 {
                     //Inputs.Add((ushort)(1 << shift));
                     Inputs.Add(0);
+                    Resets.Add(false);
                 }
                 else
                 {
                     Inputs.Add(0);
+                    Resets.Add(false);
                 }
             }
             if ((Inputs.Count > prevInputs))
@@ -465,6 +545,7 @@ namespace TriCNES
         public static List<List<byte>> TimelineSavestates;
         public static List<List<byte>> TimelineTempSavestates;
         public static List<int> TEMPRerecordTracker;
+        public static List<bool> Resets;
 
         public static List<ushort> Inputs; // high byte = controller 2
 
@@ -481,13 +562,14 @@ namespace TriCNES
             TimelineSavestates = new List<List<byte>>();
             TimelineTempSavestates = new List<List<byte>>();
             LagFrames = new List<bool>();
+            Resets = new List<bool>();
             //TEMPRerecordTracker = new List<int>();
 
 
             for (int i = 0; i < 40; i++)
             {
-                TimelineCell[] t = new TimelineCell[17];
-                for(int j = 0; j < t.Length; j++)
+                TimelineCell[] t = new TimelineCell[18];
+                for (int j = 0; j < t.Length; j++)
                 {
                     t[0] = new TimelineCell(false);
                 }
@@ -568,13 +650,17 @@ namespace TriCNES
         public void FrameAdvance()
         {
             frameIndex++;
-            if(frameIndex > LagFrames.Count)
+            if (frameIndex > LagFrames.Count)
             {
                 LagFrames.Add(MainGUI.EMU.LagFrame);
             }
             else
             {
-                LagFrames[frameIndex-1] = MainGUI.EMU.LagFrame;
+                LagFrames[frameIndex - 1] = MainGUI.EMU.LagFrame;
+            }
+            if (frameIndex > Resets.Count)
+            {
+                Resets.Add(false);
             }
             if (frameIndex > frameEmulated)
             {
@@ -625,6 +711,7 @@ namespace TriCNES
             while (frameIndex >= Inputs.Count)
             {
                 Inputs.Add(0);
+                Resets.Add(false);
                 MethodInvoker upd = delegate
                 {
                     timelineScrollbar.Maximum = Inputs.Count + 38;
@@ -653,7 +740,7 @@ namespace TriCNES
                     }
                 }
             }
-            if(!didFullRefresh)
+            if (!didFullRefresh)
             {
                 UpdateTimelineRowStatus(row - 1);
                 RedrawTimelineRow(row - 1, false);
@@ -687,7 +774,7 @@ namespace TriCNES
             if (ofd.ShowDialog() == DialogResult.OK)
             {
                 frameIndex = 0;
-                Inputs = MainGUI.ParseTasFile(ofd.FileName);
+                Inputs = MainGUI.ParseTasFile(ofd.FileName, out Resets);
                 string extension = Path.GetExtension(ofd.FileName);
                 timelineScrollbar.Maximum = Inputs.Count + 38;
                 MainGUI.Timeline_PendingHardReset = true;
@@ -705,6 +792,16 @@ namespace TriCNES
                     TopFrame = 0;
                     highestFrameEmulatedEver = 0;
                     frameEmulated = 0;
+                }
+                if (extension == ".3c2")
+                {
+                    byte[] b = File.ReadAllBytes(ofd.FileName); // Terribly inefficient to load the entire file a second time, but whatever.
+                    ClockFiltering = (b[0] & 1) == 1;
+                }
+                if (extension == ".3c3")
+                {
+                    byte[] b = File.ReadAllBytes(ofd.FileName); // Terribly inefficient to load the entire file a second time, but whatever.
+                    ClockFiltering = (b[15] & 1) == 1;
                 }
 
                 RefreshTimeline();
@@ -728,13 +825,39 @@ namespace TriCNES
             };
             sfd.ShowDialog();
 
-            if(sfd.FileName != "")
+            if (sfd.FileName != "")
             {
                 FileStream fs = (FileStream)sfd.OpenFile();
+                // Determine if controller 2 is used.
+                bool UseController2 = false;
+                for (int i = 0; i < Inputs.Count; i++)
+                {
+                    if ((Inputs[i] & 0xFF00) != 0)
+                    {
+                        UseController2 = true;
+                        break;
+                    }
+                }
+                // Determine if the RESET button is used.
+                bool UseResets = false;
+                for (int i = 0; i < Inputs.Count; i++)
+                {
+                    if (i < Resets.Count && Resets[i])
+                    {
+                        UseResets = true;
+                        break;
+                    }
+                }
+                byte Header = 0;
+                Header |= (byte)(ClockFiltering ? 1 : 0);
+                Header |= (byte)(UseController2 ? 2 : 0);
+                Header |= (byte)(UseResets ? 4 : 0);
+                fs.WriteByte(Header);
                 for (int i = 0; i < Inputs.Count; i++)
                 {
                     fs.WriteByte((byte)Inputs[i]);
-                    fs.WriteByte((byte)(Inputs[i] >> 8));
+                    if (UseController2) { fs.WriteByte((byte)(Inputs[i] >> 8)); }
+                    if (UseResets) { fs.WriteByte((byte)(Resets[i] ? 0x80 : 0)); }
                 }
                 fs.Close();
             }
@@ -777,11 +900,41 @@ namespace TriCNES
                 fs.WriteByte((byte)(Inputs.Count >> 16));
                 fs.WriteByte((byte)(Inputs.Count >> 24));
 
+                fs.WriteByte(0); // 3 currently unused bytes.
+                fs.WriteByte(0);
+                fs.WriteByte(0);
+
+                // Determine if controller 2 is used.
+                bool UseController2 = false;
+                for (int i = 0; i < Inputs.Count; i++)
+                {
+                    if ((Inputs[i] & 0xFF00) != 0)
+                    {
+                        UseController2 = true;
+                        break;
+                    }
+                }
+                // Determine if the RESET button is used.
+                bool UseResets = false;
+                for (int i = 0; i < Inputs.Count; i++)
+                {
+                    if (i < Resets.Count && Resets[i])
+                    {
+                        UseResets = true;
+                        break;
+                    }
+                }
+                byte Header15 = 0;
+                Header15 |= (byte)(ClockFiltering ? 1 : 0);
+                Header15 |= (byte)(UseController2 ? 2 : 0);
+                Header15 |= (byte)(UseResets ? 4 : 0);
+                fs.WriteByte(Header15);
+
                 for (int i = 0; i < Inputs.Count; i++)
                 {
                     fs.WriteByte((byte)Inputs[i]);
-                    fs.WriteByte((byte)(Inputs[i] >> 8));
-                    fs.WriteByte((byte)(i < LagFrames.Count ? (LagFrames[i] ? 1 : 0) : 0));
+                    if (UseController2) { fs.WriteByte((byte)(Inputs[i] >> 8)); }
+                    if (UseResets) { fs.WriteByte((byte)((Resets[i] ? 0x80 : 0) | (i < LagFrames.Count ? (LagFrames[i] ? 1 : 0) : 0))); }
                 }
 
                 for (int i = 0; i < TimelineSavestates.Count; i++)
@@ -794,7 +947,7 @@ namespace TriCNES
                         fs.WriteByte((byte)(i >> 16));
                         fs.WriteByte((byte)(i >> 24));
                         // save every byte of the savestate
-                        for(int j = 0; j<SavestateLength; j++)
+                        for (int j = 0; j < SavestateLength; j++)
                         {
                             fs.WriteByte(TimelineSavestates[i][j]);
                         }
@@ -836,7 +989,7 @@ namespace TriCNES
                 }
                 else
                 {
-                    if(LagFrames.Count < Inputs.Count)
+                    if (LagFrames.Count < Inputs.Count)
                     {
                         MessageBox.Show("The .r08 exporter needs to know which frames are lag frames.\nOnly frames that have been emulated on the timeline will be exported.");
                     }
@@ -850,10 +1003,10 @@ namespace TriCNES
                         }
                     }
                 }
-                
+
                 fs.Close();
             }
-           
+
         }
 
         bool Paused = true;
@@ -864,7 +1017,7 @@ namespace TriCNES
             b_play.Text = Paused ? "Paused" : "Running";
             MainGUI.Timeline_PendingResume = !Paused;
             MainGUI.Timeline_PendingPause = Paused;
-            if(Paused)
+            if (Paused)
             {
                 GC.Collect();
             }
@@ -895,9 +1048,14 @@ namespace TriCNES
             RefreshTimeline();
         }
 
+        public bool Player2()
+        {
+            return cb_player2.Checked;
+        }
+
         private void truncateMovieToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Inputs.RemoveRange(frameIndex+1, Inputs.Count - (frameIndex+1));
+            Inputs.RemoveRange(frameIndex + 1, Inputs.Count - (frameIndex + 1));
             if (TimelineSavestates.Count > frameIndex)
             {
                 TimelineSavestates.RemoveRange(frameIndex + 1, TimelineSavestates.Count - (frameIndex + 1));
@@ -936,10 +1094,16 @@ namespace TriCNES
             {
                 int frame = TopFrame + i;
                 RecalculateTimelineRow(i, frame < Inputs.Count ? Inputs[frame] : (ushort)0);
+                TimelineGrid[i][17].Checked = false;
+                if (frame >= 0 && frame < Resets.Count)
+                {
+                    TimelineGrid[i][17].Checked = Resets[frame];
+                }
+
                 RedrawTimelineRow(i, true);
             }
             MethodInvoker upd = delegate
-            {               
+            {
                 pb_Timeline.Image = timelineBitmap;
                 pb_Timeline.Update();
             };
@@ -973,29 +1137,33 @@ namespace TriCNES
                         new Rectangle(80 + 16*12,rowp1*16,16,16),
                         new Rectangle(80 + 16*13,rowp1*16,16,16),
                         new Rectangle(80 + 16*14,rowp1*16,16,16),
-                        new Rectangle(80 + 16*15,rowp1*16,16,16)
+                        new Rectangle(80 + 16*15,rowp1*16,16,16),
+                        new Rectangle(80 + 16*16,rowp1*16,16,16)
                     };
                 if (frameIndex - TopFrame == row)
                 {
-                    G.FillRectangle(Brush_HighlightedCell, new Rectangle(0, rowp1 * 16, 80 + 16 * 16, 16));
+                    G.FillRectangle(Brush_HighlightedCell, new Rectangle(0, rowp1 * 16, 80 + 16 * 17, 16));
                 }
                 else if (!TimelineGrid[row][0].Emulated)
                 {
                     G.FillRectangle(Brush_LeftColumn, new Rectangle(0, rowp1 * 16, 80, 16));
                     G.FillRectangle(Brush_WhiteCellP1, new Rectangle(80, rowp1 * 16, 16 * 8, 16));
                     G.FillRectangle(Brush_WhiteCellP2, new Rectangle(80 + 16 * 8, rowp1 * 16, 16 * 8, 16));
+                    G.FillRectangle(Brush_WhiteCellP1, new Rectangle(80 + 16 * 16, rowp1 * 16, 16, 16));
                 }
                 else if (TimelineGrid[row][0].Stale)
                 {
                     G.FillRectangle(Brush_LeftColumn, new Rectangle(0, rowp1 * 16, 80, 16));
                     G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP1_Stale : Brush_GreenCellP1_Stale, new Rectangle(80, rowp1 * 16, 16 * 8, 16));
                     G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP2_Stale : Brush_GreenCellP2_Stale, new Rectangle(80 + 16 * 8, rowp1 * 16, 16 * 8, 16));
+                    G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP1_Stale : Brush_GreenCellP1_Stale, new Rectangle(80 + 16 * 16, rowp1 * 16, 16, 16));
                 }
                 else
                 {
                     G.FillRectangle(TimelineSavestates[row + TopFrame].Count == SavestateLength ? Brush_LeftColumn_Saved : TimelineTempSavestates[row + TopFrame].Count == SavestateLength ? Brush_LeftColumn_TempSaved : Brush_LeftColumn, new Rectangle(0, rowp1 * 16, 80, 16));
                     G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP1 : Brush_GreenCellP1, new Rectangle(80, rowp1 * 16, 16 * 8, 16));
                     G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP2 : Brush_GreenCellP2, new Rectangle(80 + 16 * 8, rowp1 * 16, 16 * 8, 16));
+                    G.FillRectangle(TimelineGrid[row][0].LagFrame ? Brush_RedCellP1 : Brush_GreenCellP1, new Rectangle(80 + 16 * 16, rowp1 * 16, 16, 16));
                 }
 
                 G.DrawRectangles(Pens.Black, GridOverlay);
@@ -1021,6 +1189,7 @@ namespace TriCNES
                 if (TimelineGrid[row][14].Checked) { G.DrawString("D", Font_Consolas, Brushes.Black, 80 + 16 * 13, rowp1 * 16); }
                 if (TimelineGrid[row][15].Checked) { G.DrawString("L", Font_Consolas, Brushes.Black, 80 + 16 * 14, rowp1 * 16); }
                 if (TimelineGrid[row][16].Checked) { G.DrawString("R", Font_Consolas, Brushes.Black, 80 + 16 * 15, rowp1 * 16); }
+                if (TimelineGrid[row][17].Checked) { G.DrawString("r", Font_Consolas, Brushes.Black, 80 + 16 * 16, rowp1 * 16); }
                 if (!batch)
                 {
                     pb_Timeline.Image = timelineBitmap;
@@ -1028,8 +1197,8 @@ namespace TriCNES
                 }
             };
             this.BeginInvoke(upd);
-            
-            
+
+
         }
         public void RecalculateTimelineRow(int row, ushort input)
         {
@@ -1119,11 +1288,11 @@ namespace TriCNES
                 }
             }
             bool temp = false;
-            while(l != SavestateLength)
+            while (l != SavestateLength)
             {
                 frameIndex--;
                 l = TimelineSavestates[frameIndex].Count;
-                if(l != SavestateLength)
+                if (l != SavestateLength)
                 {
                     l = TimelineTempSavestates[frameIndex].Count;
                     if (l == SavestateLength)
@@ -1217,7 +1386,7 @@ namespace TriCNES
 
         private void tb_FilterForNumbers(object sender, KeyPressEventArgs e)
         {
-            if(!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
+            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
             {
                 e.Handled = true;
             }
@@ -1236,7 +1405,7 @@ namespace TriCNES
         private void tb_TempSavestates_TextChanged(object sender, EventArgs e)
         {
             int i = 0;
-            if(int.TryParse(tb_TempSavestates.Text, out i))
+            if (int.TryParse(tb_TempSavestates.Text, out i))
             {
                 TempSavestates = i;
             }
@@ -1290,7 +1459,7 @@ namespace TriCNES
             timelineScrollbar.Value = 0;
             TopFrame = 0;
             highestFrameEmulatedEver = 0;
-            frameEmulated = 0;            
+            frameEmulated = 0;
 
             RefreshTimeline();
         }

@@ -22,6 +22,7 @@ namespace TriCNES
 
         public string TasFilePath;
         public ushort[] TasInputLog;
+        public bool[] TasResetLog;
         public TriCNESGUI MainGUI;
 
         public bool SubframeInputs()
@@ -109,9 +110,11 @@ namespace TriCNES
                     // TODO: ask if the .tasd file format is a thing yet
             }
 
-            TASInputs = MainGUI.ParseTasFile(TasFilePath);
+            List<bool> Resets = new List<bool>();
+            TASInputs = MainGUI.ParseTasFile(TasFilePath, out Resets);
             // okay cool, now we have the entire input log.
             TasInputLog = TASInputs.ToArray();
+            TasResetLog = Resets.ToArray();
             l_InputCount.Text = TasInputLog.Length + " Inputs";
         }
 
