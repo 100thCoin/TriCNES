@@ -386,31 +386,31 @@ namespace TriCNES
             APU_DMC_SampleLength = 1;
             APU_DMC_ShifterBitsRemaining = 8;
 
-            switch(APUAlignment & 4)
+            switch (APUAlignment & 4)
             {
                 default:
                 case 0:
                     {
                         APU_ChannelTimer_DMC = 1022;
-                        APU_PutCycle = false;
+                        APU_PutCycle = true;
                     }
                     break;
                 case 1:
                     {
                         APU_ChannelTimer_DMC = 1022;
-                        APU_PutCycle = true;
+                        APU_PutCycle = false;
                     }
                     break;
                 case 2:
                     {
                         APU_ChannelTimer_DMC = 1020;
-                        APU_PutCycle = false;
+                        APU_PutCycle = true;
                     }
                     break;
                 case 3:
                     {
                         APU_ChannelTimer_DMC = 1020;
-                        APU_PutCycle = true;
+                        APU_PutCycle = false;
                     }
                     break;
             }
@@ -487,25 +487,25 @@ namespace TriCNES
                 case 0:
                     {
                         APU_ChannelTimer_DMC = 1022;
-                        APU_PutCycle = false;
+                        APU_PutCycle = true;
                     }
                     break;
                 case 1:
                     {
                         APU_ChannelTimer_DMC = 1022;
-                        APU_PutCycle = true;
+                        APU_PutCycle = false;
                     }
                     break;
                 case 2:
                     {
                         APU_ChannelTimer_DMC = 1020;
-                        APU_PutCycle = false;
+                        APU_PutCycle = true;
                     }
                     break;
                 case 3:
                     {
                         APU_ChannelTimer_DMC = 1020;
-                        APU_PutCycle = true;
+                        APU_PutCycle = false;
                     }
                     break;
             }
