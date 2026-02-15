@@ -160,8 +160,9 @@ namespace TriCNES
         public Cartridge Cart;  // The idea behind this emulator is that this value could be changed at any time if you so desire.
         public byte PPUClock;    // Counts down from 4. When it's 0, a PPU cycle occurs.
         public byte CPUClock;    // Counts down from 12. When it's 0, a CPU cycle occurs.
-        public byte APUClock;    // Counts down from 12. Technically an APU cycle is 24 master clock cycles, but certain actions happen when this clock goes low and when it goes high.
         public byte MasterClock; // Counts up every master clock cycle. Resets at 24.
+
+        public byte APUAlignment; // at power on or reset, is this a get/put, and how long until the DMC DMA?
 
         public bool APU_PutCycle = false; // The APU needs to know if this is a "get" or "put" cycle.
 
@@ -384,11 +385,38 @@ namespace TriCNES
 
             APU_DMC_SampleLength = 1;
             APU_DMC_ShifterBitsRemaining = 8;
-            APU_ChannelTimer_DMC = 1024; //APU_DMCRateLUT[0];
+
+            switch(APUAlignment & 4)
+            {
+                default:
+                case 0:
+                    {
+                        APU_ChannelTimer_DMC = 1022;
+                        APU_PutCycle = false;
+                    }
+                    break;
+                case 1:
+                    {
+                        APU_ChannelTimer_DMC = 1022;
+                        APU_PutCycle = true;
+                    }
+                    break;
+                case 2:
+                    {
+                        APU_ChannelTimer_DMC = 1020;
+                        APU_PutCycle = false;
+                    }
+                    break;
+                case 3:
+                    {
+                        APU_ChannelTimer_DMC = 1020;
+                        APU_PutCycle = true;
+                    }
+                    break;
+            }
+
             DoReset = true; // This is used to force the first instruction at power on to be the RESET instruction.
             PPU_RESET = false; // I'm not even 100% certain my console has this behavior. I'll set it to false for now.
-
-
         }
 
         public bool PPU_RESET;
@@ -452,6 +480,36 @@ namespace TriCNES
             DoOAMDMA = false;
             operationCycle = 0;
             operationComplete = false;
+
+            switch (APUAlignment & 4)
+            {
+                default:
+                case 0:
+                    {
+                        APU_ChannelTimer_DMC = 1022;
+                        APU_PutCycle = false;
+                    }
+                    break;
+                case 1:
+                    {
+                        APU_ChannelTimer_DMC = 1022;
+                        APU_PutCycle = true;
+                    }
+                    break;
+                case 2:
+                    {
+                        APU_ChannelTimer_DMC = 1020;
+                        APU_PutCycle = false;
+                    }
+                    break;
+                case 3:
+                    {
+                        APU_ChannelTimer_DMC = 1020;
+                        APU_PutCycle = true;
+                    }
+                    break;
+            }
+
             DoReset = true;
             PPU_RESET = false; // I'm not even 100% certain my console has this behavior. I'll set it to false for now.
             // in theory, the CPU/PPU clock would be given random values. Let's just assume no changes.
@@ -600,13 +658,12 @@ namespace TriCNES
                 }
             }
 
-            if (APUClock == 0)
+            if (CPUClock == 12)
             {
-                APU_PutCycle = !APU_PutCycle;
 
                 _EmulateAPU();
+                APU_PutCycle = !APU_PutCycle;
 
-                APUClock = 12; //24
                 // the APU is actually clocked every 24 master clock cycles.
                 // yet there's a lot of timing that happens every cpu cycle anyway??
                 // If the timing needs to be exactly n and a half APU cycles, then I'll just multiply the numbers by 2 and clock this twice as fast.
@@ -615,7 +672,6 @@ namespace TriCNES
             // Decrement the clocks.
             PPUClock--;
             CPUClock--;
-            APUClock--;
         }
 
         void _EmulateMappers()
@@ -746,8 +802,9 @@ namespace TriCNES
                 }
             }
 
-            if (APU_PutCycle)
+            if (!APU_PutCycle)
             {
+                // If this is a get cycle, transitioning to a put cycle.
 
                 // controller reading is handled here in the APU chip.
 
@@ -862,6 +919,8 @@ namespace TriCNES
             }
             else
             {
+                // If this is a put cycle, transitioning to a get cycle.
+
                 if (Clearing_APU_FrameInterrupt)
                 {
                     Clearing_APU_FrameInterrupt = false;
@@ -11381,7 +11440,6 @@ namespace TriCNES
 
             State.Add(PPUClock);
             State.Add(CPUClock);
-            State.Add(APUClock);
             State.Add(MasterClock);
 
             State.Add(operationCycle);
@@ -11729,7 +11787,6 @@ namespace TriCNES
 
             PPUClock = State[p++];
             CPUClock = State[p++];
-            APUClock = State[p++];
             MasterClock = State[p++];
 
             operationCycle = State[p++];
