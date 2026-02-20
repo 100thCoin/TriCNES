@@ -199,12 +199,11 @@ namespace TriCNES
         public bool IgnoreH;         // However, with a well-timed DMA, the H register isn't actually part of the equation on some of those.
         public byte dataBus = 0;     // The Data Bus.
         public ushort addressBus = 0;// The Address Bus. "Where are we reading/writing"
-        public byte specialBus = 0;  // The Special Bus is used in certain instructions. //TODO: What's the actual use for this bus??
+        public byte specialBus = 0;  // The Special Bus is used in certain instructions. (The special bus is mostly used in half-CPU-cycles connecting the various registers to the alu)
         public byte dl = 0;          // Data Latch. This holds values between CPU cycles that are used in later cycles within an instruction.
 
 
         public byte operationCycle = 0; // This tracks what cycle of a given instruction is being emulated. Cycle 0 fetches the opcode, and all cycles after that have specific logic depending on which cycle needs emulated next.
-        public bool operationComplete = false; // When an instruction is complete, I use this to reset operationCycle.
 
         public ushort temporaryAddress; // I use this to temporarily modify the value of the address bus for some if statements. This is mostly for checking if the low byte under/over flows.
 
@@ -479,7 +478,6 @@ namespace TriCNES
             DoDMCDMA = false;
             DoOAMDMA = false;
             operationCycle = 0;
-            operationComplete = false;
 
             switch (APUAlignment & 4)
             {
@@ -591,12 +589,6 @@ namespace TriCNES
 
         public void _EmulatorCore()
         {
-            // master clock
-            MasterClock++;
-            if (MasterClock == 24)
-            {
-                MasterClock = 0;
-            }
             // counters count down to 0, run the appropriate chip's logic, and the counter is reset.
             // If multiple counters read 0 at the same time, there's an order of events.
             // The order of events:
@@ -606,20 +598,12 @@ namespace TriCNES
 
             if (CPUClock == 0)
             {
+                CPUClock = 12; // there is 1 CPU cycle for every 12 master clock cycles
 
                 _6502(); // This is where I run the CPU
                 totalCycles++;         // for debugging mostly
-                if (operationComplete) // If this instruction is complete
-                {
-                    operationComplete = false;
-                    operationCycle = 0;
-                    addressBus = programCounter;
-                    CPU_Read = true;
-                    IgnoreH = false;
-                }
 
                 _EmulateMappers(); // currently just used to clock the sunsoft FME-7 IRQ counter.
-                CPUClock = 12; // there is 1 CPU cycle for every 12 master clock cycles
             }
             if (CPUClock == 8)
             {
@@ -631,12 +615,13 @@ namespace TriCNES
             }
             if (PPUClock == 0)
             {
+                PPUClock = 4; // there is 1 PPU cycle for every 12 master clock cycles
+
                 _EmulatePPU();
                 if (PPUBus != 0)
                 {
                     DecayPPUDataBus();
                 }
-                PPUClock = 4; // there is 1 PPU cycle for every 12 master clock cycles
             }
             if (PPUClock == 2)
             {
@@ -673,6 +658,17 @@ namespace TriCNES
             PPUClock--;
             CPUClock--;
         }
+
+        public void EmulateUntilEndOfRead()
+        {
+            // this is used during reads from some ppu registers.
+            // run 1.75 ppu cycles. (the actual duty cycle here would result in 1 and 7/8 ppu cycles, but my emulator doesn't worry about half-master-clock-cycles.
+            for (int i = 0; i < 6; i++)
+            {
+                _EmulatorCore();
+            }
+        }
+
 
         void _EmulateMappers()
         {
@@ -1532,19 +1528,16 @@ namespace TriCNES
                 PPU_OddFrame = !PPU_OddFrame; // I guess this could happen on pretty much any cycle?
 
             }
-            else if (PPU_Scanline == 261 && PPU_Dot == 0)
-            {
-
-                PPUStatus_SpriteZeroHit = false;
-                PPUStatus_SpriteOverflow = false;                
-                
-                // this contradicts the information on the nesdev wiki, but I think I'm going to go mad if this really is cleared on dot 1.
-            }
             else if (PPU_Scanline == 261 && PPU_Dot == 1)
             {
-                // On the dot 1 of the pre-render scanline, all of these flags are cleared.
+                // On dot 1 of the pre-render scanline, all of these flags are cleared.
+                // You might be looking at the results of my "$2002 Flag Clear Timing" test from the AccuracyCoin test ROM and thinking, "Hold on. That can't be right!"
+                // Well, it is. You see, PPUStatus_VBlank is read at the beginning of the read, while PPUStatus_SpriteZeroHit and PPUStatus_SpriteOverflow are read at the end of the read.
+                // This means about 1 and 7/8 ppu cycles pass between the start of the read and the end, so thes values are seemingly cleared on different cycles, but they are in-fact cleared at the same time.
                 PPUStatus_VBlank = false;
                 PPU_CanDetectSpriteZeroHit = true;
+                PPUStatus_SpriteZeroHit = false;
+                PPUStatus_SpriteOverflow = false;
             }
 
             else if (PPU_Scanline == 0 && PPU_Dot == 1)
@@ -1785,6 +1778,26 @@ namespace TriCNES
             }
             // PPU_VSET_Latch1 gets inverted, and that becomes the state of PPU_VSET_Latch2
             PPU_VSET_Latch2 = !PPU_VSET_Latch1;
+
+            if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline < 240)
+            {
+                if (PPU_Dot == 0 || PPU_Dot > 320)
+                {
+                    PPU_OAMBuffer = OAM2[0];
+                }
+                else if (PPU_Dot > 0 && PPU_Dot <= 64)
+                {
+                    PPU_OAMBuffer = 0xFF;
+                }
+                else if (PPU_Dot <= 256)
+                {
+                    PPU_OAMBuffer = PPU_OAMLatch;
+                }
+                else
+                {
+                    PPU_OAMBuffer = PPU_OAMLatch;
+                }
+            }
 
         }
 
@@ -2440,7 +2453,8 @@ namespace TriCNES
 
 
         bool OamCorruptedOnOddCycle;
-        public byte PPU_SpriteEvaluationTemp; // is this just the ppubus?
+        public byte PPU_OAMLatch; // is this just the ppubus?
+        public byte PPU_OAMBuffer; // This is the value read from $2004, updated on half cycles.
         void PPU_Render_SpriteEvaluation()
         {
             bool SpriteEval_ReadOnly_PreRenderLine = false;
@@ -2471,11 +2485,11 @@ namespace TriCNES
                     {
                         if (SpriteEval_ReadOnly_PreRenderLine)
                         {
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address];
+                            PPU_OAMLatch = OAM2[OAM2Address];
                         }
                         else
                         {
-                            PPU_SpriteEvaluationTemp = 0xFF;
+                            PPU_OAMLatch = 0xFF;
                         }
                         if (PPU_Dot == 1)
                         {
@@ -2502,7 +2516,7 @@ namespace TriCNES
                         {
                             if (!SpriteEval_ReadOnly_PreRenderLine)
                             {
-                                OAM2[OAM2Address] = PPU_SpriteEvaluationTemp; // store FF in secondary OAM
+                                OAM2[OAM2Address] = PPU_OAMLatch; // store FF in secondary OAM
                             }
                             if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
                             {
@@ -2550,11 +2564,11 @@ namespace TriCNES
                 {
                     if ((PPU_Dot & 1) == 1)
                     { //odd cycles
-                        byte PrevSpriteEvalTemp = PPU_SpriteEvaluationTemp;
-                        PPU_SpriteEvaluationTemp = OAM[PPUOAMAddress]; // read from OAM
+                        byte PrevSpriteEvalTemp = PPU_OAMLatch;
+                        PPU_OAMLatch = OAM[PPUOAMAddress]; // read from OAM
                         if ((PPUOAMAddress & 3) == 2)
                         {
-                            PPU_SpriteEvaluationTemp &= 0xE7; // OAM address 02, 06, 0A, 0E, 12... are missing bits 3 and 4.
+                            PPU_OAMLatch &= 0xE7; // OAM address 02, 06, 0A, 0E, 12... are missing bits 3 and 4.
                         }
 
                         // If rendering was disabled *this* cycle (the odd cycle) then the even cycle will run normally, and the *next odd cycle* will have the OAM address increment. Presumably, that's when we record secondOAMAddr.
@@ -2578,13 +2592,13 @@ namespace TriCNES
                             byte PreIncVal = PPUOAMAddress; // for checking if PPUOAMAddress overflows
                             if (!SecondaryOAMFull && !SpriteEval_ReadOnly_PreRenderLine) // If secondary OAM is not yet full,
                             {
-                                OAM2[OAM2Address] = PPU_SpriteEvaluationTemp; // store this value at the secondary oam address.
+                                OAM2[OAM2Address] = PPU_OAMLatch; // store this value at the secondary oam address.
                             }
                             byte OAM2READ = OAM2[OAM2Address];
                             if (SpriteEvaluationTick == 0) // tick 0: check if this object's y position is in range for this scanline
                             {
                                 PPU_OAMEvaluationObjectInXRange = false;
-                                if (!SpriteEval_ReadOnly_PreRenderLine && (PPU_Scanline & 0xFF) - PPU_SpriteEvaluationTemp >= 0 && (PPU_Scanline & 0xFF) - PPU_SpriteEvaluationTemp < (PPU_Spritex16 ? 16 : 8))
+                                if (!SpriteEval_ReadOnly_PreRenderLine && (PPU_Scanline & 0xFF) - PPU_OAMLatch >= 0 && (PPU_Scanline & 0xFF) - PPU_OAMLatch < (PPU_Spritex16 ? 16 : 8))
                                 {
                                     PPU_OAMEvaluationObjectInRange = true;
                                     // if this sprite is within range.
@@ -2658,7 +2672,7 @@ namespace TriCNES
                                     PPU_OAMEvaluationObjectInRange = false;
                                     // OAM X coordinate.
                                     // This also runs the "vertical in range check", though typically the result doesn't matter.
-                                    if (PPU_Scanline - PPU_SpriteEvaluationTemp >= 0 && PPU_Scanline - PPU_SpriteEvaluationTemp < (PPU_Spritex16 ? 16 : 8))
+                                    if (PPU_Scanline - PPU_OAMLatch >= 0 && PPU_Scanline - PPU_OAMLatch < (PPU_Spritex16 ? 16 : 8))
                                     {
                                         // if this sprite is within range.
                                         PPU_OAMEvaluationObjectInXRange = true;
@@ -2715,7 +2729,7 @@ namespace TriCNES
                             {
                                 OAMAddressOverflowedDuringSpriteEvaluation = true; // set this flag.
                             }
-                            PPU_SpriteEvaluationTemp = OAM2READ; // When overflowed, the ppu reads instead of writing to OAM2. (Run this regardless of if OAM2 is full or not.)
+                            PPU_OAMLatch = OAM2READ; // When overflowed, the ppu reads instead of writing to OAM2. (Run this regardless of if OAM2 is full or not.)
                         }
                         else
                         {   // OAM Address Overflowerd During Sprite Evaluation
@@ -2728,7 +2742,7 @@ namespace TriCNES
                                 PPUOAMAddress += 4; // +4
                                 PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
                             }
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // When overflowed, the ppu reads instead of writing to OAM2.
+                            PPU_OAMLatch = OAM2[OAM2Address]; // When overflowed, the ppu reads instead of writing to OAM2.
                         }
                         if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant && !PPU_OAMEvaluationCorruptionOddCycle) // if we just disabled rendering mid OAM evaluation, the address is incremented yet again.
                         {
@@ -2806,8 +2820,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's Y position in the array
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
-                            PPU_SpriteYposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
+                            PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteYposition[OAM2Address / 4] = PPU_OAMLatch;
                             PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
@@ -2816,8 +2830,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's pattern in the array
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
-                            PPU_SpritePattern[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
+                            PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpritePattern[OAM2Address / 4] = PPU_OAMLatch;
                             PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
@@ -2826,8 +2840,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's attribute in the array
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
-                            PPU_SpriteAttribute[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
+                            PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteAttribute[OAM2Address / 4] = PPU_OAMLatch;
                             PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
@@ -2836,8 +2850,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's X position in the array
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
-                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
+                            PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch;
                             PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
                         }
                         // notably, the secondary OAM address does not get incremented until case 7
@@ -2846,8 +2860,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's X position in the array... again.
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
-                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
+                            PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch;
                             // But also: Find the PPU address of this sprite's graphical data inside the Pattern Tables.
                             PPU_SpriteEvaluation_GetSpriteAddress((byte)(OAM2Address / 4));
                         }
@@ -2857,8 +2871,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
                         {
                             // set this object's X position in the array... again.
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
-                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
+                            PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch;
                             // but also: set up the bit plane shift register.
                             PPU_SpritePatternL = FetchPPU(PPU_AddressBus);
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
@@ -2880,8 +2894,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                         {
                             // set this object's X position in the array... again.
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
-                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp;
+                            PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch;
                             // but also: add 8 to the PPU address. The other bit plane is 8 addresses away.
                             PPU_SpriteEvaluation_GetSpriteAddress((byte)(OAM2Address / 4)); // we need to recalculate this. Slow, but accurate. (TODO: Can we test for this with a well timed write to $2000?)
                             PPU_AddressBus += 8; // at this point, the address couldn't possibly overflow, so there's no need to worry about that.
@@ -2893,8 +2907,8 @@ namespace TriCNES
                         if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
                         {
                             // set this object's X position in the array... again.
-                            PPU_SpriteEvaluationTemp = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
-                            PPU_SpriteXposition[OAM2Address / 4] = PPU_SpriteEvaluationTemp; // read X pos again
+                            PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
+                            PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch; // read X pos again
                             // but also: set up the second bit plane
                             PPU_SpritePatternH = FetchPPU(PPU_AddressBus);
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
@@ -3907,6 +3921,14 @@ namespace TriCNES
             }
         }
 
+        void CompleteOperation()
+        {
+            operationCycle = 0xFF; // this will be incremented to 0.
+            addressBus = programCounter;
+            CPU_Read = true;
+            IgnoreH = false;
+        }
+
         public void _6502()
         {
             if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015) && CPU_Read) || (DoOAMDMA && CPU_Read)) // Are we running a DMA? Did it fail? Also some specific behavior can force a DMA to abort. Did that occur?
@@ -4089,7 +4111,6 @@ namespace TriCNES
                             case 1:
                                 if (!DoBRK)
                                 {
-                                    addressBus = programCounter;
                                     Fetch(addressBus); //dummy fetch without incrementing PC.
                                 }
                                 else
@@ -4165,7 +4186,7 @@ namespace TriCNES
                                     programCounter = (ushort)((programCounter & 0xFF) | (Fetch(0xFFFF) << 8));
                                 }
 
-                                operationComplete = true; // notably, BRK does not check the NMI edge detector at the end of the instruction
+                                CompleteOperation(); // notably, BRK does not check the NMI edge detector at the end of the instruction
                                 DoReset = false;
 
                                 DoNMI = false;
@@ -4194,7 +4215,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_ORA(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4203,7 +4224,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -4245,7 +4266,7 @@ namespace TriCNES
                             case 7:
                                 PollInterrupts();
                                 Op_SLO(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4260,7 +4281,7 @@ namespace TriCNES
                             // read from address
                             PollInterrupts();
                             Fetch(addressBus);
-                            operationComplete = true;
+                            CompleteOperation();
                         }
                         break;
 
@@ -4274,7 +4295,7 @@ namespace TriCNES
                             // read from address
                             PollInterrupts();
                             Op_ORA(Fetch(addressBus));
-                            operationComplete = true;
+                            CompleteOperation();
                         }
                         break;
 
@@ -4286,6 +4307,7 @@ namespace TriCNES
                                 break;
                             case 2: // read from address
                                 dl = Fetch(addressBus);
+                                CPU_Read = false;
                                 break;
                             case 3: //dummy write
                                 Store(dl, addressBus);
@@ -4293,7 +4315,7 @@ namespace TriCNES
                             case 4: // perform operation
                                 PollInterrupts();
                                 Op_ASL(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4306,6 +4328,7 @@ namespace TriCNES
                                 break;
                             case 2: // read from address
                                 dl = Fetch(addressBus);
+                                CPU_Read = false;
                                 break;
                             case 3: //dummy write
                                 Store(dl, addressBus);
@@ -4313,7 +4336,7 @@ namespace TriCNES
                             case 4: // perform operation
                                 PollInterrupts();
                                 Op_SLO(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4323,7 +4346,7 @@ namespace TriCNES
                         if (operationCycle == 1)
                         {
                             //dummy fetch
-                            Fetch(programCounter);
+                            Fetch(addressBus);
                         }
                         else
                         {
@@ -4338,7 +4361,7 @@ namespace TriCNES
                             status += flag_Overflow ? (byte)0x40 : (byte)0;
                             status += flag_Negative ? (byte)0x80 : (byte)0;
                             Push(status);
-                            operationComplete = true;
+                            CompleteOperation();
                         }
                         break;
 
@@ -4346,14 +4369,14 @@ namespace TriCNES
                         PollInterrupts();
                         GetImmediate();
                         Op_ORA(dl);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x0A: //ASL A
                         PollInterrupts();
                         Fetch(addressBus); // dummy read
                         Op_ASL_A();
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x0B: //ANC Imm ***
@@ -4363,7 +4386,7 @@ namespace TriCNES
                         flag_Carry = A >= 0x80;
                         flag_Zero = A == 0;
                         flag_Negative = A >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
@@ -4377,7 +4400,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4392,7 +4415,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_ORA(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4406,6 +4429,7 @@ namespace TriCNES
                                 break;
                             case 3: // read from address
                                 dl = Fetch(addressBus);
+                                CPU_Read = false;
                                 break;
                             case 4: //dummy write
                                 Store(dl, addressBus);
@@ -4413,7 +4437,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_ASL(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4427,6 +4451,7 @@ namespace TriCNES
                                 break;
                             case 3: // read from address
                                 dl = Fetch(addressBus);
+                                CPU_Read = false;
                                 break;
                             case 4: //dummy write
                                 Store(dl, addressBus);
@@ -4434,7 +4459,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_SLO(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4447,7 +4472,7 @@ namespace TriCNES
                                 GetImmediate();
                                 if (flag_Negative)
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 2:
@@ -4457,14 +4482,14 @@ namespace TriCNES
                                 addressBus = programCounter;
                                 if ((temporaryAddress & 0xFF00) == (programCounter & 0xFF00))
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 3: // read from address
                                 PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4481,7 +4506,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_ORA(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4490,7 +4515,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -4532,7 +4557,7 @@ namespace TriCNES
                             case 7: // read from address
                                 PollInterrupts();
                                 Op_SLO(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4547,7 +4572,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4562,7 +4587,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_ORA(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4584,7 +4609,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_ASL(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4606,7 +4631,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_SLO(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4615,7 +4640,7 @@ namespace TriCNES
                         PollInterrupts();
                         Fetch(addressBus); // dummy read
                         flag_Carry = false;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x19: //ORA Abs, Y
@@ -4629,15 +4654,15 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_ORA(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
 
                     case 0x1A: //NOP ***
                         PollInterrupts();
-                        addressBus = programCounter; Fetch(addressBus);
-                        operationComplete = true;
+                        Fetch(addressBus);
+                        CompleteOperation();
                         break;
 
                     case 0x1B: //SLO Abs Y *** 
@@ -4656,7 +4681,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_SLO(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4672,7 +4697,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4688,7 +4713,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_ORA(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4709,7 +4734,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_ASL(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4731,7 +4756,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_SLO(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4767,7 +4792,7 @@ namespace TriCNES
                                 addressBus = programCounter;
                                 programCounter = (ushort)((Fetch(addressBus) << 8) | stackPointer);
                                 stackPointer = specialBus;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4784,7 +4809,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_AND(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4793,7 +4818,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -4835,7 +4860,7 @@ namespace TriCNES
                             case 7:
                                 PollInterrupts();
                                 Op_RLA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4852,7 +4877,7 @@ namespace TriCNES
                                 flag_Zero = (A & dl) == 0;
                                 flag_Negative = (dl & 0x80) != 0;
                                 flag_Overflow = (dl & 0x40) != 0;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4866,7 +4891,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Op_AND(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4887,7 +4912,7 @@ namespace TriCNES
                             case 4: // perform operation
                                 PollInterrupts();
                                 Op_ROL(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4908,7 +4933,7 @@ namespace TriCNES
                             case 4: // perform operation
                                 PollInterrupts();
                                 Op_RLA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4917,7 +4942,6 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1: //dummy fetch
-                                addressBus = programCounter;
                                 Fetch(addressBus);
                                 break;
                             case 2: //increment S
@@ -4935,7 +4959,7 @@ namespace TriCNES
                                 flag_Decimal = ((status & 0x08) >> 3) == 1;
                                 flag_Overflow = ((status & 0x40) >> 6) == 1;
                                 flag_Negative = ((status & 0x80) >> 7) == 1;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4944,14 +4968,14 @@ namespace TriCNES
                         PollInterrupts();
                         GetImmediate();
                         Op_AND(dl);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x2A: //ROL A
                         PollInterrupts();
                         Fetch(addressBus); // dummy read
                         Op_ROL_A();
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x2B: //ANC Imm *** (same as 0x0B)
@@ -4961,7 +4985,7 @@ namespace TriCNES
                         flag_Carry = A >= 0x80;
                         flag_Zero = A == 0;
                         flag_Negative = A >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
@@ -4978,7 +5002,7 @@ namespace TriCNES
                                 flag_Zero = (A & dl) == 0;
                                 flag_Negative = (dl & 0x80) != 0;
                                 flag_Overflow = (dl & 0x40) != 0;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -4993,7 +5017,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_AND(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5015,7 +5039,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_ROL(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5037,7 +5061,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_RLA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5050,7 +5074,7 @@ namespace TriCNES
                                 GetImmediate();
                                 if (!flag_Negative)
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 2:
@@ -5060,14 +5084,14 @@ namespace TriCNES
                                 addressBus = programCounter;
                                 if ((temporaryAddress & 0xFF00) == (programCounter & 0xFF00))
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 3: // read from address
                                 PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5084,7 +5108,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_AND(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5093,7 +5117,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -5134,7 +5158,7 @@ namespace TriCNES
                             case 7: // read from address
                                 PollInterrupts();
                                 Op_RLA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5149,7 +5173,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5164,7 +5188,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_AND(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5186,7 +5210,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_ROL(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5208,7 +5232,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_RLA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5217,7 +5241,7 @@ namespace TriCNES
                         PollInterrupts();
                         Fetch(addressBus); // dummy read
                         flag_Carry = true;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x39: //AND Abs, Y
@@ -5231,7 +5255,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_AND(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5239,7 +5263,7 @@ namespace TriCNES
                     case 0x3A: //NOP ***
                         PollInterrupts();
                         addressBus = programCounter; Fetch(addressBus);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x3B: //RLA Abs, Y ***
@@ -5258,7 +5282,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_RLA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5274,7 +5298,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5290,7 +5314,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_AND(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5311,7 +5335,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_ROL(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5332,7 +5356,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_RLA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5369,7 +5393,7 @@ namespace TriCNES
                                 dl = Fetch(addressBus);
                                 programCounter = (ushort)((programCounter & 0xFF) | (dl << 8));
                                 stackPointer = (byte)addressBus;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
 
                         }
@@ -5387,7 +5411,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_EOR(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5396,7 +5420,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -5439,7 +5463,7 @@ namespace TriCNES
                             case 7:
                                 PollInterrupts();
                                 Op_SRE(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5453,7 +5477,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5467,7 +5491,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Op_EOR(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5488,7 +5512,7 @@ namespace TriCNES
                             case 4: // perform operation
                                 PollInterrupts();
                                 Op_LSR(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5510,7 +5534,7 @@ namespace TriCNES
                             case 4: // perform operation
                                 PollInterrupts();
                                 Op_SRE(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5525,7 +5549,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Push(A);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5534,14 +5558,14 @@ namespace TriCNES
                         PollInterrupts();
                         GetImmediate();
                         Op_EOR(dl);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x4A: //LSR A
                         PollInterrupts();
                         Fetch(addressBus); // dummy read
                         Op_LSR_A();
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x4B: //ASR Imm ***
@@ -5549,7 +5573,7 @@ namespace TriCNES
                         GetImmediate();
                         A = (byte)(A & dl);
                         Op_LSR_A();
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x4C: //JMP
@@ -5563,7 +5587,7 @@ namespace TriCNES
                             PollInterrupts();
                             GetAddressAbsolute();
                             programCounter = addressBus;
-                            operationComplete = true;
+                            CompleteOperation();
                         }
                         break;
 
@@ -5577,7 +5601,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_EOR(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5600,7 +5624,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_LSR(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5623,7 +5647,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_SRE(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5637,7 +5661,7 @@ namespace TriCNES
                                 GetImmediate();
                                 if (flag_Overflow)
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 2:
@@ -5647,14 +5671,14 @@ namespace TriCNES
                                 addressBus = programCounter;
                                 if ((temporaryAddress & 0xFF00) == (programCounter & 0xFF00))
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 3: // read from address
                                 PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5671,7 +5695,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_EOR(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5680,7 +5704,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -5723,7 +5747,7 @@ namespace TriCNES
                             case 7: // read from address
                                 PollInterrupts();
                                 Op_SRE(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5738,7 +5762,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5753,7 +5777,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_EOR(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5776,7 +5800,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_LSR(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5799,7 +5823,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_SRE(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5808,7 +5832,7 @@ namespace TriCNES
                         PollInterrupts();
                         Fetch(addressBus); // dummy read
                         flag_Interrupt = false;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x59: //EOR Abs Y
@@ -5822,7 +5846,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_EOR(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5830,7 +5854,7 @@ namespace TriCNES
                     case 0x5A: //NOP ***
                         PollInterrupts();
                         addressBus = programCounter; Fetch(addressBus);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x5B: //SRE abs, Y ***
@@ -5850,7 +5874,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_SRE(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5866,7 +5890,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5882,7 +5906,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_EOR(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5904,7 +5928,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_LSR(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5926,7 +5950,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_SRE(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5957,7 +5981,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 stackPointer = (byte)addressBus;
                                 GetImmediate();
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
 
                         }
@@ -5975,7 +5999,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_ADC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -5984,7 +6008,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -6026,7 +6050,7 @@ namespace TriCNES
                             case 7:
                                 PollInterrupts();
                                 Op_RRA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6040,7 +6064,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6054,7 +6078,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Op_ADC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6075,7 +6099,7 @@ namespace TriCNES
                             case 4: // perform operation
                                 PollInterrupts();
                                 Op_ROR(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6096,7 +6120,7 @@ namespace TriCNES
                             case 4: // perform operation
                                 PollInterrupts();
                                 Op_RRA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6119,7 +6143,7 @@ namespace TriCNES
                                 A = Fetch(addressBus);
                                 flag_Zero = A == 0;
                                 flag_Negative = A >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6128,14 +6152,14 @@ namespace TriCNES
                         PollInterrupts();
                         GetImmediate();
                         Op_ADC(dl);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x6A: //ROR A
                         PollInterrupts();
                         Fetch(addressBus); // dummy read
                         Op_ROR_A();
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x6B: // ARR ***
@@ -6147,7 +6171,7 @@ namespace TriCNES
                         flag_Carry = ((A & 0x40) >> 6) == 1;
                         flag_Overflow = (((A & 0x20) >> 5) ^ ((A & 0x40) >> 6)) == 1;
                         flag_Negative = A >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x6C: //JMP (indirect)
@@ -6164,7 +6188,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 dl = Fetch((ushort)((addressBus & 0xFF00) | (byte)(addressBus + 1)));
                                 programCounter = (ushort)((dl << 8) | specialBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6179,7 +6203,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_ADC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6201,7 +6225,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_ROR(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6223,7 +6247,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_RRA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6236,7 +6260,7 @@ namespace TriCNES
                                 GetImmediate();
                                 if (!flag_Overflow)
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 2:
@@ -6246,14 +6270,14 @@ namespace TriCNES
                                 addressBus = programCounter;
                                 if ((temporaryAddress & 0xFF00) == (programCounter & 0xFF00))
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 3: // read from address
                                 PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6270,7 +6294,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_ADC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6279,7 +6303,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -6321,7 +6345,7 @@ namespace TriCNES
                             case 7: // read from address
                                 PollInterrupts();
                                 Op_RRA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6336,7 +6360,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6352,7 +6376,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_ADC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6374,7 +6398,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_ROR(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6396,7 +6420,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_RRA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6405,7 +6429,7 @@ namespace TriCNES
                         PollInterrupts();
                         Fetch(addressBus); // dummy read
                         flag_Interrupt = true;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
                     case 0x79: //ADC Abs, Y
 
@@ -6419,7 +6443,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_ADC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6428,7 +6452,7 @@ namespace TriCNES
                         PollInterrupts();
                         addressBus = programCounter;
                         Fetch(addressBus);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x7B: //RRA Abs, Y ***
@@ -6447,7 +6471,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_RRA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6463,7 +6487,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6480,7 +6504,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_ADC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6501,7 +6525,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_ROR(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6522,7 +6546,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_RRA(dl, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6530,7 +6554,7 @@ namespace TriCNES
                     case 0x80: //DOP ***
                         PollInterrupts();
                         GetImmediate();
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
 
@@ -6547,7 +6571,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Store(A, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6555,7 +6579,7 @@ namespace TriCNES
                     case 0x82: //DOP ***
                         PollInterrupts();
                         GetImmediate();
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x83: //(SAX X)
@@ -6571,7 +6595,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Store((byte)(A & X), addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6586,7 +6610,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Store(Y, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6601,7 +6625,7 @@ namespace TriCNES
                             case 2:
                                 PollInterrupts();
                                 Store(A, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6616,7 +6640,7 @@ namespace TriCNES
                             case 2:
                                 PollInterrupts();
                                 Store(X, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6630,7 +6654,7 @@ namespace TriCNES
                             case 2:
                                 PollInterrupts();
                                 Store((byte)(A & X), addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6641,16 +6665,15 @@ namespace TriCNES
                         Y--;
                         flag_Zero = Y == 0;
                         flag_Negative = Y >= 0x80;
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
                     case 0x89: //DOP ***
                         PollInterrupts();
                         GetImmediate();
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
@@ -6659,9 +6682,8 @@ namespace TriCNES
                         A = X;
                         flag_Zero = A == 0;
                         flag_Negative = A >= 0x80;
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x8B: //ANE
@@ -6672,7 +6694,7 @@ namespace TriCNES
                         A = (byte)((A | 0xFF) & X & dl); // 0xEE is also known as "MAGIC", and can supposedly be different depending on the CPU's temperature.
                         flag_Zero = A == 0;
                         flag_Negative = A >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0x8C: //STY Abs
@@ -6686,7 +6708,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Store(Y, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6702,7 +6724,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Store(A, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6718,7 +6740,7 @@ namespace TriCNES
                             case 3:
                                 PollInterrupts();
                                 Store(X, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6734,7 +6756,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Store((byte)(A & X), addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6747,7 +6769,7 @@ namespace TriCNES
                                 GetImmediate();
                                 if (flag_Carry)
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 2:
@@ -6757,14 +6779,14 @@ namespace TriCNES
                                 addressBus = programCounter;
                                 if ((temporaryAddress & 0xFF00) == (programCounter & 0xFF00))
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 3: // read from address
                                 PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6782,7 +6804,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Store(A, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6791,7 +6813,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -6840,7 +6862,7 @@ namespace TriCNES
                                     H = 0xFF;
                                 }
                                 Store((byte)(A & (X | 0xF5) & H), addressBus); // Alternate SHA behavior. X is ORed with a magic number. On my console, it's $F5 for a few hours, then it flickers from $F5 and $FD.
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
 
@@ -6858,7 +6880,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Store(Y, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6875,7 +6897,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Store(A, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6891,7 +6913,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Store(X, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6907,7 +6929,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Store((byte)(A & X), addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6915,11 +6937,10 @@ namespace TriCNES
                     case 0x98: //TYA
                         PollInterrupts();
                         A = Y;
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         flag_Zero = A == 0;
                         flag_Negative = A >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
@@ -6935,7 +6956,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Store(A, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6943,9 +6964,8 @@ namespace TriCNES
                     case 0x9A: //TXS
                         PollInterrupts();
                         stackPointer = X;
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
 
@@ -6972,7 +6992,7 @@ namespace TriCNES
                                     H = 0xFF;
                                 }
                                 Store((byte)(A & (X | 0xF5) & H), addressBus); // Alternate SHS behavior. X is ORed with a magic number. On my console, it's $F5 for a few hours, then it flickers from $F5 and $FD.
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -6998,7 +7018,7 @@ namespace TriCNES
                                     H = 0xFF;
                                 }
                                 Store((byte)(Y & H), addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7015,7 +7035,7 @@ namespace TriCNES
                             case 4:
                                 PollInterrupts();
                                 Store(A, addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7042,7 +7062,7 @@ namespace TriCNES
                                     H = 0xFF;
                                 }
                                 Store((byte)(X & H), addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7068,7 +7088,7 @@ namespace TriCNES
                                     H = 0xFF;
                                 }
                                 Store((byte)(A & (X | 0xF5) & H), addressBus); // Alternate SHA behavior. X is ORed with a magic number. On my console, it's $F5 for a few hours, then it flickers from $F5 and $FD.
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7079,7 +7099,7 @@ namespace TriCNES
                         Y = dl;
                         flag_Zero = Y == 0;
                         flag_Negative = Y >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
@@ -7097,7 +7117,7 @@ namespace TriCNES
                                 A = Fetch(addressBus);
                                 flag_Zero = A == 0;
                                 flag_Negative = A >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7108,7 +7128,7 @@ namespace TriCNES
                         X = dl;
                         flag_Zero = X == 0;
                         flag_Negative = X >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
@@ -7127,7 +7147,7 @@ namespace TriCNES
                                 X = A;
                                 flag_Zero = X == 0;
                                 flag_Negative = X >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7143,7 +7163,7 @@ namespace TriCNES
                                 Y = Fetch(addressBus);
                                 flag_Zero = Y == 0;
                                 flag_Negative = Y >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7159,7 +7179,7 @@ namespace TriCNES
                                 A = Fetch(addressBus);
                                 flag_Zero = A == 0;
                                 flag_Negative = A >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7175,7 +7195,7 @@ namespace TriCNES
                                 X = Fetch(addressBus);
                                 flag_Zero = X == 0;
                                 flag_Negative = X >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7192,7 +7212,7 @@ namespace TriCNES
                                 X = A;
                                 flag_Zero = X == 0;
                                 flag_Negative = X >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7200,11 +7220,10 @@ namespace TriCNES
                     case 0xA8: //TAY
                         PollInterrupts();
                         Y = A;
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         flag_Zero = A == 0;
                         flag_Negative = Y >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xA9: //LDA Imm
@@ -7213,17 +7232,16 @@ namespace TriCNES
                         A = dl;
                         flag_Zero = A == 0;
                         flag_Negative = A >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xAA: //TAX
                         PollInterrupts();
                         X = A;
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         flag_Zero = X == 0;
                         flag_Negative = X >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xAB: //LXA ***
@@ -7233,7 +7251,7 @@ namespace TriCNES
                         X = A;  // this instruction is basically XAA but using LAX behavior, so X is also affected..
                         flag_Negative = X >= 0x80;
                         flag_Zero = X == 0x00;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xAC: //LDY Abs
@@ -7248,7 +7266,7 @@ namespace TriCNES
                                 Y = Fetch(addressBus);
                                 flag_Negative = Y >= 0x80;
                                 flag_Zero = Y == 0x00;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7265,7 +7283,7 @@ namespace TriCNES
                                 A = Fetch(addressBus);
                                 flag_Negative = A >= 0x80;
                                 flag_Zero = A == 0x00;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7282,7 +7300,7 @@ namespace TriCNES
                                 X = Fetch(addressBus);
                                 flag_Negative = X >= 0x80;
                                 flag_Zero = X == 0x00;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7300,7 +7318,7 @@ namespace TriCNES
                                 X = A;
                                 flag_Negative = X >= 0x80;
                                 flag_Zero = X == 0x00;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7313,7 +7331,7 @@ namespace TriCNES
                                 GetImmediate();
                                 if (!flag_Carry)
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 2:
@@ -7323,14 +7341,14 @@ namespace TriCNES
                                 addressBus = programCounter;
                                 if ((temporaryAddress & 0xFF00) == (programCounter & 0xFF00))
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 3: // read from address
                                 PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7350,7 +7368,7 @@ namespace TriCNES
                                 A = Fetch(addressBus);
                                 flag_Zero = A == 0;
                                 flag_Negative = A >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7359,7 +7377,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -7397,7 +7415,7 @@ namespace TriCNES
                                 X = A;
                                 flag_Zero = X == 0;
                                 flag_Negative = X >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7413,7 +7431,7 @@ namespace TriCNES
                                 Y = Fetch(addressBus);
                                 flag_Zero = Y == 0;
                                 flag_Negative = Y >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7430,7 +7448,7 @@ namespace TriCNES
                                 A = Fetch(addressBus);
                                 flag_Zero = A == 0;
                                 flag_Negative = A >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7447,7 +7465,7 @@ namespace TriCNES
                                 X = Fetch(addressBus);
                                 flag_Zero = X == 0;
                                 flag_Negative = X >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7465,17 +7483,16 @@ namespace TriCNES
                                 X = A;
                                 flag_Zero = X == 0;
                                 flag_Negative = X >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
 
                     case 0xB8: //CLV
                         PollInterrupts();
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         flag_Overflow = false;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xB9: //LDA abs , Y
@@ -7491,7 +7508,7 @@ namespace TriCNES
                                 A = Fetch(addressBus);
                                 flag_Zero = A == 0;
                                 flag_Negative = A >= 0x80;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7500,11 +7517,10 @@ namespace TriCNES
 
                         PollInterrupts();
                         X = stackPointer;
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         flag_Negative = X >= 0x80;
                         flag_Zero = X == 0;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xBB: //LAE Abs, Y***
@@ -7523,7 +7539,7 @@ namespace TriCNES
                                 stackPointer = (byte)(dl & stackPointer);
                                 flag_Negative = X >= 0x80;
                                 flag_Zero = X == 0;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7541,7 +7557,7 @@ namespace TriCNES
                                 Y = Fetch(addressBus);
                                 flag_Negative = Y >= 0x80;
                                 flag_Zero = Y == 0;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7561,7 +7577,7 @@ namespace TriCNES
                                 A = Fetch(addressBus);
                                 flag_Negative = A >= 0x80;
                                 flag_Zero = A == 0;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7579,7 +7595,7 @@ namespace TriCNES
                                 X = Fetch(addressBus);
                                 flag_Negative = X >= 0x80;
                                 flag_Zero = X == 0;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7598,7 +7614,7 @@ namespace TriCNES
                                 X = A;
                                 flag_Negative = X >= 0x80;
                                 flag_Zero = X == 0;
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7607,7 +7623,7 @@ namespace TriCNES
                         PollInterrupts();
                         GetImmediate();
                         Op_CPY(dl);
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
@@ -7623,7 +7639,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_CMP(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7631,7 +7647,7 @@ namespace TriCNES
                     case 0xC2: //DOP ***
                         PollInterrupts();
                         GetImmediate();
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
@@ -7656,7 +7672,7 @@ namespace TriCNES
                                 dl--;
                                 Store(dl, addressBus);
                                 Op_CMP(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7670,7 +7686,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Op_CPY(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7684,7 +7700,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Op_CMP(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7705,7 +7721,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_DEC(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7727,7 +7743,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_DEC(addressBus);
                                 Op_CMP(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7736,28 +7752,26 @@ namespace TriCNES
                     case 0xC8: //INY
                         PollInterrupts();
                         Y++;
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         flag_Zero = Y == 0;
                         flag_Negative = Y >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xC9: //CMP Imm
                         PollInterrupts();
                         GetImmediate();
                         Op_CMP(dl);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xCA: //DEX
                         PollInterrupts();
                         X--;
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         flag_Zero = X == 0;
                         flag_Negative = X >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
 
@@ -7770,7 +7784,7 @@ namespace TriCNES
                         flag_Zero = X == 0;
                         flag_Negative = (X >= 0x80);
 
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
 
@@ -7784,7 +7798,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_CPY(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7799,7 +7813,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_CMP(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7823,7 +7837,7 @@ namespace TriCNES
                             case 5: // write
                                 PollInterrupts();
                                 Op_DEC(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7848,7 +7862,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_DEC(addressBus);
                                 Op_CMP(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7861,7 +7875,7 @@ namespace TriCNES
                                 GetImmediate();
                                 if (flag_Zero)
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 2:
@@ -7871,14 +7885,14 @@ namespace TriCNES
                                 addressBus = programCounter;
                                 if ((temporaryAddress & 0xFF00) == (programCounter & 0xFF00))
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 3: // read from address
                                 PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7895,7 +7909,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_CMP(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7904,7 +7918,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -7947,7 +7961,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_DEC(addressBus);
                                 Op_CMP(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7962,7 +7976,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -7977,7 +7991,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_CMP(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8000,7 +8014,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_DEC(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8024,17 +8038,16 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_DEC(addressBus);
                                 Op_CMP(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
 
                     case 0xD8: //CLD
                         PollInterrupts();
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         flag_Decimal = false;
-                        operationComplete = true;
+                        CompleteOperation();
 
                         break;
                     case 0xD9: //CMP abs, Y
@@ -8048,16 +8061,15 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_CMP(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
 
                     case 0xDA: //NOP ***
                         PollInterrupts();
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xDB: //DCP Abs Y ***
@@ -8077,7 +8089,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_DEC(addressBus);
                                 Op_CMP(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8093,7 +8105,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8110,7 +8122,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_CMP(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8132,7 +8144,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_DEC(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8154,7 +8166,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_DEC(addressBus);
                                 Op_CMP(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8163,7 +8175,7 @@ namespace TriCNES
                         PollInterrupts();
                         GetImmediate();
                         Op_CPX(dl);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xE1: //(SBC X)
@@ -8178,7 +8190,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_SBC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8186,7 +8198,7 @@ namespace TriCNES
                     case 0xE2: //DOP ***
                         PollInterrupts();
                         GetImmediate();
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xE3: //(ISC, X) ***
@@ -8210,7 +8222,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_INC(addressBus);
                                 Op_SBC(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8224,7 +8236,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Op_CPX(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8239,7 +8251,7 @@ namespace TriCNES
                             case 2: // read from address
                                 PollInterrupts();
                                 Op_SBC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8260,7 +8272,7 @@ namespace TriCNES
                             case 4: // perform operation
                                 PollInterrupts();
                                 Op_INC(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8282,40 +8294,38 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_INC(addressBus);
                                 Op_SBC(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
 
                     case 0xE8: //INX
                         PollInterrupts();
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         X++;
                         flag_Zero = X == 0;
                         flag_Negative = X >= 0x80;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xE9: //SBC Imm
                         PollInterrupts();
                         GetImmediate();
                         Op_SBC(dl);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xEA: //NOP
                         PollInterrupts();
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xEB: //SBC Imm ***
                         PollInterrupts();
                         GetImmediate();
                         Op_SBC(dl);
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xEC: //CPX Abs
@@ -8328,7 +8338,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_CPX(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8344,7 +8354,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_SBC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8370,7 +8380,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_INC(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8393,7 +8403,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_INC(addressBus);
                                 Op_SBC(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8406,7 +8416,7 @@ namespace TriCNES
                                 GetImmediate();
                                 if (!flag_Zero)
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 2:
@@ -8416,14 +8426,14 @@ namespace TriCNES
                                 addressBus = programCounter;
                                 if ((temporaryAddress & 0xFF00) == (programCounter & 0xFF00))
                                 {
-                                    operationComplete = true;
+                                    CompleteOperation();
                                 }
                                 break;
                             case 3: // read from address
                                 PollInterrupts_CantDisableIRQ(); // If the first poll detected an IRQ, this second poll should not be allowed to un-set the IRQ.
                                 Fetch(addressBus); // dummy read
                                 programCounter = (ushort)((programCounter & 0xFF) | (temporaryAddress & 0xFF00));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8440,7 +8450,7 @@ namespace TriCNES
                             case 5: // read from address
                                 PollInterrupts();
                                 Op_SBC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8449,7 +8459,7 @@ namespace TriCNES
                         switch (operationCycle)
                         {
                             case 1:
-                                dl = Fetch(programCounter);
+                                dl = Fetch(addressBus);
                                 break;
                             case 2:
                                 addressBus = 0xFFFF;
@@ -8492,7 +8502,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_INC(addressBus);
                                 Op_SBC(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8507,7 +8517,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8523,7 +8533,7 @@ namespace TriCNES
                             case 3: // read from address
                                 PollInterrupts();
                                 Op_SBC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8545,7 +8555,7 @@ namespace TriCNES
                             case 5:
                                 PollInterrupts();
                                 Op_INC(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8568,17 +8578,16 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_INC(addressBus);
                                 Op_SBC(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
 
                     case 0xF8: //SED
                         PollInterrupts();
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
                         flag_Decimal = true;
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xF9: //SBC Abs Y
@@ -8593,16 +8602,15 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_SBC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
 
                     case 0xFA: //NOP ***
                         PollInterrupts();
-                        addressBus = programCounter;
                         Fetch(addressBus); // dummy read
-                        operationComplete = true;
+                        CompleteOperation();
                         break;
 
                     case 0xFB: //ISC Abs Y ***
@@ -8622,7 +8630,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_INC(addressBus);
                                 Op_SBC(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8638,7 +8646,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Fetch(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8654,7 +8662,7 @@ namespace TriCNES
                             case 4: // read from address
                                 PollInterrupts();
                                 Op_SBC(Fetch(addressBus));
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8675,7 +8683,7 @@ namespace TriCNES
                             case 6:// read from address
                                 PollInterrupts();
                                 Op_INC(addressBus);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8697,7 +8705,7 @@ namespace TriCNES
                                 PollInterrupts();
                                 Op_INC(addressBus);
                                 Op_SBC(dl);
-                                operationComplete = true;
+                                CompleteOperation();
                                 break;
                         }
                         break;
@@ -8706,7 +8714,6 @@ namespace TriCNES
                     default: return; // logically, this can never happen.
                 }
                 operationCycle++; // increment this for next CPU cycle.
-                // If operationComplete is true, operationCycle will be set to 0 for next instruction.
             }
             if (DoDMCDMA && APU_ImplicitAbortDMC4015)
             {
@@ -8889,10 +8896,14 @@ namespace TriCNES
                         break;
                     case 0x2002:
                         // PPU Flags.
-                        dataBus = (byte)((((PPUStatus_VBlank ? 0x80 : 0) | (PPUStatus_SpriteZeroHit ? 0x40 : 0) | (PPUStatus_SpriteOverflow ? 0x20 : 0)) & 0xE0) + (PPUBus & 0x1F));
-                        
-                        PPUAddrLatch = false;
+
+
+                        dataBus = (byte)((((PPUStatus_VBlank ? 0x80 : 0)))); // The vblank flag is read at the start of the read...
                         PPU_Read2002 = true;
+                        EmulateUntilEndOfRead();
+                        dataBus |= (byte)((((PPUStatus_SpriteZeroHit ? 0x40 : 0) | (PPUStatus_SpriteOverflow ? 0x20 : 0)) &0xE0) + (PPUBus & 0x1F)); // ...while the sprite flags are read at the end.
+
+                        PPUAddrLatch = false;
                         PPUBus = dataBus;
                         for (int i = 5; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
                         
@@ -8902,6 +8913,7 @@ namespace TriCNES
                         dataBus = PPUBus; break;
                     case 0x2004:
                         // Read from OAM
+                        EmulateUntilEndOfRead();
                         dataBus = ReadOAM();
                         
                         PPUBus = dataBus;
@@ -9907,7 +9919,9 @@ namespace TriCNES
         {
             if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline < 240)
             {
-                if(PPU_Dot == 0 || PPU_Dot > 320)
+                return PPU_OAMBuffer; //TODO: How do I manage reads that occur when M2 goes low, rather than when M2 goes high?
+
+                if (PPU_Dot == 0 || PPU_Dot > 320)
                 {
                     return OAM2[0];
                 }
@@ -9917,11 +9931,11 @@ namespace TriCNES
                 }
                 else if (PPU_Dot <= 256)
                 {
-                    return PPU_SpriteEvaluationTemp;
+                    return PPU_OAMLatch;
                 }
                 else
                 {
-                    return PPU_SpriteEvaluationTemp;
+                    return PPU_OAMLatch;
                 }
             }
             return OAM[PPUOAMAddress];
@@ -11440,11 +11454,9 @@ namespace TriCNES
 
             State.Add(PPUClock);
             State.Add(CPUClock);
-            State.Add(MasterClock);
 
             State.Add(operationCycle);
             State.Add(opCode);
-            State.Add((byte)(operationComplete ? 1 : 0));
 
             State.Add(dl);
             State.Add(dataBus);
@@ -11638,7 +11650,7 @@ namespace TriCNES
             State.Add((byte)(CopyV ? 1 : 0));
             State.Add((byte)(SkippedPreRenderDot341 ? 1 : 0));
             State.Add((byte)(OamCorruptedOnOddCycle ? 1 : 0));
-            State.Add(PPU_SpriteEvaluationTemp);
+            State.Add(PPU_OAMLatch);
             State.Add(PPU_RenderTemp);
             State.Add((byte)(PPU_Commit_NametableFetch ? 1 : 0));
             State.Add((byte)(PPU_Commit_AttributeFetch ? 1 : 0));
@@ -11787,11 +11799,9 @@ namespace TriCNES
 
             PPUClock = State[p++];
             CPUClock = State[p++];
-            MasterClock = State[p++];
 
             operationCycle = State[p++];
             opCode = State[p++];
-            operationComplete = (State[p++] & 1) == 1;
 
             dl = State[p++];
             dataBus = State[p++];
@@ -11986,7 +11996,7 @@ namespace TriCNES
             CopyV = (State[p++] & 1) == 1;
             SkippedPreRenderDot341 = (State[p++] & 1) == 1;
             OamCorruptedOnOddCycle = (State[p++] & 1) == 1;
-            PPU_SpriteEvaluationTemp = State[p++];
+            PPU_OAMLatch = State[p++];
             PPU_RenderTemp = State[p++];
             PPU_Commit_NametableFetch = (State[p++] & 1) == 1;
             PPU_Commit_AttributeFetch = (State[p++] & 1) == 1;
