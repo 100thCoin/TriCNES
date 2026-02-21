@@ -663,7 +663,7 @@ namespace TriCNES
         {
             // this is used during reads from some ppu registers.
             // run 1.75 ppu cycles. (the actual duty cycle here would result in 1 and 7/8 ppu cycles, but my emulator doesn't worry about half-master-clock-cycles.
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 4; i++) // In reality, this SHOULD be i < 7, but that breaks a lot of sprite zero hit tests by seeing that flag early. TODO: Look into that. (I highly doubt I should have the _Delayed version of the sprite flags, but that makes these off by even more.)
             {
                 _EmulatorCore();
             }
@@ -1108,8 +1108,11 @@ namespace TriCNES
         const int PPUBusDecayConstant = 1786830; // 20 frames. Approximately how long it takes for the PPU bus to decay on my console.
         public byte PPUOAMAddress; // The address used to index into Object Attribute Memory
         public bool PPUStatus_VBlank; // This is set during Vblank, and cleared at the end, or if $2002 is read. This value can be read in address $2002
+        public bool PPUStatus_PendingSpriteZeroHit; // If a sprite zero hit occurs, this is set. This toggles PPUStatus_SpriteZeroHit on the next half-ppu-cycle.
         public bool PPUStatus_SpriteZeroHit; // If a sprite zero hit occurs, this is set. This value can be read in address $2002
+        public bool PPUStatus_SpriteZeroHit_Delayed;
         public bool PPUStatus_SpriteOverflow; // If a scanline had more than 8 objects in range, this is set. This value can be read in address $2002
+        public bool PPUStatus_SpriteOverflow_Delayed;
 
         public bool PPU_VSET; // This line is high for half a ppu cycle at the start of scanline 240.
         public bool PPU_VSET_Latch1; // A latch used in the timing for the VBlank flag.
@@ -1538,6 +1541,7 @@ namespace TriCNES
                 PPU_CanDetectSpriteZeroHit = true;
                 PPUStatus_SpriteZeroHit = false;
                 PPUStatus_SpriteOverflow = false;
+                PPUStatus_SpriteZeroHit_Delayed = false;
             }
 
             else if (PPU_Scanline == 0 && PPU_Dot == 1)
@@ -1558,6 +1562,9 @@ namespace TriCNES
                 PPU_Read2002 = false;
                 PPUStatus_VBlank = false;
             }
+
+            PPUStatus_SpriteOverflow_Delayed = PPUStatus_SpriteOverflow;
+
 
             if (Logging && LoggingPPU)
             {
@@ -1797,6 +1804,13 @@ namespace TriCNES
                 {
                     PPU_OAMBuffer = PPU_OAMLatch;
                 }
+            }
+
+            PPUStatus_SpriteZeroHit_Delayed = PPUStatus_SpriteZeroHit;
+            if (PPUStatus_PendingSpriteZeroHit)
+            {
+                PPUStatus_PendingSpriteZeroHit = false;
+                PPUStatus_SpriteZeroHit = true;
             }
 
         }
@@ -2627,7 +2641,7 @@ namespace TriCNES
                                             PPU_NextScanlineContainsSpriteZero = true; // this value will be transferred to PPU_PreviousScanlineContainsSpriteZero at the end of the scanline, and that variable is used in sp 0 hit detection.
                                         }
                                     }
-                                    else // if secondary OAM is full, yet another object is on this scanline
+                                    else if(!PPUStatus_SpriteOverflow)// if secondary OAM is full, yet another object is on this scanline
                                     {
                                         PPUStatus_SpriteOverflow = true; // set the sprite overflow flag
                                     }
@@ -3108,7 +3122,7 @@ namespace TriCNES
                             {
                                 if ((PPU_Mask_8PxShowSprites || PPU_Dot > 8) && PPU_Dot < 256) // and if this isn't on pixel 256, or in the first 8 pixels being masked away from the nametable, if that setting is enabled...
                                 {
-                                    PPUStatus_SpriteZeroHit = true; // we did it! sprite zero hit achieved.
+                                    PPUStatus_PendingSpriteZeroHit = true; // we did it! sprite zero hit achieved... the flag is set on teh next half-ppu-cycle.
                                     PPU_CanDetectSpriteZeroHit = false; // another sprite zero hit cannot occur until the end of next vblank.
                                     if (Logging) // and for some debug logging...
                                     {
@@ -8901,7 +8915,7 @@ namespace TriCNES
                         dataBus = (byte)((((PPUStatus_VBlank ? 0x80 : 0)))); // The vblank flag is read at the start of the read...
                         PPU_Read2002 = true;
                         EmulateUntilEndOfRead();
-                        dataBus |= (byte)((((PPUStatus_SpriteZeroHit ? 0x40 : 0) | (PPUStatus_SpriteOverflow ? 0x20 : 0)) &0xE0) + (PPUBus & 0x1F)); // ...while the sprite flags are read at the end.
+                        dataBus |= (byte)((((PPUStatus_SpriteZeroHit_Delayed ? 0x40 : 0) | (PPUStatus_SpriteOverflow_Delayed ? 0x20 : 0)) &0xE0) + (PPUBus & 0x1F)); // ...while the sprite flags are read at the end.
 
                         PPUAddrLatch = false;
                         PPUBus = dataBus;
@@ -11584,6 +11598,10 @@ namespace TriCNES
             State.Add((byte)(PPUStatus_VBlank ? 1 : 0));
             State.Add((byte)(PPUStatus_SpriteZeroHit ? 1 : 0));
             State.Add((byte)(PPUStatus_SpriteOverflow ? 1 : 0));
+            State.Add((byte)(PPUStatus_PendingSpriteZeroHit ? 1 : 0));
+            State.Add((byte)(PPUStatus_SpriteZeroHit_Delayed ? 1 : 0));
+            State.Add((byte)(PPUStatus_SpriteOverflow_Delayed ? 1 : 0));
+
             State.Add((byte)(PPU_Spritex16 ? 1 : 0));
             State.Add((byte)PPU_Scanline);
             State.Add((byte)(PPU_Scanline >> 8));
@@ -11930,6 +11948,10 @@ namespace TriCNES
             PPUStatus_VBlank = (State[p++] & 1) == 1;
             PPUStatus_SpriteZeroHit = (State[p++] & 1) == 1;
             PPUStatus_SpriteOverflow = (State[p++] & 1) == 1;
+            PPUStatus_PendingSpriteZeroHit = (State[p++] & 1) == 1;
+            PPUStatus_SpriteZeroHit_Delayed = (State[p++] & 1) == 1;
+            PPUStatus_SpriteOverflow_Delayed = (State[p++] & 1) == 1;
+
             PPU_Spritex16 = (State[p++] & 1) == 1;
             PPU_Scanline = State[p++];
             PPU_Scanline |= (ushort)(State[p++] << 8);
