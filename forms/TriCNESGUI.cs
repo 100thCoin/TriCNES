@@ -83,6 +83,18 @@ namespace TriCNES
                     }
                 }
             }
+            if (Pending_ShowScreenBorders)
+            {
+                Pending_ShowScreenBorders = false;
+                EMU.PPU_ShowScreenBorders = true;
+                BeginInvoke(new MethodInvoker(delegate () { ResizeWindow(ScreenMult); }));
+            }
+            if (Pending_HideScreenBorders)
+            {
+                Pending_HideScreenBorders = false;
+                EMU.PPU_ShowScreenBorders = false;
+                BeginInvoke(new MethodInvoker(delegate () { ResizeWindow(ScreenMult); }));
+            }
             if (PendingSaveState)
             {
                 PendingSaveState = false;
@@ -958,29 +970,27 @@ namespace TriCNES
             TraceLogger.Show();
             TraceLogger.Location = Location;
         }
-
+        bool Pending_ShowScreenBorders;
         private void trueToolStripMenuItem1_Click(object sender, EventArgs e)
         {
             toolstrip_ViewBorders_False.Checked = false;
             toolstrip_ViewBorders_True.Checked = true;
             if (EMU != null)
             {
-                EMU.PPU_ShowScreenBorders = true;
+                Pending_ShowScreenBorders = true;
             }
             settings_border = true;
-            ResizeWindow(ScreenMult);
         }
-
+        bool Pending_HideScreenBorders;
         private void falseToolStripMenuItem1_Click(object sender, EventArgs e)
         {
             toolstrip_ViewBorders_False.Checked = true;
             toolstrip_ViewBorders_True.Checked = false;
             if (EMU != null)
             {
-                EMU.PPU_ShowScreenBorders = false;
+                Pending_HideScreenBorders = true;
             }
             settings_border = false;
-            ResizeWindow(ScreenMult);
         }
 
         private void nametableViewerToolStripMenuItem_Click(object sender, EventArgs e)
