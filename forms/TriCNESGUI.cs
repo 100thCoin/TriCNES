@@ -48,6 +48,7 @@ namespace TriCNES
         public Emulator EMU;
         public Thread EmuClock;
         string filePath;
+        bool FDS;
         TASProperties TASPropertiesForm;
         TASProperties3ct TASPropertiesForm3ct;
         public TriCTraceLogger? TraceLogger;
@@ -395,6 +396,57 @@ namespace TriCNES
             return NametableBitmap.Bitmap;
         }
 
+        public bool LoadROM(string FilePath)
+        {
+            if (FDS)
+            {
+                string InitDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                if (Directory.Exists(AppDomain.CurrentDomain.BaseDirectory + @"roms\"))
+                {
+                    InitDirectory += @"roms\";
+                }
+                OpenFileDialog ofd = new OpenFileDialog()
+                {
+                    FileName = "",
+                    Title = "Select FDS BIOS",
+                    InitialDirectory = InitDirectory
+                };
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    string fds_bios = ofd.FileName;
+                    byte[] FDS_BIOS = File.ReadAllBytes(fds_bios);
+                    if (FDS_BIOS.Length != 0x2000)
+                    {
+                        return false;
+                    }
+                    Cartridge Cart = new Cartridge(filePath, fds_bios);
+                    EMU.Cart = Cart;
+                    Cart.Emu = EMU;
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                Cartridge Cart = new Cartridge(filePath);
+                EMU.Cart = Cart;
+                Cart.Emu = EMU;
+                return true;
+            }
+            return false;
+        }
+
+        public void InsertDisk(string filepath)
+        {
+            if(EMU.Cart.FDS != null)
+            {
+                EMU.Cart.FDS.InsertDisk(filepath);
+            }
+        }
+
         void ClockEmulator3CT(CancellationToken ct)
         {
             Cartridge[] CartArray = TASPropertiesForm3ct.CartridgeArray;
@@ -452,13 +504,13 @@ namespace TriCNES
                     GC.Collect();
                 }
                 filePath = ofd.FileName;
+                FDS = Path.GetExtension(ofd.FileName) == ".fds";
                 EMU = new Emulator();
                 EMU.PPU_DecodeSignal = settings_ntsc;
                 EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
                 EMU.PPU_ShowScreenBorders = settings_border;
                 EMU.PPUClock = settings_alignment;
-                Cartridge Cart = new Cartridge(filePath);
-                EMU.Cart = Cart;
+                if (!LoadROM(filePath)) { return; }
                 cancel = new CancellationTokenSource();
                 EmuClock = new Thread(() => ClockEmulator(cancel.Token));
                 EmuClock.SetApartmentState(ApartmentState.STA);
@@ -531,8 +583,8 @@ namespace TriCNES
             EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
             EMU.PPU_ShowScreenBorders = settings_border;
 
-            Cartridge Cart = new Cartridge(filePath);
-            EMU.Cart = Cart;
+            if (!LoadROM(filePath)) { return; }
+
             EMU.TAS_ReadingTAS = true;
             EMU.TAS_InputLog = TASPropertiesForm.TasInputLog;
             EMU.TAS_ResetLog = TASPropertiesForm.TasResetLog;
@@ -648,6 +700,10 @@ namespace TriCNES
                 EMU.PPU_ShowScreenBorders = settings_border;
                 EMU.PPUClock = settings_alignment;
             }
+            foreach(Cartridge c in TASPropertiesForm3ct.CartridgeArray)
+            {
+                c.Emu = EMU;
+            }
             cancel = new CancellationTokenSource();
             EmuClock = new Thread(() => ClockEmulator3CT(cancel.Token));
             EmuClock.IsBackground = true;
@@ -716,41 +772,52 @@ namespace TriCNES
         private void pb_Screen_DragEnter(object sender, DragEventArgs e)
         {
             var filenames = (string[])e.Data.GetData(DataFormats.FileDrop, false);
-            if (Path.GetExtension(filenames[0]) == ".nes" || Path.GetExtension(filenames[0]) == ".NES") e.Effect = DragDropEffects.All;
+            if (Path.GetExtension(filenames[0]) == ".nes" || Path.GetExtension(filenames[0]) == ".NES" || Path.GetExtension(filenames[0]) == ".fds" || Path.GetExtension(filenames[0]) == ".FDS") e.Effect = DragDropEffects.All;
             else e.Effect = DragDropEffects.None;
         }
 
         private void pb_Screen_DragDrop(object sender, DragEventArgs e)
         {
-            if (EmuClock != null)
-            {
-                cancel.Cancel();
-                EmuClock.Join();
-            }
-
-            if (EMU != null)
-            {
-                EMU.Dispose();
-                GC.Collect();
-            }
-
             var filenames = (string[])e.Data.GetData(DataFormats.FileDrop, false);
             string filename = filenames[0];
             filePath = filename;
-            EMU = new Emulator();
-            EMU.PPU_DecodeSignal = settings_ntsc;
-            EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
-            EMU.PPU_ShowScreenBorders = settings_border;
-            EMU.PPUClock = settings_alignment;
+            bool prev_FDS = FDS;
+            FDS = Path.GetExtension(filePath).ToLower() == ".fds";
 
-            Cartridge Cart = new Cartridge(filePath);
+            if (!FDS || !prev_FDS)
+            {
+                if (EmuClock != null)
+                {
+                    cancel.Cancel();
+                    EmuClock.Join();
+                }
 
-            EMU.Cart = Cart;
-            cancel = new CancellationTokenSource();
-            EmuClock = new Thread(() => ClockEmulator(cancel.Token));
-            EmuClock.SetApartmentState(ApartmentState.STA);
-            EmuClock.IsBackground = true;
-            EmuClock.Start();
+                if (EMU != null)
+                {
+                    EMU.Dispose();
+                    GC.Collect();
+                }
+            }
+            if (FDS && prev_FDS)
+            {
+                InsertDisk(filePath);
+            }
+            else
+            {
+                EMU = new Emulator();
+                EMU.PPU_DecodeSignal = settings_ntsc;
+                EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
+                EMU.PPU_ShowScreenBorders = settings_border;
+                EMU.PPUClock = settings_alignment;
+
+                if (!LoadROM(filePath)) { return; }
+
+                cancel = new CancellationTokenSource();
+                EmuClock = new Thread(() => ClockEmulator(cancel.Token));
+                EmuClock.SetApartmentState(ApartmentState.STA);
+                EmuClock.IsBackground = true;
+                EmuClock.Start();
+            }
             GC.Collect();
 
         }
@@ -1065,6 +1132,7 @@ namespace TriCNES
                         EmuClock.Join();
                     }
                     filePath = ofd.FileName;
+                    FDS = Path.GetExtension(ofd.FileName) == ".fds";
                     TasTimeline = new TriCTASTimeline(this);
                     TasTimeline.Show();
                     TasTimeline.Location = Location;
@@ -1568,8 +1636,8 @@ namespace TriCNES
             EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
             EMU.PPU_ShowScreenBorders = settings_border;
             EMU.PPUClock = settings_alignment;
-            Cartridge Cart = new Cartridge(filePath);
-            EMU.Cart = Cart;
+            if (!LoadROM(filePath)) { return; }
+
             cancel = new CancellationTokenSource();
             EmuClock = new Thread(() => ClockTimelineEmulator(cancel.Token));
             EmuClock.SetApartmentState(ApartmentState.STA);
@@ -1615,8 +1683,8 @@ namespace TriCNES
                     EMU.PPU_ShowRawNTSCSignal = settings_ntscRaw;
                     EMU.PPU_ShowScreenBorders = settings_border;
                     EMU.PPUClock = settings_alignment;
-                    Cartridge Cart = new Cartridge(filePath);
-                    EMU.Cart = Cart;
+                    if (!LoadROM(filePath)) { return; }
+
                     if (Timeline_PendingClockFiltering)
                     {
                         Timeline_PendingClockFiltering = false;
