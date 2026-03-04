@@ -86,6 +86,7 @@
     <Compile Include="forms\TriCNESGUI.Designer.cs">
       <DependentUpon>TriCNESGUI.cs</DependentUpon>
     </Compile>
+    <Compile Include="mappers\Mapper_NULL.cs" />
     <Compile Include="mappers\Mapper_MMC1.cs" />
     <Compile Include="mappers\Mapper_MMC3.cs" />
     <Compile Include="mappers\Mapper_CNROM.cs" />

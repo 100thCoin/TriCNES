@@ -1368,7 +1368,7 @@ namespace TriCNES
                         if (PPU_VRAM_MysteryAddress >= 0x3F00)
                         {
 
-                            StorePPUData((ushort)(PPU_ReadWriteAddress), (byte)PPU_VRAM_MysteryAddress);
+                            StorePPUData((ushort)(PPU_ReadWriteAddress & 0x2FFF), (byte)PPU_VRAM_MysteryAddress);
                             PPU_AddressBus = PPU_ReadWriteAddress;
 
                         }
@@ -1452,7 +1452,14 @@ namespace TriCNES
                             if ((CPUClock & 3) != 0) // This write only occurs on phases 1, 2, and 3
                             {
                                 // Store the expected value at the *recently modified* Read/Write address.
-                                StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
+                                if ((PPU_AddressBus & 0x3FFF) >= 0x3F00)
+                                {
+                                    StorePPUData((ushort)(PPU_AddressBus & 0x2FFF), PPU_Data_StateMachine_InputValue);
+                                }
+                                else
+                                {
+                                    StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
+                                }
                             }
                         }
                     }
