@@ -61,7 +61,7 @@ namespace TriCNES
 
             NametableHorizontalMirroring = ((ROM[6] & 1) == 0); // The style in which the nametable is mirrored is part of the iNES header.
             AlternativeNametableArrangement = ((ROM[6] & 8) != 0); // Some mappers support other arrangements.
-            if(AlternativeNametableArrangement)
+            if (AlternativeNametableArrangement)
             {
                 PRGVRAM = new byte[0x800];
             }
@@ -76,7 +76,7 @@ namespace TriCNES
 
             Name = filepath; // For debugging, it's nice to see the file name sometimes.
 
-            switch(MemoryMapper)
+            switch (MemoryMapper)
             {
                 default:
                 case 0: MapperChip = new Mapper_NROM(); break;
@@ -204,7 +204,7 @@ namespace TriCNES
         {
             Disk = File.ReadAllBytes(filepath); // Reads the file from the provided file path, and stores every byte into an array.
         }
-    }  
+    }
 
 
     public class Emulator
@@ -328,7 +328,7 @@ namespace TriCNES
             VRAM = new byte[0x800];
             OAM = new byte[0x100];
             OAM2 = new byte[32];
-            for(int oam2_init = 0; oam2_init < OAM2.Length; oam2_init++)
+            for (int oam2_init = 0; oam2_init < OAM2.Length; oam2_init++)
             {
                 OAM2[oam2_init] = 0xFF;
             }
@@ -594,8 +594,8 @@ namespace TriCNES
         public byte ControllerPort2;            // The buttons currently pressed on controller 2. These are in the "A, B, Select, Start, Up, Down, Left, Right" order.
         public byte ControllerShiftRegister1;   // Controllers are read 1 bit at a time. First the A Button is read, then B, and so on.
         public byte ControllerShiftRegister2;   // Whenever the shift register is read, all the bits are shifted to the left, and a '1' replaces bit 0.
-        public byte Controller1ShiftCounter;    // Subsequent CPU cycles reading from $2006 do not update the shift register.
-        public byte Controller2ShiftCounter;    // Subsequent CPU cycles reading from $2007 do not update the shift register.
+        public byte Controller1ShiftCounter;    // Subsequent CPU cycles reading from $4016 do not update the shift register.
+        public byte Controller2ShiftCounter;    // Subsequent CPU cycles reading from $4017 do not update the shift register.
 
 
 
@@ -1597,11 +1597,11 @@ namespace TriCNES
             }
 
             PPU_VSET_Latch1 = !PPU_VSET; //  VSET_Latch1 is latched with /VSET on the first half of a PPU cycle.
-            if(PPU_VSET && !PPU_VSET_Latch2)
+            if (PPU_VSET && !PPU_VSET_Latch2)
             {
                 PPUStatus_VBlank = true;
             }
-            if(PPU_Read2002)
+            if (PPU_Read2002)
             {
                 PPU_Read2002 = false;
                 PPUStatus_VBlank = false;
@@ -2412,9 +2412,9 @@ namespace TriCNES
                 {
                     if (PPU_ShowRawNTSCSignal)
                     {
-                        R = NTSC_Samples[i+8] * 12;
-                        G = NTSC_Samples[i+8] * 12;
-                        B = NTSC_Samples[i+8] * 12;
+                        R = NTSC_Samples[i + 8] * 12;
+                        G = NTSC_Samples[i + 8] * 12;
+                        B = NTSC_Samples[i + 8] * 12;
                         if (R < 0) { R = 0; }
                         if (R > 1) { R = 1; }
                         if (G < 0) { G = 0; }
@@ -2471,6 +2471,7 @@ namespace TriCNES
         bool OamCorruptedOnOddCycle;
         public byte PPU_OAMLatch; // is this just the ppubus?
         public byte PPU_OAMBuffer; // This is the value read from $2004, updated on half cycles.
+        bool NineObjectsOnThisScanline;
         void PPU_Render_SpriteEvaluation()
         {
             bool SpriteEval_ReadOnly_PreRenderLine = false;
@@ -2575,6 +2576,7 @@ namespace TriCNES
                 if (PPU_Dot == 65)
                 {
                     OAM2Address = 0;
+                    NineObjectsOnThisScanline = false;
                 }
                 if (PPU_Mask_ShowBackground_Instant || PPU_Mask_ShowSprites_Instant || PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant) // if rendering is enabled, or was *just* disabled mid evaluation
                 {
@@ -2602,7 +2604,10 @@ namespace TriCNES
                     }
                     else
                     { //even cycles                       
+                        if(PPU_OAMLatch == 0x7F && PPU_Scanline == 0x80)
+                        {
 
+                        }
                         if (!OAMAddressOverflowedDuringSpriteEvaluation)
                         {
                             byte PreIncVal = PPUOAMAddress; // for checking if PPUOAMAddress overflows
@@ -2614,7 +2619,7 @@ namespace TriCNES
                             if (SpriteEvaluationTick == 0) // tick 0: check if this object's y position is in range for this scanline
                             {
                                 PPU_OAMEvaluationObjectInXRange = false;
-                                if (!SpriteEval_ReadOnly_PreRenderLine && (PPU_Scanline & 0xFF) - PPU_OAMLatch >= 0 && (PPU_Scanline & 0xFF) - PPU_OAMLatch < (PPU_Spritex16 ? 16 : 8))
+                                if (!NineObjectsOnThisScanline && !SpriteEval_ReadOnly_PreRenderLine && (PPU_Scanline & 0xFF) - PPU_OAMLatch >= 0 && (PPU_Scanline & 0xFF) - PPU_OAMLatch < (PPU_Spritex16 ? 16 : 8))
                                 {
                                     PPU_OAMEvaluationObjectInRange = true;
                                     // if this sprite is within range.
@@ -2643,9 +2648,14 @@ namespace TriCNES
                                             PPU_NextScanlineContainsSpriteZero = true; // this value will be transferred to PPU_PreviousScanlineContainsSpriteZero at the end of the scanline, and that variable is used in sp 0 hit detection.
                                         }
                                     }
-                                    else if(!PPUStatus_SpriteOverflow)// if secondary OAM is full, yet another object is on this scanline
+                                    else
                                     {
-                                        PPUStatus_SpriteOverflow = true; // set the sprite overflow flag
+                                        NineObjectsOnThisScanline = true;
+                                        PPUOAMAddress++;
+                                        if (!PPUStatus_SpriteOverflow)// if secondary OAM is full, yet another object is on this scanline
+                                        {
+                                            PPUStatus_SpriteOverflow = true; // set the sprite overflow flag
+                                        }
                                     }
                                     if (!SpriteEval_ReadOnly_PreRenderLine)
                                     {
@@ -2661,7 +2671,7 @@ namespace TriCNES
                                     PPU_OAMEvaluationObjectInRange = false;
                                     if (!OamCorruptedOnOddCycle && !SpriteEval_ReadOnly_PreRenderLine)
                                     {
-                                        if (SecondaryOAMFull)
+                                        if (SecondaryOAMFull && !NineObjectsOnThisScanline)// this behavior stops after finding the ninth object.
                                         {
                                             if ((PPUOAMAddress & 0x3) == 3)
                                             {
@@ -2717,6 +2727,11 @@ namespace TriCNES
                                                 PPUOAMAddress += 1; // +1 (In theory, this should be +4, though my experiments only reflect my consoles behavior if this is +1?)
                                                 PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
                                             }
+                                        }
+                                        else
+                                        {
+                                            PPUOAMAddress += 1; // +1 (In theory, this should be +4, though my experiments only reflect my consoles behavior if this is +1?)
+                                            PPUOAMAddress &= 0xFC; // also mask away the lower 2 bits
                                         }
                                     }
                                 }
@@ -8916,12 +8931,12 @@ namespace TriCNES
                         dataBus = (byte)((((PPUStatus_VBlank ? 0x80 : 0)))); // The vblank flag is read at the start of the read...
                         PPU_Read2002 = true;
                         EmulateUntilEndOfRead();
-                        dataBus |= (byte)((((PPUStatus_SpriteZeroHit_Delayed ? 0x40 : 0) | (PPUStatus_SpriteOverflow_Delayed ? 0x20 : 0)) &0xE0) + (PPUBus & 0x1F)); // ...while the sprite flags are read at the end.
+                        dataBus |= (byte)((((PPUStatus_SpriteZeroHit_Delayed ? 0x40 : 0) | (PPUStatus_SpriteOverflow_Delayed ? 0x20 : 0)) & 0xE0) + (PPUBus & 0x1F)); // ...while the sprite flags are read at the end.
 
                         PPUAddrLatch = false;
                         PPUBus = dataBus;
                         for (int i = 5; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
-                        
+
                         break;
                     case 0x2003:
                         // write only. Return the PPU databus.
@@ -8930,10 +8945,10 @@ namespace TriCNES
                         // Read from OAM
                         EmulateUntilEndOfRead();
                         dataBus = ReadOAM();
-                        
+
                         PPUBus = dataBus;
                         for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
-                        
+
                         break;
                     case 0x2005:
                         // write only. Return the PPU databus.
@@ -8997,7 +9012,7 @@ namespace TriCNES
                             {
                                 // not reading from the palettes, reading from the buffer.
                                 dataBus = PPU_VRAMAddressBuffer;
-                            }                               
+                            }
                         }
 
                         // if the PPU state machine is not currently in progress...
@@ -9019,7 +9034,7 @@ namespace TriCNES
                         PPU_Data_StateMachine_Read_Delayed = true; // This is also set, in case the state machine is interrupted.
                         PPUBus = dataBus;
                         for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
-                        
+
                         break;
                 }
                 dataPinsAreNotFloating = true;
@@ -9037,7 +9052,7 @@ namespace TriCNES
                 byte Reg = (byte)(Address & 0x1F);
                 if (Reg == 0x15)
                 {
-                    
+
                     byte InternalBus = dataBus;
 
                     InternalBus &= 0x20;
@@ -9048,9 +9063,9 @@ namespace TriCNES
                     InternalBus |= (byte)((APU_LengthCounter_Triangle != 0) ? 0x04 : 0);
                     InternalBus |= (byte)((APU_LengthCounter_Pulse2 != 0) ? 0x02 : 0);
                     InternalBus |= (byte)((APU_LengthCounter_Pulse1 != 0) ? 0x01 : 0);
-                    
+
                     Clearing_APU_FrameInterrupt = true;
-                    
+
 
                     // footnote:
                     // Consider the following. LDA #0, STA $4015, LDA $4015.
@@ -9066,7 +9081,7 @@ namespace TriCNES
                     // controller ports
                     // grab 1 bit from the controller's shift register.
                     // also add the upper 3 bits of the databus.
-                    
+
                     if (Reg == 0x16)
                     {
                         // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
@@ -9077,7 +9092,7 @@ namespace TriCNES
                         // if there are 2 CPU cycles in a row that read from this address, the registers don't get shifted
                         Controller2ShiftCounter = 2; // The shift register isn't shifted until this is 0, decremented in every APU PUT cycle
                     }
-                    
+
                     APU_ControllerPortsStrobed = false; // This allows data to rapidly be streamed in through the A button if the controllers are read while strobed.
                     if (DoOAMDMA && dataPinsAreNotFloating) // If all the databus pins are floating, then the controller bits are visible. Otherwise... not so much.
                     {
@@ -9127,11 +9142,11 @@ namespace TriCNES
                     // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
                     return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
                 }
-                if(Cart.AlternativeNametableArrangement)
+                if (Cart.AlternativeNametableArrangement)
                 {
-                    if(Cart.MemoryMapper == 4)
+                    if (Cart.MemoryMapper == 4)
                     {
-                        if((Address & 0x800) != 0)
+                        if ((Address & 0x800) != 0)
                         {
                             // using the extra PRG VRAM.
                             Address &= 0x7FF;
@@ -10466,7 +10481,7 @@ namespace TriCNES
         void Debug_PPU()
         {
             string dotColor = "";
-            if(PPU_ShowScreenBorders || (PPU_Scanline < 240 && PPU_Dot <= 256 && PPU_Dot > 0))
+            if (PPU_ShowScreenBorders || (PPU_Scanline < 240 && PPU_Dot <= 256 && PPU_Dot > 0))
             {
                 dotColor = "COLOR: " + DotColor.ToString("X2") + "\t";
             }
@@ -10481,7 +10496,7 @@ namespace TriCNES
                 }
             }
             */
-            string Addr = "Address: "+PPU_AddressBus.ToString("X4") + "\t";
+            string Addr = "Address: " + PPU_AddressBus.ToString("X4") + "\t";
             string m2Filter = Cart.MemoryMapper == 4 ? ("M2Filter: " + MMC3_M2Filter.ToString() + "\t") : "";
             string enabled = "[" + (PPU_Mask_ShowSprites ? "S" : "-") + (PPU_Mask_ShowBackground ? "B" : "-") + "]\t";
 
@@ -10644,7 +10659,7 @@ namespace TriCNES
             State.Add((byte)(PPUStatus_SpriteZeroHit ? 1 : 0));
             State.Add((byte)(PPUStatus_SpriteOverflow ? 1 : 0));
             State.Add((byte)(PPUStatus_PendingSpriteZeroHit ? 1 : 0));
-            State.Add((byte)(PPUStatus_PendingSpriteZeroHit2 ? 1 : 0));            
+            State.Add((byte)(PPUStatus_PendingSpriteZeroHit2 ? 1 : 0));
             State.Add((byte)(PPUStatus_SpriteZeroHit_Delayed ? 1 : 0));
             State.Add((byte)(PPUStatus_SpriteOverflow_Delayed ? 1 : 0));
 
@@ -10778,7 +10793,7 @@ namespace TriCNES
             State.Add(MMC3_M2Filter);
 
             List<byte> MapperBytes = Cart.MapperChip.SaveMapperRegisters();
-            for(int i = 0; i < MapperBytes.Count; i++)
+            for (int i = 0; i < MapperBytes.Count; i++)
             {
                 State.Add(MapperBytes[i]);
             }

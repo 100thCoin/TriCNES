@@ -88,6 +88,7 @@
             // 
             this.tb_RangeLow.Enabled = false;
             this.tb_RangeLow.Location = new System.Drawing.Point(298, 495);
+            this.tb_RangeLow.MaxLength = 4;
             this.tb_RangeLow.Name = "tb_RangeLow";
             this.tb_RangeLow.ReadOnly = true;
             this.tb_RangeLow.Size = new System.Drawing.Size(32, 20);
@@ -99,6 +100,7 @@
             // 
             this.tb_RangeHigh.Enabled = false;
             this.tb_RangeHigh.Location = new System.Drawing.Point(336, 495);
+            this.tb_RangeHigh.MaxLength = 4;
             this.tb_RangeHigh.Name = "tb_RangeHigh";
             this.tb_RangeHigh.ReadOnly = true;
             this.tb_RangeHigh.Size = new System.Drawing.Size(32, 20);
