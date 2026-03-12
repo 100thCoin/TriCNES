@@ -226,6 +226,55 @@ namespace TriCNES.mappers
                 else { Address &= 0x7FF; return Cart.CHRROM[(Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
             }
         }
+        public override byte FetchPPU2()
+        {
+            // This will always use the upper 8 bits of the address bus | the octal latch. This replaces the lower 8 bits of the address bus.
+            ushort Address = (ushort)(Cart.Emu.PPU_AddressBus & 0x3FFF);
+            bool CIRAM = Address >= 0x2000;
+            if (!CIRAM)
+            {
+                if (Cart.UsingCHRRAM)
+                {
+                    Cart.Emu.PPU_AddressBus &= 0xFF00;
+                    Cart.Emu.PPU_AddressBus |= Cart.CHRRAM[Address];
+                }
+                else
+                {
+                    //Pattern Table
+                    Cart.Emu.PPU_AddressBus &= 0xFF00;
+                    Cart.Emu.PPU_AddressBus |= Cart.MapperChip.FetchCHR(Address, false);
+                }
+            }
+            else // if the VRAM address is >= $2000, we need to consider nametable mirroring.
+            {
+                Address = MirrorNametable(Address);
+
+                if (Cart.AlternativeNametableArrangement)
+                {
+
+                    if ((Address & 0x800) != 0)
+                    {
+                        // using the extra PRG VRAM.
+                        Address &= 0x7FF;
+                        Cart.Emu.PPU_AddressBus &= 0xFF00;
+                        Cart.Emu.PPU_AddressBus |= Cart.PRGVRAM[Address];
+                    }
+                    else
+                    {
+                        Address &= 0x7FF;
+                        Cart.Emu.PPU_AddressBus &= 0xFF00;
+                        Cart.Emu.PPU_AddressBus |= Cart.Emu.VRAM[Address];
+                    }
+                }
+                else
+                {
+                    Address &= 0x7FF;
+                    Cart.Emu.PPU_AddressBus &= 0xFF00;
+                    Cart.Emu.PPU_AddressBus |= Cart.Emu.VRAM[Address];
+                }
+            }
+            return (byte)Cart.Emu.PPU_AddressBus;
+        }
         public override ushort MirrorNametable(ushort Address)
         {
             if (!Cart.AlternativeNametableArrangement)
@@ -246,7 +295,10 @@ namespace TriCNES.mappers
             List<byte> State = new List<byte>();
             foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
             foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
-            foreach (Byte b in Cart.PRGVRAM) { State.Add(b); }
+            if (Cart.PRGVRAM != null)
+            {
+                foreach (Byte b in Cart.PRGVRAM) { State.Add(b); }
+            }
             State.Add(Mapper_4_8000);
             State.Add(Mapper_4_BankA);
             State.Add(Mapper_4_Bank8C);
@@ -270,7 +322,10 @@ namespace TriCNES.mappers
             int p = startIndex;
             for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
             for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
-            for (int i = 0; i < Cart.PRGVRAM.Length; i++) { Cart.PRGVRAM[i] = State[p++]; }
+            if (Cart.PRGVRAM != null)
+            {
+                for (int i = 0; i < Cart.PRGVRAM.Length; i++) { Cart.PRGVRAM[i] = State[p++]; }
+            }
             Mapper_4_8000 = State[p++];
             Mapper_4_BankA = State[p++];
             Mapper_4_Bank8C = State[p++];

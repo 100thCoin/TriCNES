@@ -364,8 +364,8 @@ namespace TriCNES
                 ||| ++-------------- nametable select
                 +++----------------- fine Y scroll
                 */
-                int X = ((EMU.PPU_TempVRAMAddress & 0b11111) << 3) | EMU.PPU_FineXScroll | ((EMU.PPU_TempVRAMAddress & 0b10000000000) >> 2);
-                int Y = ((EMU.PPU_TempVRAMAddress & 0b1111100000) >> 2) | ((EMU.PPU_TempVRAMAddress & 0b111000000000000) >> 12) | ((EMU.PPU_TempVRAMAddress & 0b100000000000) >> 4);
+                int X = ((EMU.PPU_t & 0b11111) << 3) | EMU.PPU_FineXScroll | ((EMU.PPU_t & 0b10000000000) >> 2);
+                int Y = ((EMU.PPU_t & 0b1111100000) >> 2) | ((EMU.PPU_t & 0b111000000000000) >> 12) | ((EMU.PPU_t & 0b100000000000) >> 4);
                 int i = 0;
                 while (i <= 257)
                 {
@@ -383,8 +383,8 @@ namespace TriCNES
             }
             if (NametableViewer.OverlayScreen())
             {
-                int X = ((EMU.PPU_TempVRAMAddress & 0b11111) << 3) | EMU.PPU_FineXScroll | ((EMU.PPU_TempVRAMAddress & 0b10000000000) >> 2);
-                int Y = ((EMU.PPU_TempVRAMAddress & 0b1111100000) >> 2) | ((EMU.PPU_TempVRAMAddress & 0b111000000000000) >> 12) | ((EMU.PPU_TempVRAMAddress & 0b100000000000) >> 4);
+                int X = ((EMU.PPU_t & 0b11111) << 3) | EMU.PPU_FineXScroll | ((EMU.PPU_t & 0b10000000000) >> 2);
+                int Y = ((EMU.PPU_t & 0b1111100000) >> 2) | ((EMU.PPU_t & 0b111000000000000) >> 12) | ((EMU.PPU_t & 0b100000000000) >> 4);
                 for (int xx = 0; xx < 256; xx++)
                 {
                     for (int yy = 0; yy < 240; yy++)
@@ -759,6 +759,7 @@ namespace TriCNES
                 Emu2.PPU_ShowScreenBorders = settings_border;
                 Emu2.PPUClock = settings_alignment;
                 Emu2.Cart = EMU.Cart;
+                Emu2.Cart.Emu = Emu2;
                 EMU = Emu2;
             }
         }
