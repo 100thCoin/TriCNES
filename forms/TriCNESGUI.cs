@@ -306,8 +306,8 @@ namespace TriCNES
                     {
                         while (x < 32)
                         {
-                            PatternTile = EMU.FetchPPU((ushort)(0x2000 + 0x400 * tx + 0x800 * ty + x + y * 32));
-                            pal = EMU.FetchPPU((ushort)(0x2000 + 0x400 * (tx + 1) + 0x800 * ty - 0x40 + x / 4 + (y / 4) * 8));
+                            PatternTile = EMU.ObservePPU((ushort)(0x2000 + 0x400 * tx + 0x800 * ty + x + y * 32));
+                            pal = EMU.ObservePPU((ushort)(0x2000 + 0x400 * (tx + 1) + 0x800 * ty - 0x40 + x / 4 + (y / 4) * 8));
                             if ((x & 3) >= 2)
                             {
                                 pal = pal >> 2;
@@ -322,14 +322,14 @@ namespace TriCNES
                                 while (px < 8)
                                 {
 
-                                    int k = ((EMU.FetchPPU((ushort)(py + PatternTile * 16 + (!EMU.PPU_PatternSelect_Background ? 0 : 0x1000))) >> (7 - px)) & 1) + 2 * ((EMU.FetchPPU((ushort)(py + 8 + PatternTile * 16 + (!EMU.PPU_PatternSelect_Background ? 0 : 0x1000))) >> (7 - px)) & 1);
+                                    int k = ((EMU.ObservePPU((ushort)(py + PatternTile * 16 + (!EMU.PPU_PatternSelect_Background ? 0 : 0x1000))) >> (7 - px)) & 1) + 2 * ((EMU.ObservePPU((ushort)(py + 8 + PatternTile * 16 + (!EMU.PPU_PatternSelect_Background ? 0 : 0x1000))) >> (7 - px)) & 1);
                                     if (k == 0 && ForceBackdropOnIndex0)
                                     {
-                                        k = EMU.FetchPPU(0x3F00);
+                                        k = EMU.ObservePPU(0x3F00);
                                     }
                                     else
                                     {
-                                        k = EMU.FetchPPU((ushort)(0x3F00 + k + pal * 4));
+                                        k = EMU.ObservePPU((ushort)(0x3F00 + k + pal * 4));
                                     }
                                     int col = unchecked((int)Emulator.NesPalInts[k & 0x3F]);
                                     NametableBitmap.SetPixel(tx * 0x100 + x * 8 + px, ty * 0xF0 + y * 8 + py, col);
@@ -898,6 +898,7 @@ namespace TriCNES
             {
                 Emulator Emu2 = new Emulator();
                 Emu2.Cart = EMU.Cart;
+                Emu2.Cart.Emu = Emu2;
                 EMU = Emu2;
                 EMU.PPUClock = Alignment;
                 EMU.CPUClock = 0;

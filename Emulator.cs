@@ -148,7 +148,7 @@ namespace TriCNES
         public virtual void FetchPPU1()
         {
             // This also happens when reading from palette RAM. The CPU sees palette RAM, the PPU sees stuff from the nametable again.
-            if (Cart.Emu.PPU_ALE || true)
+            if (Cart.Emu.PPU_ALE)
             {
                 Cart.Emu.PPU_OctalLatch = (byte)Cart.Emu.PPU_AddressBus;
             }
@@ -557,8 +557,7 @@ namespace TriCNES
 
             //$2006 is unchanged
 
-            PPU_Data_StateMachine = 9;
-            PPU_VRAMAddressBuffer = 0;
+            PPU_ReadBuffer = 0;
             PPU_OddFrame = false;
 
             PPU_Dot = 0;
@@ -632,20 +631,6 @@ namespace TriCNES
         public byte ControllerShiftRegister2;   // Whenever the shift register is read, all the bits are shifted to the left, and a '1' replaces bit 0.
         public byte Controller1ShiftCounter;    // Subsequent CPU cycles reading from $4016 do not update the shift register.
         public byte Controller2ShiftCounter;    // Subsequent CPU cycles reading from $4017 do not update the shift register.
-
-
-
-        // The PPU state machine:
-        // In summary, the steps that are taken when writing to 2007 do not happen in a single ppu cycle.
-        public byte PPU_Data_StateMachine = 0x7;                   // The value of the state machine indicates what step should be taken on any given ppu cycle.
-        public bool PPU_Data_StateMachine_Read;                     // If this is a read instruction, the state machine behaves differently
-        public bool PPU_Data_StateMachine_Read_Delayed;             // If the read cycle happens immediately before a write cycle, there's also different behavior.
-        public bool PPU_Data_StateMachine_PerformMysteryWrite;      // This is only set during a read-modify-write instruction to $2007, if the current CPU/PPU alignment would result in "the mystery write" occurring.
-        public byte PPU_Data_StateMachine_InputValue;               // This is the value that was written to $2007 while interrupting the state machine.
-        public bool PPU_Data_StateMachine_UpdateVRAMAddressEarly;   // During read-modify-write instructions to $2007, certain CPU/PPU alignments will update the VRAM address earlier than expected.
-        public bool PPU_Data_StateMachine_UpdateVRAMBufferLate;     // During read-modify-write instructions to $2007, certain CPU/PPU alignments will update the VRAM buffer later than expected.
-        public bool PPU_Data_StateMachine_NormalWriteBehavior;      // If this write instruction is not interrupting the state machine.
-        public bool PPU_Data_StateMachine_InterruptedReadToWrite;   // If a write happens on cycle 3 of the state machine.
 
         public bool LagFrame; // True if the controller port was not strobed in a frame.
         public bool TASTimelineClockFiltering; // Primarily used in the TASTimeline if you are using subframe Inputs.
@@ -1278,7 +1263,6 @@ namespace TriCNES
         bool CopyV = false; // set by writes to $2006. If it occurs on the same dot the scroll values are naturally incremented, some bugs occur.
         bool SkippedPreRenderDot341 = false;
 
-
         void _EmulatePPU()
         {
 
@@ -1340,182 +1324,6 @@ namespace TriCNES
                     PPU_PatternSelect_Sprites = (PPU_Update2000Value & 0x8) != 0;
                     PPU_PatternSelect_Background = (PPU_Update2000Value & 0x10) != 0;
                     PPU_t = (ushort)((PPU_t & 0b0111001111111111) | ((PPU_Update2000Value & 0x3) << 10)); // change which nametable to render.
-
-
-                }
-            }
-
-            if (PPU_Data_StateMachine < 9)
-            {
-                // This info was not determined by using visualNES or visual2c02, and is entirely "speculation" based on behavior I was able to detect on my console through read-modify-write instructions to address $2007.
-
-                // reading/writing to address $2007 will set the state machine value to 0. Increment it every PPU Cycle
-                // There's a handful of unexpected behavior if this state machine is currently happening when another read/write to $2007 occurs
-                // in other words, if 2 consecutive CPU cycles access $2007 there's unexpected behavior.
-                // that behavior is handled here.
-
-                // NOTE: This behavior matches my console, though different revisions have shown different behaviors.
-
-                // TODO: Something is going wrong with the timing of STA $2007, X (where X = 0). Gotta figure that out, and probably re-do this entire function. I have no idea how inaccurate this is. 
-
-                if (PPU_Data_StateMachine == 1) // 1 ppu cycle after the read occurs
-                {
-                    if (PPU_Data_StateMachine_Read && !PPU_Data_StateMachine_UpdateVRAMBufferLate) // if this is a read, and PPU_Data_StateMachine_UpdateVRAMBufferLate is not set: (I think this is just for alignments 2 and 3?)
-                    {
-                        if (PPU_v >= 0x3F00) // If the read/write address is where the Palette info is...
-                        {
-                            PPU_AddressBus = PPU_v;
-                            PPU_VRAMAddressBuffer = FetchPPU((ushort)(PPU_AddressBus & 0x2FFF)); // The buffer cannot read from the palettes.
-                        }
-                        else
-                        {
-                            PPU_AddressBus = PPU_v;
-                            PPU_VRAMAddressBuffer = FetchPPU((ushort)(PPU_AddressBus & 0x3FFF));
-                        }
-                    }
-                }
-                if (PPU_Data_StateMachine == 3)
-                {
-                    // This is only relevant when the state machine is not interrupted.
-                    if (PPU_Data_StateMachine_NormalWriteBehavior)
-                    {
-                        PPU_Data_StateMachine_NormalWriteBehavior = false;
-                        if (!PPU_Data_StateMachine_Read || !PPU_Data_StateMachine_Read_Delayed)
-                        {
-                            PPU_AddressBus = PPU_v;
-                            StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
-                        }
-                    }
-                    // if the state machine *is* interrupted, this runs
-                    else
-                    if (!PPU_Data_StateMachine_Read && PPU_Data_StateMachine_PerformMysteryWrite)
-                    {
-                        // the mystery write
-
-                        // Here's how the mystery write behaves:
-                        // Suppose we're writing a value of $ZZ to address $2007, and the PPU Read/Write address is at address $YYXX
-                        // The mystery write will store $ZZ at address $YYZZ
-                        // In addition to that, $XX (The low byte of the read/write address) is also written to $YYXX
-
-                        // This only occurs if there's 2 consecutive CPU cycles that access $2007
-
-                        // The mystery writes cannot write to palettes. Instead, write the modified value read from palette RAM to the following address.
-                        if (PPU_VRAM_MysteryAddress >= 0x3F00)
-                        {
-
-                            StorePPUData((ushort)(PPU_v & 0x2FFF), (byte)PPU_VRAM_MysteryAddress);
-                            PPU_AddressBus = PPU_v;
-
-                        }
-                        else
-                        {
-                            // As far as I know, the PPU can only make 1 write per cycle... The exact timing here might be wrong, but the end result of the behavior emulated here seems to match my console.
-                            StorePPUData((ushort)(PPU_VRAM_MysteryAddress), (byte)PPU_VRAM_MysteryAddress);
-                            StorePPUData((ushort)(PPU_v), (byte)PPU_v);
-                            PPU_AddressBus = PPU_v;
-                        }
-
-                        // That second write can be overwritten in the next steps depending on the CPU/PPU alignment.
-                        // My current understanding is: if the mystery write happens, that other extra write happens too.
-                        // but again, I'm not certain on the timing. Do these actually both happen on the same cycle?
-                    }
-                    // the PPU Read/Write address is incremented 1 cycle after the write occurs.
-                }
-                if (PPU_Data_StateMachine == 4) // 4 ppu cycles after a read or  1 ppu cycle after a write occurs
-                {
-                    // This is alignment-specific behavior due to a Read-Modify-Write instruction on address $2007
-                    if (PPU_Data_StateMachine_Read && PPU_Data_StateMachine_UpdateVRAMBufferLate)
-                    {
-                        if (PPU_v >= 0x3F00) // If the read/write address is where the Palette info is...
-                        {
-                            PPU_AddressBus = PPU_v;
-                            PPU_VRAMAddressBuffer = FetchPPU((ushort)(PPU_AddressBus & 0x2FFF));// The buffer cannot read from the palettes.
-                        }
-                        else
-                        {
-                            PPU_AddressBus = PPU_v;
-                            PPU_VRAMAddressBuffer = FetchPPU((ushort)(PPU_AddressBus & 0x3FFF));
-                        }
-                    }
-                    // We're getting deep into alignment specific state machine shenanigans.
-                    // If the state machine was interrupted with a read cycle, and the CPU/PPU is not in alignment 0:
-                    if (PPU_Data_StateMachine_UpdateVRAMAddressEarly)
-                    {
-                        PPU_Data_StateMachine_UpdateVRAMAddressEarly = false;
-                        // The VRAM address is updated earlier than expected.
-                        PPU_v += PPUControlIncrementMode32 ? (ushort)32 : (ushort)1; // add either 1 or 32 depending on PPU_CRTL
-                        PPU_v &= 0x3FFF; // and truncate to just 15 bits
-                        PPU_AddressBus = PPU_v;
-                        // Read from the new VRAM address
-                        if (PPU_Data_StateMachine_Read)
-                        {
-                            if (PPU_v >= 0x3F00) // If the read/write address is where the Palette info is...
-                            {
-                                PPU_VRAMAddressBuffer = FetchPPU((ushort)(PPU_AddressBus & 0x2FFF)); // The buffer cannot read from the palettes.
-                            }
-                            else
-                            {
-                                PPU_VRAMAddressBuffer = FetchPPU((ushort)(PPU_AddressBus & 0x3FFF));
-                            }
-                        }
-                        // And then the VRAM address is updated again!
-                    }
-
-
-
-                    if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && (PPU_Scanline < 240 || PPU_Scanline == 261))
-                    {
-                        // If rendering is enabled when v increments, v increments both horizontally and vertically, with wraparound behavior too.
-                        PPU_IncrementScrollX();
-                        PPU_IncrementScrollY();
-                    }
-                    else
-                    {
-                        // This part here happens regardless of state machine shenanigans. This is just the state machine working as intended.
-                        PPU_v += PPUControlIncrementMode32 ? (ushort)32 : (ushort)1; // add either 1 or 32 depending on PPU_CRTL
-                        PPU_v &= 0x3FFF;                                             // and truncate to just 15 bits
-                    }
-
-                    PPU_AddressBus = PPU_v;
-
-                    // The mystery write strikes back! (Keep in mind, this is only used during state machine shenanigans. Normal writes to $2007 happen on cycle 3 of the state machine.
-                    // (at least that's how I'm emulating it? More research is needed for the actual cycle-by-cycle breakdown of this state machine.)
-                    if (!PPU_Data_StateMachine_Read || !PPU_Data_StateMachine_Read_Delayed)
-                    {
-                        if (PPU_Data_StateMachine_PerformMysteryWrite)
-                        {
-                            if ((CPUClock & 3) != 0) // This write only occurs on phases 1, 2, and 3
-                            {
-                                // Store the expected value at the *recently modified* Read/Write address.
-                                if ((PPU_AddressBus & 0x3FFF) >= 0x3F00)
-                                {
-                                    StorePPUData((ushort)(PPU_AddressBus & 0x2FFF), PPU_Data_StateMachine_InputValue);
-                                }
-                                else
-                                {
-                                    StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
-                                }
-                            }
-                        }
-                    }
-                    PPU_Data_StateMachine_Read = PPU_Data_StateMachine_Read_Delayed;
-                    PPU_Data_StateMachine_PerformMysteryWrite = false;
-                }
-                // And that's it for the PPU $2007 State Machine.
-                PPU_Data_StateMachine++;    // this stops counting up at 8.
-            }
-            if (PPU_Data_StateMachine == 8)
-            {
-                if (PPU_Data_StateMachine_InterruptedReadToWrite)
-                {
-                    if ((CPUClock & 3) != 0) // This write only occurs on phases 1, 2, and 3
-                    {
-                        StorePPUData(PPU_AddressBus, PPU_Data_StateMachine_InputValue);
-                    }
-                    PPU_Data_StateMachine_InterruptedReadToWrite = false;
-                    PPU_v += PPUControlIncrementMode32 ? (ushort)32 : (ushort)1; // add either 1 or 32 depending on PPU_CRTL
-                    PPU_v &= 0x3FFF; // and truncate to just 15 bits
-                    PPU_AddressBus = PPU_v;
 
 
                 }
@@ -1682,6 +1490,9 @@ namespace TriCNES
                 PPU_Mask_ShowBackground_Delayed = PPU_Mask_ShowBackground;
                 PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
             }
+
+            PPU_DATA_StateMachine();
+
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
             {
                 // Sprite evaluation
@@ -1898,7 +1709,114 @@ namespace TriCNES
                 PPUStatus_PendingSpriteZeroHit2 = true;
             }
 
+            PPU_DATA_StateMachine_Half();
+
         }
+
+        public bool PPU_2007_Read;
+        public bool PPU_2007_Read_SR;
+        public bool[] PPU_2007_Read_Latches = new bool[5];
+        public bool PPU_2007_PD_RB;
+        public bool PPU_2007_ReadALE;
+        public bool PPU_2007_Read_H0_Latch;
+        public bool PPU_2007_Read_XRB;
+
+        public bool PPU_READ; // The lower 8 bits of the address bus are being used as data pins for a read.
+
+        public bool PPU_2007_Write;
+        public bool PPU_2007_Write_SR;
+        public bool[] PPU_2007_Write_Latches = new bool[5];
+        public bool PPU_2007_DB_PAR;
+        public bool PPU_2007_WriteALE;
+        public bool PPU_2007_TStep_Latch;
+        public bool PPU_2007_TStep;
+
+        public bool PPU_2007_BLNK_Latch;
+        public bool PPU_2007_PaletteRAMEnable;
+        public byte PPU_2007_WriteData;
+
+        public bool PPU_WRITE; // The lower 8 bits of the address bus are being used as data pins for a write.
+        void PPU_DATA_StateMachine()
+        {
+            bool BLNK = (!PPU_Mask_ShowBackground && !PPU_Mask_ShowSprites) || (PPU_Scanline >= 240 && PPU_Scanline < 261);
+            PPU_2007_BLNK_Latch = BLNK;
+            bool H0_DASH = (PPU_Dot - 1 & 1) != 0;
+
+            PPU_2007_PaletteRAMEnable = ((PPU_AddressBus & 0x3F00) == 0x3F00) && PPU_2007_BLNK_Latch;
+            PPU_2007_Read_XRB = PPU_2007_Read && PPU_2007_PaletteRAMEnable;
+                     
+            PPU_2007_Read_Latches[0] = PPU_2007_Read && PPU_2007_Read_SR;
+            PPU_2007_Read = false;
+            PPU_2007_Read_Latches[2] = PPU_2007_Read_Latches[1];
+            PPU_2007_Read_Latches[4] = PPU_2007_Read_Latches[3];
+            PPU_2007_PD_RB = PPU_2007_Read_Latches[4] && !PPU_2007_Read_Latches[2];
+            PPU_2007_ReadALE = !PPU_2007_Read_Latches[4] && PPU_2007_Read_Latches[2];
+            PPU_2007_Read_H0_Latch = (PPU_Dot - 1 & 1) != 0;
+
+            if(PPU_2007_PD_RB)
+            {
+                PPU_ReadBuffer = Cart.MapperChip.FetchPPU2();
+            }
+
+            PPU_READ = (PPU_2007_PD_RB || (!BLNK && PPU_2007_Read_H0_Latch)); // even ppu cycles outside of blanking always read. Also read if we are reading $2007.
+
+            PPU_2007_Write_Latches[0] = PPU_2007_Write && PPU_2007_Write_SR;
+            PPU_2007_Write = false;
+            PPU_2007_Write_Latches[2] = PPU_2007_Write_Latches[1];
+            PPU_2007_Write_Latches[4] = PPU_2007_Write_Latches[3];
+            PPU_2007_WriteALE = !PPU_2007_Write_Latches[4] && PPU_2007_Write_Latches[2];
+
+            PPU_WRITE = !PPU_2007_PaletteRAMEnable && PPU_2007_DB_PAR;
+
+            if(PPU_2007_DB_PAR)
+            {
+                PPU_AddressBus = PPU_v;
+                StorePPUData(PPU_AddressBus, PPU_2007_WriteData);
+            }
+
+
+            PPU_2007_TStep = (PPU_2007_TStep_Latch || PPU_2007_PD_RB);
+            PPU_2007_TStep_Latch = PPU_2007_DB_PAR;
+
+            if (PPU_2007_TStep)
+            {
+                PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
+                if(!BLNK)
+                {
+                    PPU_IncrementScrollY();
+                }
+            }
+
+            bool b = (!BLNK && !H0_DASH); // If you are on an even dot out of a blanking period
+            PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE || b);
+
+            if(PPU_2007_ReadALE || PPU_2007_WriteALE)
+            {
+                PPU_AddressBus = PPU_v;
+                Cart.MapperChip.FetchPPU1();
+            }
+
+        }
+
+        void PPU_DATA_StateMachine_Half()
+        {
+            PPU_2007_Read_Latches[1] = PPU_2007_Read_Latches[0];
+            PPU_2007_Read_Latches[3] = PPU_2007_Read_Latches[2];
+            if (PPU_2007_Read_Latches[3])
+            {
+                PPU_2007_Read_SR = false;
+            }
+
+            PPU_2007_Write_Latches[1] = PPU_2007_Write_Latches[0];
+            PPU_2007_Write_Latches[3] = PPU_2007_Write_Latches[2];
+            if (PPU_2007_Write_Latches[3])
+            {
+                PPU_2007_Write_SR = false;
+            }
+            PPU_2007_DB_PAR = PPU_2007_Write_Latches[1] && !PPU_2007_Write_Latches[3];
+        }
+
+
 
         void DrawToScreen()
         {
@@ -2801,7 +2719,7 @@ namespace TriCNES
                             PPU_OAMLatch = OAM2READ; // When overflowed, the ppu reads instead of writing to OAM2. (Run this regardless of if OAM2 is full or not.)
                         }
                         else
-                        {   // OAM Address Overflowerd During Sprite Evaluation
+                        {   // OAM Address Overflowed During Sprite Evaluation
                             // fail to write to SecondaryOAM
                             // boo womp.
 
@@ -8894,7 +8812,7 @@ namespace TriCNES
 
         bool PPU_WasRenderingBefore2001Write; // Were we rendering before writing to $2001? (used for OAM corruption)
 
-        byte PPU_VRAMAddressBuffer = 0; // when reading from $2007, this buffer holds the value from VRAM that gets read. Updated after reading from $2007.
+        byte PPU_ReadBuffer = 0; // when reading from $2007, this buffer holds the value from VRAM that gets read. Updated after reading from $2007.
 
         bool PPUAddrLatch = false;  // Certain ppu registers take two writes to fully set things up. It's flipped when writing to $2005 and $2006. Reset when reading from $2002
 
@@ -9054,81 +8972,29 @@ namespace TriCNES
                     case 0x2007:
                         // Reading from VRAM.
 
-                        // if this is 1 CPU cycle after another read, there's interesting behavior.
-                        if (PPU_Data_StateMachine == 3 && PPU_Data_StateMachine_Read)
+                        if ((PPU_AddressBus & 0x3FFF) >= 0x3F00)
                         {
-                            //Behavior that is CPU/PPU alignment specific
-                            if (PPUClock == 0)
+                            // read from palette RAM.
+                            // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
+                            ThisDotReadFromPaletteRAM = true;
+                            ushort PalRAMAddr = (ushort)(PPU_v & 0x3F1F);
+                            if ((PalRAMAddr & 3) == 0)
                             {
-                                dataBus = PPU_VRAMAddressBuffer; // just read the buffer
+                                PalRAMAddr &= 0x3F0F;
                             }
-                            else if (PPUClock == 1)
-                            {
-                                PPU_Data_StateMachine_UpdateVRAMAddressEarly = true;
-                                dataBus = PPU_VRAMAddressBuffer; // just read the buffer, but *also* the VRAM address will be updated early.
 
-                            }
-                            else if (PPUClock == 2)
-                            {
-                                PPU_Data_StateMachine_UpdateVRAMAddressEarly = true; // update the vram address early...
-
-                                dataBus = (byte)(PPU_v & 0xFF); // the value read is not the buffer, but instead it's the low byte of the read/write address. 
-                            }
-                            else if (PPUClock == 3)
-                            {
-                                if (PPU_v >= 0x2000) // this is apparently different depending on where the read is? TODO: More testing required.
-                                {
-                                    if (PPU_VRAMAddressBuffer != 0)
-                                    {
-                                        // TODO: Inconsistent on real hardware, even with the same alignment.
-                                    }
-                                    dataBus = PPU_VRAMAddressBuffer; // with some bits missing
-                                    PPU_Data_StateMachine_UpdateVRAMAddressEarly = true; // update the vram address early...
-
-                                }
-                                else
-                                {
-                                    PPU_Data_StateMachine_UpdateVRAMAddressEarly = true; // update the vram address early...
-
-                                    dataBus = (byte)(PPU_v & 0xFF); // the value read is not the buffer, but instead it's the low byte of the read/write address. 
-                                }
-                            }
+                            dataBus = (byte)((PaletteRAM[PalRAMAddr & 0x1F] & 0x3F) | (PPUBus & 0xC0));
                         }
-                        else // a normal read, not interrupting another read.
+                        else
                         {
-                            // this isn't a RMW instruction
-                            if (PPU_v >= 0x3F00)
-                            {
-                                // reading from the palettes
-                                PPU_AddressBus = PPU_v;
-                                dataBus = FetchPPU((ushort)(PPU_AddressBus & 0x3FFF));
-                            }
-                            else
-                            {
-                                // not reading from the palettes, reading from the buffer.
-                                dataBus = PPU_VRAMAddressBuffer;
-                            }
+                            dataBus = PPU_ReadBuffer;
                         }
-
-                        // if the PPU state machine is not currently in progress...
-                        if (PPU_Data_StateMachine == 9)
-                        {
-                            PPU_Data_StateMachine = 0; // start it at 0
-                            if (PPUClock == 1 || PPUClock == 0)
-                            {
-                                // and if this is phase 0 or 1, the buffer is updated later.
-                                PPU_Data_StateMachine_UpdateVRAMBufferLate = true;
-                            }
-                            if ((DoDMCDMA && (APU_Status_DMC || APU_ImplicitAbortDMC4015)))
-                            {
-                                PPU_v++; // I'm unsure on the timing of this, but I know the DMC DMA landing here ends up incrementing this one more time than my "state machine" currently runs.
-                            }
-                        }
-
-                        PPU_Data_StateMachine_Read = true; // This is a read instruction, so the state machien needs to read.
-                        PPU_Data_StateMachine_Read_Delayed = true; // This is also set, in case the state machine is interrupted.
                         PPUBus = dataBus;
                         for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
+
+                        EmulateUntilEndOfRead();
+                        PPU_2007_Read_SR = true; // set the SR latch at the end of the CPU read. Here's where the clock alignment differences begin. :)
+                        PPU_2007_Read = true; // Start the $2007 Read state machine.
 
                         break;
                 }
@@ -9200,73 +9066,9 @@ namespace TriCNES
 
             return dataBus;
         }
-
-        /// <summary>
-        /// Returns the value from the PPU RAM, or the cartridge's CHR RAM/ROM at the target PPU address. 
-        /// </summary>
-        /// <param name="Address"></param>
-        /// <returns></returns>
-        public byte FetchPPU(ushort Address)
-        {
-            if (Cart == null)
-            {
-                return 0;
-            }
-            // when reading from the PPU's Video RAM, there's a lot of mapper-specific behavior to consider.
-            // This will always use the upper 8 bits of the address bus | the octal latch. This replaces the lower 8 bits of the address bus.
-            Address &= 0x3FFF;
-            if (Address >= 0x3F00)
-            {
-                // read from palette RAM.
-                // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
-                ThisDotReadFromPaletteRAM = true;
-                Address &= 0x3F1F;
-                if ((Address & 3) == 0)
-                {
-                    Address &= 0x3F0F;
-                }
-                
-                return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
-            }
-            bool CIRAM = Address >= 0x2000;
-            if (!CIRAM)
-            {
-                if (Cart.UsingCHRRAM)
-                {
-                    return Cart.CHRRAM[Address];
-                }
-                else
-                {
-                    //Pattern Table
-                    return Cart.MapperChip.FetchCHR(Address, false);
-                }
-            }
-            else // if the VRAM address is >= $2000, we need to consider nametable mirroring.
-            {
-                Address = Cart.MapperChip.MirrorNametable(Address);
-
-                if (Cart.AlternativeNametableArrangement)
-                {
-                    if (Cart.MemoryMapper == 4)
-                    {
-                        if ((Address & 0x800) != 0)
-                        {
-                            // using the extra PRG VRAM.
-                            Address &= 0x7FF;
-                            return Cart.PRGVRAM[Address];
-                        }
-                    }
-                }
-                
-                Address &= 0x7FF;
-                return Cart.Emu.VRAM[Address];
-                
-            }
-        }
-
         public byte ObservePPU(ushort Address)
         {
-            // pretty much a copy of FetchPPU, except it doesn't trigger MMC2 stuff.
+            // A way to view PPU data for various debugging tools.
             if (Cart == null)
             {
                 return 0;
@@ -9764,10 +9566,10 @@ namespace TriCNES
                         PPU_Update2006Value_Temp = PPU_v;
                         switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
                         {
-                            case 0: PPU_Update2006Delay = 4; break;
-                            case 1: PPU_Update2006Delay = 4; break;
-                            case 2: PPU_Update2006Delay = 5; break;
-                            case 3: PPU_Update2006Delay = 4; break;
+                            case 0: PPU_Update2006Delay = 5; break;
+                            case 1: PPU_Update2006Delay = 5; break;
+                            case 2: PPU_Update2006Delay = 6; break;
+                            case 3: PPU_Update2006Delay = 5; break;
                         }
                     }
                     PPUAddrLatch = !PPUAddrLatch;
@@ -9777,47 +9579,11 @@ namespace TriCNES
                 case 0x2007:
                     // writing here updates the byte at the current read/write address
                     PPUBus = In;
+                    PPU_2007_WriteData = PPUBus;
                     for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
-                    PPU_Data_StateMachine_InputValue = In;
-
-                    ushort Address = PPU_v;
-                    // This if statement is only relevent in an edge case. Read-Modify-Write instructions to $2007 are *complicated*.
-                    if (PPU_Data_StateMachine == 3 || PPU_Data_StateMachine == 6) // This write follows another read/write cycle
-                    {
-                        // during Read-Modify-Write instructions to $2007, there's alignment specific side effects.
-                        PPU_VRAM_MysteryAddress = (ushort)(Address & 0xFF00 | In);
-                        if (!PPU_Data_StateMachine_Read)
-                        {
-                            PPU_Data_StateMachine_PerformMysteryWrite = true;
-                        }
-                        else
-                        {
-                            PPU_Data_StateMachine_InterruptedReadToWrite = true;
-                        }
-                    }
-                    else
-                    {
-                        // if this isn't interrupting the PPU's state machine due to a read-modify-write, don't worry about all that.
-                        PPU_Data_StateMachine_NormalWriteBehavior = true;
-                    }
-
-                    if (PPU_Data_StateMachine != 3) // as long as this isn't 1 CPU cycle after the previous access to $2007...
-                    {
-                        if (PPU_Data_StateMachine == 9) // If this is not interrupting the state machine. (This is just a standard write to the $2007. No back-to-back cycles reading/writing)
-                        {
-                            PPU_Data_StateMachine = 3; // then the ppu VRAM read/write address needs to be updated *next* cycle.
-                        }
-                        else
-                        {
-                            PPU_Data_StateMachine = 0; // otherwise, the state machine will need to go back to zero.
-                        }
-                        PPU_Data_StateMachine_Read = false; // this is a write, not a read.
-                    }
-                    else
-                    {
-                        PPU_Data_StateMachine_Read_Delayed = false; // this is a write, not a read, but we likely just cut off a read.
-                    }
-
+                    EmulateUntilEndOfRead(); // or in this case, write.
+                    PPU_2007_Write = true;
+                    PPU_2007_Write_SR = true; // set the SR latch at the end of the CPU write. Here's where the clock alignment differences begin. :)
                     break;
                 // and that's it for the ppu registers!
 
@@ -10573,7 +10339,7 @@ namespace TriCNES
 
 
                 string TempLine_PPU = LogLine + "\t$2000:" + Observe(0x2000).ToString("X2") + "\t$2001:" + Observe(0x2001).ToString("X2") + "\t$2002:" + Observe(0x2002).ToString("X2") + "\tR/W Addr:" + PPU_v.ToString("X4") + "\tPPUAddrLatch:" + PPUAddrLatch + "\tPPU AddressBus: " + PPU_AddressBus.ToString("X4");
-                string TempLine_PPU2 = LogLine + "\tVRAMAddress:" + PPU_v.ToString("X4") + "\tPPUReadBuffer:" + PPU_VRAMAddressBuffer.ToString("X2");
+                string TempLine_PPU2 = LogLine + "\tVRAMAddress:" + PPU_v.ToString("X4") + "\tPPUReadBuffer:" + PPU_ReadBuffer.ToString("X2");
                 string TempLine_PPU3 = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\todd:" + PPU_OddFrame.ToString() + "\tv: " + PPU_v.ToString("X4");
 
                 //string TempLine_MMC3IRQ = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\tIRQTimer:" + Cart.Mapper_4_IRQCounter + "\tIRQLatch: " + Cart.Mapper_4_IRQLatch + "\tIRQEnabled: " + Cart.Mapper_4_EnableIRQ + "\tDoIRQ: " + DoIRQ + "\tPPU_ADDR_Prev: " + (PPU_A12_Prev ? "1" : "0");
@@ -10862,7 +10628,7 @@ namespace TriCNES
             State.Add((byte)PPU_Update2006Value_Temp);
             State.Add((byte)(PPU_Update2006Value_Temp >> 8));
             State.Add((byte)(PPU_WasRenderingBefore2001Write ? 1 : 0));
-            State.Add(PPU_VRAMAddressBuffer);
+            State.Add(PPU_ReadBuffer);
             State.Add((byte)(PPUAddrLatch ? 1 : 0));
             State.Add((byte)(PPUControlIncrementMode32 ? 1 : 0));
             State.Add((byte)(PPUControl_NMIEnabled ? 1 : 0));
@@ -10885,23 +10651,30 @@ namespace TriCNES
             State.Add((byte)(PPU_ALE ? 1 : 0));
             State.Add(PPU_OctalLatch);
 
+            State.Add((byte)(PPU_2007_Read ? 1 : 0));
+            State.Add((byte)(PPU_2007_Read_SR ? 1 : 0));
+            for (int i = 0; i < PPU_2007_Read_Latches.Length; i++) { State.Add((byte)(PPU_2007_Read_Latches[i] ? 1 : 0)); }
+            State.Add((byte)(PPU_2007_PD_RB ? 1 : 0));
+            State.Add((byte)(PPU_2007_ReadALE ? 1 : 0));
+            State.Add((byte)(PPU_2007_Read_H0_Latch ? 1 : 0));
+            State.Add((byte)(PPU_2007_Read_XRB ? 1 : 0));
+            State.Add((byte)(PPU_READ ? 1 : 0));
+            State.Add((byte)(PPU_2007_Write ? 1 : 0));
+            State.Add((byte)(PPU_2007_Write_SR ? 1 : 0));
+            for (int i = 0; i < PPU_2007_Write_Latches.Length; i++) { State.Add((byte)(PPU_2007_Write_Latches[i] ? 1 : 0)); }
+            State.Add((byte)(PPU_2007_DB_PAR ? 1 : 0));
+            State.Add((byte)(PPU_2007_WriteALE ? 1 : 0));
+            State.Add((byte)(PPU_2007_TStep_Latch ? 1 : 0));
+            State.Add((byte)(PPU_2007_TStep ? 1 : 0));
+            State.Add((byte)(PPU_2007_BLNK_Latch ? 1 : 0));
+            State.Add((byte)(PPU_2007_PaletteRAMEnable ? 1 : 0));
+            State.Add(PPU_2007_WriteData);            State.Add((byte)(PPU_WRITE ? 1 : 0));
+
             foreach (Byte b in RAM) { State.Add(b); }
             foreach (Byte b in VRAM) { State.Add(b); }
             foreach (Byte b in OAM) { State.Add(b); }
             foreach (Byte b in OAM2) { State.Add(b); }
             foreach (Byte b in PaletteRAM) { State.Add(b); }
-
-            // putting stuff down here that I plan to refactor in future updates to the emulator.
-
-            State.Add(PPU_Data_StateMachine);
-            State.Add((byte)(PPU_Data_StateMachine_Read ? 1 : 0));
-            State.Add((byte)(PPU_Data_StateMachine_Read_Delayed ? 1 : 0));
-            State.Add((byte)(PPU_Data_StateMachine_PerformMysteryWrite ? 1 : 0));
-            State.Add(PPU_Data_StateMachine_InputValue);
-            State.Add((byte)(PPU_Data_StateMachine_UpdateVRAMAddressEarly ? 1 : 0));
-            State.Add((byte)(PPU_Data_StateMachine_UpdateVRAMBufferLate ? 1 : 0));
-            State.Add((byte)(PPU_Data_StateMachine_NormalWriteBehavior ? 1 : 0));
-            State.Add((byte)(PPU_Data_StateMachine_InterruptedReadToWrite ? 1 : 0));
 
             List<byte> MapperBytes = Cart.MapperChip.SaveMapperRegisters();
             for (int i = 0; i < MapperBytes.Count; i++)
@@ -11161,7 +10934,7 @@ namespace TriCNES
             PPU_Update2006Value_Temp = State[p++];
             PPU_Update2006Value_Temp |= (ushort)(State[p++] << 8);
             PPU_WasRenderingBefore2001Write = (State[p++] & 1) == 1;
-            PPU_VRAMAddressBuffer = State[p++];
+            PPU_ReadBuffer = State[p++];
             PPUAddrLatch = (State[p++] & 1) == 1;
             PPUControlIncrementMode32 = (State[p++] & 1) == 1;
             PPUControl_NMIEnabled = (State[p++] & 1) == 1;
@@ -11184,23 +10957,31 @@ namespace TriCNES
             PPU_ALE = (State[p++] & 1) == 1;
             PPU_OctalLatch = State[p++];
 
+            PPU_2007_Read = (State[p++] & 1) == 1;
+            PPU_2007_Read_SR = (State[p++] & 1) == 1;
+            for (int i = 0; i < PPU_2007_Read_Latches.Length; i++) { PPU_2007_Read_Latches[i] = (State[p++] & 1) == 1; }
+            PPU_2007_PD_RB = (State[p++] & 1) == 1;
+            PPU_2007_ReadALE = (State[p++] & 1) == 1;
+            PPU_2007_Read_H0_Latch = (State[p++] & 1) == 1;
+            PPU_2007_Read_XRB = (State[p++] & 1) == 1;
+            PPU_READ = (State[p++] & 1) == 1;
+            PPU_2007_Write = (State[p++] & 1) == 1;
+            PPU_2007_Write_SR = (State[p++] & 1) == 1;
+            for (int i = 0; i < PPU_2007_Write_Latches.Length; i++) { PPU_2007_Write_Latches[i] = (State[p++] & 1) == 1; }
+            PPU_2007_DB_PAR = (State[p++] & 1) == 1;
+            PPU_2007_WriteALE = (State[p++] & 1) == 1;
+            PPU_2007_TStep_Latch = (State[p++] & 1) == 1;
+            PPU_2007_TStep = (State[p++] & 1) == 1;
+            PPU_2007_BLNK_Latch = (State[p++] & 1) == 1;
+            PPU_2007_PaletteRAMEnable = (State[p++] & 1) == 1;
+            PPU_2007_WriteData = State[p++];
+            PPU_WRITE = (State[p++] & 1) == 1;
+
             for (int i = 0; i < RAM.Length; i++) { RAM[i] = State[p++]; }
             for (int i = 0; i < VRAM.Length; i++) { VRAM[i] = State[p++]; }
             for (int i = 0; i < OAM.Length; i++) { OAM[i] = State[p++]; }
             for (int i = 0; i < OAM2.Length; i++) { OAM2[i] = State[p++]; }
             for (int i = 0; i < PaletteRAM.Length; i++) { PaletteRAM[i] = State[p++]; }
-
-            // putting stuff down here that I plan to refactor in future updates to the emulator.
-
-            PPU_Data_StateMachine = State[p++];
-            PPU_Data_StateMachine_Read = (State[p++] & 1) == 1;
-            PPU_Data_StateMachine_Read_Delayed = (State[p++] & 1) == 1;
-            PPU_Data_StateMachine_PerformMysteryWrite = (State[p++] & 1) == 1;
-            PPU_Data_StateMachine_InputValue = State[p++];
-            PPU_Data_StateMachine_UpdateVRAMAddressEarly = (State[p++] & 1) == 1;
-            PPU_Data_StateMachine_UpdateVRAMBufferLate = (State[p++] & 1) == 1;
-            PPU_Data_StateMachine_NormalWriteBehavior = (State[p++] & 1) == 1;
-            PPU_Data_StateMachine_InterruptedReadToWrite = (State[p++] & 1) == 1;
 
             Cart.MapperChip.LoadMapperRegisters(State, p, out p);
         }
