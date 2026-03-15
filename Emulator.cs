@@ -145,15 +145,7 @@ namespace TriCNES
         {
             return Cart.CHRROM[Address & 0x1FFF];
         }
-        public virtual void FetchPPU1()
-        {
-            // This also happens when reading from palette RAM. The CPU sees palette RAM, the PPU sees stuff from the nametable again.
-            if (Cart.Emu.PPU_ALE)
-            {
-                Cart.Emu.PPU_OctalLatch = (byte)Cart.Emu.PPU_AddressBus;
-            }
-        }
-        public virtual byte FetchPPU2()
+        public virtual byte FetchPPU()
         {
             // This will always use the upper 8 bits of the address bus | the octal latch. This replaces the lower 8 bits of the address bus.
             ushort Address = (ushort)((Cart.Emu.PPU_AddressBus & 0x3F00) | Cart.Emu.PPU_OctalLatch);
@@ -1793,7 +1785,7 @@ namespace TriCNES
                 if (!PPU_READ)
                 {
                     PPU_AddressBus = PPU_v;
-                    Cart.MapperChip.FetchPPU1();
+                    PPU_OctalLatch = (byte)PPU_AddressBus;
                 }
             }
         }
@@ -1801,7 +1793,7 @@ namespace TriCNES
         {
             if (PPU_2007_PD_RB)
             {
-                PPU_ReadBuffer = Cart.MapperChip.FetchPPU2();
+                PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
                 if (PPU_ALE)
                 {
                     PPU_OctalLatch = (byte)PPU_AddressBus;
@@ -1818,11 +1810,14 @@ namespace TriCNES
         }
         void PPU_DATA_StateMachine_Half()
         {
+            PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE);
+
             if (PPU_2007_PD_RB)
             {
-                PPU_ReadBuffer = Cart.MapperChip.FetchPPU2();
+                PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
                 if (PPU_ALE)
                 {
+                    // pretty sure this can never happen, but keep it just in case.
                     PPU_OctalLatch = (byte)PPU_AddressBus;
                 }
             }
@@ -2585,10 +2580,6 @@ namespace TriCNES
                     }
                     else
                     { //even cycles                       
-                        if(PPU_OAMLatch == 0x7F && PPU_Scanline == 0x80)
-                        {
-
-                        }
                         if (!OAMAddressOverflowedDuringSpriteEvaluation)
                         {
                             byte PreIncVal = PPUOAMAddress; // for checking if PPUOAMAddress overflows
@@ -2898,7 +2889,7 @@ namespace TriCNES
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
                             PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch;
                             // but also: set up the bit plane shift register.
-                            PPU_SpritePatternL = Cart.MapperChip.FetchPPU2();
+                            PPU_SpritePatternL = Cart.MapperChip.FetchPPU();
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
                             {
                                 PPU_SpritePatternL = Flip(PPU_SpritePatternL);
@@ -2936,7 +2927,7 @@ namespace TriCNES
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
                             PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch; // read X pos again
                             // but also: set up the second bit plane
-                            PPU_SpritePatternH = Cart.MapperChip.FetchPPU2();
+                            PPU_SpritePatternH = Cart.MapperChip.FetchPPU();
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
                             {
                                 PPU_SpritePatternH = Flip(PPU_SpritePatternH);
@@ -2949,6 +2940,12 @@ namespace TriCNES
                         {
                             PPU_SpriteShiftRegisterH[OAM2Address / 4] = 0; // clear the value in this shift register if this object isn't in range.
                         }
+
+                        if (PPU_SpriteShiftRegisterH[OAM2Address / 4] != 0)
+                        { 
+                        
+                        }
+
 
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
 
@@ -3547,7 +3544,7 @@ namespace TriCNES
             byte cycleTick; // for the switch statement below, this checks which case to run on a given ppu cycle.
             cycleTick = (byte)((PPU_Dot+7) & 7);
 
-            if (PPU_READ)
+            if (PPU_ALE && PPU_READ)
             {
                 Cart.Emu.PPU_OctalLatch = (byte)PPU_AddressBus;
             }
@@ -3559,7 +3556,7 @@ namespace TriCNES
                     break;
                 case 1:
                     // fetch byte from Nametable
-                    PPU_RenderTemp = Cart.MapperChip.FetchPPU2();
+                    PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                     PPU_Commit_NametableFetch = true;
                     break;
                 case 2:
@@ -3567,7 +3564,7 @@ namespace TriCNES
                     break;
                 case 3:
                     // fetch attribute byte from attribute table
-                    PPU_RenderTemp = Cart.MapperChip.FetchPPU2();
+                    PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                     PPU_Commit_AttributeFetch = true;
                     // now we only have the 2 bits we're looking for
                     break;
@@ -3578,7 +3575,7 @@ namespace TriCNES
                     break;
                 case 5:
                     // fetch pattern bits from value read off the nametable
-                    PPU_RenderTemp = Cart.MapperChip.FetchPPU2();
+                    PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                     PPU_Commit_PatternLowFetch = true;
                     break;
                 case 6:
@@ -3588,7 +3585,7 @@ namespace TriCNES
                     break;
                 case 7:
                     // fetch pattern bits with the new address
-                    PPU_RenderTemp = Cart.MapperChip.FetchPPU2();
+                    PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                     PPU_Commit_PatternHighFetch = true;
                     break;
             }
@@ -3700,7 +3697,7 @@ namespace TriCNES
                     case 1:
                         // fetch byte from Nametable
                         PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
-                        PPU_RenderTemp = Cart.MapperChip.FetchPPU2();
+                        PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                         PPU_Commit_NametableFetch = true;
                         break;
                     case 2:
@@ -3708,7 +3705,7 @@ namespace TriCNES
                         break;
                     case 3:
                         // fetch attribute byte from attribute table
-                        PPU_RenderTemp = Cart.MapperChip.FetchPPU2();
+                        PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                         //IGNORED NT FETCH: This actually doesn't update the NT register.
                         break;
                 }

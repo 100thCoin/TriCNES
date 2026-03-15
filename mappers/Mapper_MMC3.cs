@@ -226,7 +226,7 @@ namespace TriCNES.mappers
                 else { Address &= 0x7FF; return Cart.CHRROM[(Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
             }
         }
-        public override byte FetchPPU2()
+        public override byte FetchPPU()
         {
             // This will always use the upper 8 bits of the address bus | the octal latch. This replaces the lower 8 bits of the address bus.
             ushort Address = (ushort)(Cart.Emu.PPU_AddressBus & 0x3FFF);
