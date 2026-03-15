@@ -1783,14 +1783,7 @@ namespace TriCNES
             PPU_2007_TStep = (PPU_2007_TStep_Latch || PPU_2007_PD_RB);
             PPU_2007_TStep_Latch = PPU_2007_DB_PAR;
 
-            if (PPU_2007_TStep)
-            {
-                PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
-                if(!BLNK)
-                {
-                    PPU_IncrementScrollY();
-                }
-            }
+            
 
             bool b = (!BLNK && !H0_DASH); // If you are on an even dot out of a blanking period
             PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE || b);
@@ -1809,9 +1802,17 @@ namespace TriCNES
             if (PPU_2007_PD_RB)
             {
                 PPU_ReadBuffer = Cart.MapperChip.FetchPPU2();
-                if(PPU_ALE)
+                if (PPU_ALE)
                 {
                     PPU_OctalLatch = (byte)PPU_AddressBus;
+                }
+            }
+            if (PPU_2007_TStep)
+            {
+                PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
+                if (!PPU_2007_BLNK_Latch)
+                {
+                    PPU_IncrementScrollY();
                 }
             }
         }
@@ -1830,10 +1831,6 @@ namespace TriCNES
             if (PPU_2007_Read_Latches[3])
             {
                 PPU_2007_Read_SR = false;
-            }
-            if (PPU_2007_PD_RB)
-            {
-                //PPU_ReadBuffer = Cart.MapperChip.FetchPPU2();
             }
 
             PPU_2007_Write_Latches[1] = PPU_2007_Write_Latches[0];
