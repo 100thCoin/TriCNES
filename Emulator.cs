@@ -1491,6 +1491,7 @@ namespace TriCNES
                 PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
             }
 
+            PPU_Render_CommitShiftRegistersAndBitPlanes();
             PPU_DATA_StateMachine();
 
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
@@ -1561,7 +1562,6 @@ namespace TriCNES
             PrevPrevPrevDotColor = PrevPrevDotColor; // Drawing a color to the screen has a 3(?) ppu cycle delay between deciding the color, and drawing it.
             PrevPrevDotColor = PrevDotColor;
             PrevDotColor = DotColor; // These variables here just record the color, and swap them through these variables so it can be used 3 cycles after it was chosen.
-            PPU_Render_CommitShiftRegistersAndBitPlanes();
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
             {
                 if ((PPU_Dot >= 1 && PPU_Dot <= 256) || (PPU_Dot >= 321 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
@@ -1579,7 +1579,7 @@ namespace TriCNES
                     }
                 }
 
-                if ((PPU_Dot > 0 && PPU_Dot <= 257)) // if this is a visible pixel, or preparing the start of next scanline
+                if ((PPU_Dot > 0 && PPU_Dot <= 256)) // if this is a visible pixel, or preparing the start of next scanline
                 {
                     if (PPU_Scanline < 241)
                     {
@@ -1635,6 +1635,8 @@ namespace TriCNES
                 DrawToBorderedScreen();
             }
             ThisDotReadFromPaletteRAM = false;
+
+            PPU_DATA_StateMachine2();
 
             if (PPU_DecodeSignal)
             {
@@ -1746,22 +1748,25 @@ namespace TriCNES
             PPU_2007_Read_XRB = PPU_2007_Read && PPU_2007_PaletteRAMEnable;
                      
             PPU_2007_Read_Latches[0] = PPU_2007_Read && PPU_2007_Read_SR;
-            PPU_2007_Read = false;
+            if(PPU_2007_Read)
+            {
+                PPU_2007_Read = false; // I put this in an if statement for easier debugging / breakpoint placement.
+            }
             PPU_2007_Read_Latches[2] = PPU_2007_Read_Latches[1];
             PPU_2007_Read_Latches[4] = PPU_2007_Read_Latches[3];
             PPU_2007_PD_RB = PPU_2007_Read_Latches[4] && !PPU_2007_Read_Latches[2];
             PPU_2007_ReadALE = !PPU_2007_Read_Latches[4] && PPU_2007_Read_Latches[2];
             PPU_2007_Read_H0_Latch = (PPU_Dot - 1 & 1) != 0;
 
-            if(PPU_2007_PD_RB)
-            {
-                PPU_ReadBuffer = Cart.MapperChip.FetchPPU2();
-            }
+
 
             PPU_READ = (PPU_2007_PD_RB || (!BLNK && PPU_2007_Read_H0_Latch)); // even ppu cycles outside of blanking always read. Also read if we are reading $2007.
 
             PPU_2007_Write_Latches[0] = PPU_2007_Write && PPU_2007_Write_SR;
-            PPU_2007_Write = false;
+            if (PPU_2007_Write)
+            {
+                PPU_2007_Write = false; // I put this in an if statement for easier debugging / breakpoint placement.
+            }
             PPU_2007_Write_Latches[2] = PPU_2007_Write_Latches[1];
             PPU_2007_Write_Latches[4] = PPU_2007_Write_Latches[3];
             PPU_2007_WriteALE = !PPU_2007_Write_Latches[4] && PPU_2007_Write_Latches[2];
@@ -1790,21 +1795,45 @@ namespace TriCNES
             bool b = (!BLNK && !H0_DASH); // If you are on an even dot out of a blanking period
             PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE || b);
 
-            if(PPU_2007_ReadALE || PPU_2007_WriteALE)
+            if ((PPU_2007_ReadALE || PPU_2007_WriteALE))
             {
-                PPU_AddressBus = PPU_v;
-                Cart.MapperChip.FetchPPU1();
+                if (!PPU_READ)
+                {
+                    PPU_AddressBus = PPU_v;
+                    Cart.MapperChip.FetchPPU1();
+                }
             }
-
         }
-
+        void PPU_DATA_StateMachine2()
+        {
+            if (PPU_2007_PD_RB)
+            {
+                PPU_ReadBuffer = Cart.MapperChip.FetchPPU2();
+                if(PPU_ALE)
+                {
+                    PPU_OctalLatch = (byte)PPU_AddressBus;
+                }
+            }
+        }
         void PPU_DATA_StateMachine_Half()
         {
+            if (PPU_2007_PD_RB)
+            {
+                PPU_ReadBuffer = Cart.MapperChip.FetchPPU2();
+                if (PPU_ALE)
+                {
+                    PPU_OctalLatch = (byte)PPU_AddressBus;
+                }
+            }
             PPU_2007_Read_Latches[1] = PPU_2007_Read_Latches[0];
             PPU_2007_Read_Latches[3] = PPU_2007_Read_Latches[2];
             if (PPU_2007_Read_Latches[3])
             {
                 PPU_2007_Read_SR = false;
+            }
+            if (PPU_2007_PD_RB)
+            {
+                //PPU_ReadBuffer = Cart.MapperChip.FetchPPU2();
             }
 
             PPU_2007_Write_Latches[1] = PPU_2007_Write_Latches[0];
@@ -2784,10 +2813,9 @@ namespace TriCNES
                     PPU_OAMCorruptionIndex = OAM2Address; // this value will be used when rendering is re-enabled and the corruption occurs
                 }
 
-
-                if (PPU_Scanline == 72)
+                if (PPU_READ)
                 {
-
+                    Cart.Emu.PPU_OctalLatch = (byte)PPU_AddressBus;
                 }
 
                 switch (SpriteEvaluationTick)
@@ -2813,7 +2841,9 @@ namespace TriCNES
                             // set this object's Y position in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
                             PPU_SpriteYposition[OAM2Address / 4] = PPU_OAMLatch;
-                            PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
+
+                            PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
+
                             InRangeCheck = (ushort)((PPU_Scanline & 0xFF) - PPU_OAMLatch);
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
@@ -2834,7 +2864,8 @@ namespace TriCNES
                             // set this object's attribute in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
                             PPU_SpriteAttribute[OAM2Address / 4] = PPU_OAMLatch;
-                            PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
+
+                            PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
                         break;
@@ -2860,7 +2891,6 @@ namespace TriCNES
                             PPU_CheckPAR();
                             PPU_PatternAddressRegister &= 0b1111111110111;
                             PPU_AddressBus = PPU_PatternAddressRegister;
-                            Cart.MapperChip.FetchPPU1();
                         }
 
                         break;
@@ -2898,7 +2928,6 @@ namespace TriCNES
                             PPU_CheckPAR();
                             PPU_PatternAddressRegister |= 8;
                             PPU_AddressBus = PPU_PatternAddressRegister;
-                            Cart.MapperChip.FetchPPU1();
                         }
 
                         break;
@@ -2927,6 +2956,10 @@ namespace TriCNES
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
 
                         break;
+                }
+                if (PPU_ALE && !PPU_READ)
+                {
+                    Cart.Emu.PPU_OctalLatch = (byte)PPU_AddressBus;
                 }
                 OAM2Address &= 0x1F; // keep the secondary OAM address in-bounds
 
@@ -3516,11 +3549,16 @@ namespace TriCNES
         {
             byte cycleTick; // for the switch statement below, this checks which case to run on a given ppu cycle.
             cycleTick = (byte)((PPU_Dot+7) & 7);
+
+            if (PPU_READ)
+            {
+                Cart.Emu.PPU_OctalLatch = (byte)PPU_AddressBus;
+            }
+
             switch (cycleTick)
             {
                 case 0:
                     PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
-                    Cart.MapperChip.FetchPPU1();
                     break;
                 case 1:
                     // fetch byte from Nametable
@@ -3529,7 +3567,6 @@ namespace TriCNES
                     break;
                 case 2:
                     PPU_AddressBus = (ushort)(0x23C0 | (PPU_v & 0x0C00) | ((PPU_v >> 4) & 0x38) | ((PPU_v >> 2) & 0x07));
-                    Cart.MapperChip.FetchPPU1();
                     break;
                 case 3:
                     // fetch attribute byte from attribute table
@@ -3541,7 +3578,6 @@ namespace TriCNES
                     PPU_CheckPAR();
                     PPU_PatternAddressRegister &= 0b1111111110111;
                     PPU_AddressBus = PPU_PatternAddressRegister;
-                    Cart.MapperChip.FetchPPU1();
                     break;
                 case 5:
                     // fetch pattern bits from value read off the nametable
@@ -3552,13 +3588,17 @@ namespace TriCNES
                     PPU_CheckPAR();
                     PPU_PatternAddressRegister |= 8;
                     PPU_AddressBus = PPU_PatternAddressRegister;
-                    Cart.MapperChip.FetchPPU1();
                     break;
                 case 7:
                     // fetch pattern bits with the new address
                     PPU_RenderTemp = Cart.MapperChip.FetchPPU2();
                     PPU_Commit_PatternHighFetch = true;
                     break;
+            }
+
+            if (PPU_ALE && !PPU_READ)
+            {
+                Cart.Emu.PPU_OctalLatch = (byte)PPU_AddressBus;
             }
 
         }
@@ -3638,10 +3678,17 @@ namespace TriCNES
 
         void PPU_Render_ShiftRegistersAndBitPlanes_DummyNT()
         {
+
+            if (PPU_READ)
+            {
+                Cart.Emu.PPU_OctalLatch = (byte)PPU_AddressBus;
+            }
+
             if (PPU_Dot == 0)
             {
-                PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
-                Cart.MapperChip.FetchPPU1();
+                PPU_CheckPAR();
+                PPU_PatternAddressRegister &= 0b1111111110111;
+                PPU_AddressBus = PPU_PatternAddressRegister;
             }
             else
             {
@@ -3652,7 +3699,6 @@ namespace TriCNES
                 {
                     case 0:
                         PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
-                        Cart.MapperChip.FetchPPU1();
                         break;
                     case 1:
                         // fetch byte from Nametable
@@ -3662,7 +3708,6 @@ namespace TriCNES
                         break;
                     case 2:
                         PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
-                        Cart.MapperChip.FetchPPU1();
                         break;
                     case 3:
                         // fetch attribute byte from attribute table
@@ -3670,6 +3715,10 @@ namespace TriCNES
                         //IGNORED NT FETCH: This actually doesn't update the NT register.
                         break;
                 }
+            }
+            if (PPU_ALE && !PPU_READ)
+            {
+                Cart.Emu.PPU_OctalLatch = (byte)PPU_AddressBus;
             }
         }
 
@@ -8784,8 +8833,8 @@ namespace TriCNES
         ushort PPU_VRAM_MysteryAddress; // used during consecutive write cycles to VRAM. The PPU makes 2 extra writes to VRAM, and one of them I call "the mystery write".
 
         public ushort PPU_AddressBus;  // the Address Bus of the PPU
-        public bool PPU_ALE;
-        public byte PPU_OctalLatch;
+        public bool PPU_ALE; // Address Latch Enable
+        public byte PPU_OctalLatch; // This is the address latch.
 
         public ushort PPU_v = 0;// PPU Internal Register 'v'
         public ushort PPU_t = 0; // PPU Internal Register 't'. "can also be thought of as the address of the top left onscreen tile: https://www.nesdev.org/wiki/PPU_scrolling"
@@ -10668,7 +10717,8 @@ namespace TriCNES
             State.Add((byte)(PPU_2007_TStep ? 1 : 0));
             State.Add((byte)(PPU_2007_BLNK_Latch ? 1 : 0));
             State.Add((byte)(PPU_2007_PaletteRAMEnable ? 1 : 0));
-            State.Add(PPU_2007_WriteData);            State.Add((byte)(PPU_WRITE ? 1 : 0));
+            State.Add(PPU_2007_WriteData);
+            State.Add((byte)(PPU_WRITE ? 1 : 0));
 
             foreach (Byte b in RAM) { State.Add(b); }
             foreach (Byte b in VRAM) { State.Add(b); }
