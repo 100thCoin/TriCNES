@@ -9026,7 +9026,7 @@ namespace TriCNES
                                 PalRAMAddr &= 0x3F0F;
                             }
 
-                            dataBus = (byte)((PaletteRAM[PalRAMAddr & 0x1F] & 0x3F) | (PPUBus & 0xC0));
+                            dataBus = (byte)(((PaletteRAM[PalRAMAddr & 0x1F] & 0x3F) | (PPUBus & 0xC0)) & (PPU_Mask_Greyscale ? 0xF0 : 0xFF));
                         }
                         else
                         {
