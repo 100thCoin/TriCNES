@@ -23,14 +23,14 @@ namespace TriCNES.mappers
             if (Address >= 0xE000)
             {
                 // read from the FDS BIOS
-                dataPinsAreNotFloating = true;                
-                dataBus = FDS_BIOS[Address & 0x1FFF];
+                notFloating = true;
+                data = FDS_BIOS[Address & 0x1FFF];
             }
             else if (Address >= 0x6000)
             {
                 // read from the FDS PRG RAM
-                dataPinsAreNotFloating = true;
-                dataBus = Cart.PRGRAM[Address-0x6000];
+                notFloating = true;
+                data = Cart.PRGRAM[Address-0x6000];
             }
             else if (Address >= 4030 && Address <= 0x403F)
             {

@@ -228,6 +228,22 @@ namespace TriCNES
         public byte[] Disk;
         public byte ShiftRegister;
         public bool IRQ;
+        public ushort clock; // every 1792 master clock cycles,
+
+        public bool Status_ByteTransferFlag;
+
+        public void Clock()
+        {
+            clock++;
+            if(clock == 1792)
+            {
+                clock = 0;
+
+
+            }
+        }
+
+
         public void InsertDisk(string filepath)
         {
             Disk = File.ReadAllBytes(filepath); // Reads the file from the provided file path, and stores every byte into an array.
@@ -714,6 +730,11 @@ namespace TriCNES
             // Decrement the clocks.
             PPUClock--;
             CPUClock--;
+
+            if(Cart.FDS != null)
+            {
+                Cart.FDS.Clock();
+            }
         }
 
         public void EmulateUntilEndOfRead()
@@ -1161,7 +1182,7 @@ namespace TriCNES
         public bool PPUStatus_SpriteOverflow; // If a scanline had more than 8 objects in range, this is set. This value can be read in address $2002
         public bool PPUStatus_SpriteOverflow_Delayed;
 
-        public bool PPU_VSET; // This line is high for half a ppu cycle at the start of scanline 240.
+        public bool PPU_VSET; // This line is high for half a ppu cycle at the start of scanline 241.
         public bool PPU_VSET_Latch1; // A latch used in the timing for the VBlank flag.
         public bool PPU_VSET_Latch2; // A latch used in the timing for the VBlank flag.
         public bool PPU_Read2002; // This clears the VBlank flag.
@@ -1648,7 +1669,7 @@ namespace TriCNES
                 {
                     if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
                     {
-                        PPU_UpdateShiftRegisters(); // shift all the shift registers 1 bit
+                        PPU_UpdateBackgroundShiftRegisters(); // shift all the shift registers 1 bit
                     }
                 }
             }
@@ -1739,13 +1760,13 @@ namespace TriCNES
             PPU_2007_PaletteRAMEnable = ((PPU_AddressBus & 0x3F00) == 0x3F00) && PPU_2007_BLNK_Latch;
             PPU_2007_Read_XRB = PPU_2007_Read && PPU_2007_PaletteRAMEnable;
                      
-            PPU_2007_Read_Latches[0] = PPU_2007_Read && PPU_2007_Read_SR;
+            PPU_2007_Read_Latches[0] = PPU_2007_Read_SR;
             if(PPU_2007_Read)
             {
                 PPU_2007_Read = false; // I put this in an if statement for easier debugging / breakpoint placement.
             }
-            PPU_2007_Read_Latches[2] = PPU_2007_Read_Latches[1];
-            PPU_2007_Read_Latches[4] = PPU_2007_Read_Latches[3];
+            PPU_2007_Read_Latches[2] = !PPU_2007_Read_Latches[1];
+            PPU_2007_Read_Latches[4] = !PPU_2007_Read_Latches[3];
             PPU_2007_PD_RB = PPU_2007_Read_Latches[4] && !PPU_2007_Read_Latches[2];
             PPU_2007_ReadALE = !PPU_2007_Read_Latches[4] && PPU_2007_Read_Latches[2];
             PPU_2007_Read_H0_Latch = (PPU_Dot - 1 & 1) != 0;
@@ -1754,28 +1775,20 @@ namespace TriCNES
 
             PPU_READ = (PPU_2007_PD_RB || (!BLNK && PPU_2007_Read_H0_Latch)); // even ppu cycles outside of blanking always read. Also read if we are reading $2007.
 
-            PPU_2007_Write_Latches[0] = PPU_2007_Write && PPU_2007_Write_SR;
+            PPU_2007_Write_Latches[0] = PPU_2007_Write_SR;
             if (PPU_2007_Write)
             {
                 PPU_2007_Write = false; // I put this in an if statement for easier debugging / breakpoint placement.
             }
-            PPU_2007_Write_Latches[2] = PPU_2007_Write_Latches[1];
-            PPU_2007_Write_Latches[4] = PPU_2007_Write_Latches[3];
+            PPU_2007_Write_Latches[2] = !PPU_2007_Write_Latches[1];
+            PPU_2007_Write_Latches[4] = !PPU_2007_Write_Latches[3];
             PPU_2007_WriteALE = !PPU_2007_Write_Latches[4] && PPU_2007_Write_Latches[2];
-
-            PPU_WRITE = !PPU_2007_PaletteRAMEnable && PPU_2007_DB_PAR;
-
-            if(PPU_2007_DB_PAR)
-            {
-                PPU_AddressBus = PPU_v;
-                StorePPUData(PPU_AddressBus, PPU_2007_WriteData);
-            }
 
 
             PPU_2007_TStep = (PPU_2007_TStep_Latch || PPU_2007_PD_RB);
             PPU_2007_TStep_Latch = PPU_2007_DB_PAR;
 
-            
+
 
             bool b = (!BLNK && !H0_DASH); // If you are on an even dot out of a blanking period
             PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE || b);
@@ -1791,14 +1804,6 @@ namespace TriCNES
         }
         void PPU_DATA_StateMachine2()
         {
-            if (PPU_2007_PD_RB)
-            {
-                PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
-                if (PPU_ALE)
-                {
-                    PPU_OctalLatch = (byte)PPU_AddressBus;
-                }
-            }
             if (PPU_2007_TStep)
             {
                 PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
@@ -1807,6 +1812,14 @@ namespace TriCNES
                     PPU_IncrementScrollY();
                 }
             }
+            if (PPU_2007_PD_RB)
+            {
+                PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
+                if (PPU_ALE)
+                {
+                    PPU_OctalLatch = (byte)PPU_AddressBus;
+                }
+            }           
         }
         void PPU_DATA_StateMachine_Half()
         {
@@ -1821,20 +1834,25 @@ namespace TriCNES
                     PPU_OctalLatch = (byte)PPU_AddressBus;
                 }
             }
-            PPU_2007_Read_Latches[1] = PPU_2007_Read_Latches[0];
-            PPU_2007_Read_Latches[3] = PPU_2007_Read_Latches[2];
-            if (PPU_2007_Read_Latches[3])
+            PPU_2007_Read_Latches[1] = !PPU_2007_Read_Latches[0];
+            PPU_2007_Read_Latches[3] = !PPU_2007_Read_Latches[2];
+            if (!PPU_2007_Read_Latches[3])
             {
                 PPU_2007_Read_SR = false;
             }
 
-            PPU_2007_Write_Latches[1] = PPU_2007_Write_Latches[0];
-            PPU_2007_Write_Latches[3] = PPU_2007_Write_Latches[2];
-            if (PPU_2007_Write_Latches[3])
+            PPU_2007_Write_Latches[1] = !PPU_2007_Write_Latches[0];
+            PPU_2007_Write_Latches[3] = !PPU_2007_Write_Latches[2];
+            if (!PPU_2007_Write_Latches[3])
             {
                 PPU_2007_Write_SR = false;
             }
             PPU_2007_DB_PAR = PPU_2007_Write_Latches[1] && !PPU_2007_Write_Latches[3];
+            PPU_WRITE = !PPU_2007_PaletteRAMEnable && PPU_2007_DB_PAR;
+            if (PPU_2007_DB_PAR) // Using PAR instead of PPU_WRITE, since I re-use StorePPUData() for writes to palette RAM.
+            {
+                StorePPUData(PPU_AddressBus, PPU_2007_WriteData);
+            }
         }
 
 
@@ -3756,9 +3774,9 @@ namespace TriCNES
             return b;
         }
 
-        void PPU_UpdateShiftRegisters()
+        void PPU_UpdateBackgroundShiftRegisters()
         {
-            PPU_BackgroundPatternShiftRegisterL = (ushort)((PPU_BackgroundPatternShiftRegisterL << 1) | 0); // shift 1 bit to the left. Bring in a 0.
+            PPU_BackgroundPatternShiftRegisterL = (ushort)(PPU_BackgroundPatternShiftRegisterL << 1); // shift 1 bit to the left. Bring in a 0.
             PPU_BackgroundPatternShiftRegisterH = (ushort)((PPU_BackgroundPatternShiftRegisterH << 1) | 1); // shift 1 bit to the left. Bring in a 1.
             PPU_BackgroundAttributeShiftRegisterL = (ushort)((PPU_BackgroundAttributeShiftRegisterL << 1) | (PPU_AttributeLatchRegister & 1)); // shift 1 bit to the left. Bring in Attribute low bit.
             PPU_BackgroundAttributeShiftRegisterH = (ushort)((PPU_BackgroundAttributeShiftRegisterH << 1) | ((PPU_AttributeLatchRegister & 10) >> 1)); // shift 1 bit to the left. Bring in Attribute high bit.
