@@ -542,7 +542,6 @@ namespace TriCNES
             APU_Framecounter = 0; // reset the frame counter
 
             // PPU registers
-            PPU_Update2000Delay = 0;
             PPUControl_NMIEnabled = false;
             PPUControlIncrementMode32 = false;
             PPU_Spritex16 = false;
@@ -550,7 +549,6 @@ namespace TriCNES
             PPU_PatternSelect_Background = false;
             PPU_t = 0;
 
-            PPU_Update2001Delay = 0;
             PPU_Mask_Greyscale = false;
             PPU_Mask_EmphasizeRed = false;
             PPU_Mask_EmphasizeGreen = false;
@@ -651,6 +649,7 @@ namespace TriCNES
             while (!FrameAdvance_ReachedVBlank)
             {
                 _EmulatorCore();
+                _EmulatorCoreHalf();
             }
         }
 
@@ -662,6 +661,7 @@ namespace TriCNES
             while (i < 12)
             {
                 _EmulatorCore();
+                _EmulatorCoreHalf();
                 i++;
             }
             CycleCountForCycleTAS++;
@@ -676,25 +676,23 @@ namespace TriCNES
             // PPU
             // APU
 
-            if (CPUClock == 0)
+            if (CPUClock == 12)
             {
-                CPUClock = 12; // there is 1 CPU cycle for every 12 master clock cycles
+                CPUClock = 0; // there is 1 CPU cycle for every 12 master clock cycles
 
                 _6502(); // This is where I run the CPU
                 totalCycles++;         // for debugging mostly
                 Cart.MapperChip.CPUClock(); // If the mapper chip does every cpu cycle... (see FME-7)
-            }
-            if (CPUClock == 8)
-            {
+
                 NMILine |= PPUControl_NMIEnabled && PPUStatus_VBlank;
                 if (operationCycle == 0 && !(PPUStatus_VBlank && PPUControl_NMIEnabled))
                 {
                     NMILine = false;
                 }
             }
-            if (PPUClock == 0)
+            if (PPUClock == 4)
             {
-                PPUClock = 4; // there is 1 PPU cycle for every 12 master clock cycles
+                PPUClock = 0; // there is 1 PPU cycle for every 12 master clock cycles
 
                 _EmulatePPU();
                 if (PPUBus != 0)
@@ -706,17 +704,9 @@ namespace TriCNES
             {
                 _EmulateHalfPPU();
             }
-            if (CPUClock == 5)
-            {
-                IRQLine = IRQ_LevelDetector;
-                if (APU_Status_FrameInterrupt && !APU_FrameCounterInhibitIRQ)
-                {
-                    IRQ_LevelDetector = true; // if the APU frame counter flag is never cleared, you will get another IRQ when the I flag is cleared.
-                }
-                Cart.MapperChip.CPUClockRise(); // If the mapper chip does something when M2 rises... (see MMC3)
-            }
+            
 
-            if (CPUClock == 12)
+            if (CPUClock == 0)
             {
 
                 _EmulateAPU();
@@ -728,14 +718,29 @@ namespace TriCNES
             }
 
             // Decrement the clocks.
-            PPUClock--;
-            CPUClock--;
+            PPUClock++;
+            CPUClock++;
 
             if(Cart.FDS != null)
             {
                 Cart.FDS.Clock();
             }
         }
+        public void _EmulatorCoreHalf()
+        {
+            // half master clock cycles.
+            if (CPUClock == 7) //M2 going low.
+            {
+                IRQLine = IRQ_LevelDetector;
+                if (APU_Status_FrameInterrupt && !APU_FrameCounterInhibitIRQ)
+                {
+                    IRQ_LevelDetector = true; // if the APU frame counter flag is never cleared, you will get another IRQ when the I flag is cleared.
+                }
+                Cart.MapperChip.CPUClockRise(); // If the mapper chip does something when M2 rises... (see MMC3)
+            }
+
+        }
+
 
         public void EmulateUntilEndOfRead()
         {
@@ -744,6 +749,17 @@ namespace TriCNES
             for (int i = 0; i < 7; i++)
             {
                 _EmulatorCore();
+                _EmulatorCoreHalf();
+            }
+        }
+
+        public void EmulateNMasterClockCycles(int n)
+        {
+            // This does run the risk of recursion, so don't use a value of 12 or more with this.
+            for (int i = 0; i < n; i++)
+            {
+                _EmulatorCore();
+                _EmulatorCoreHalf();
             }
         }
 
@@ -1211,6 +1227,7 @@ namespace TriCNES
         ushort PPU_BackgroundAttributeShiftRegisterH; // 8 bit latch register for the background tile attributes high bit plane.
         ushort PPU_BackgroundPatternShiftRegisterL; // 16 bit shift register for the background tile pattern low bit plane.
         ushort PPU_BackgroundPatternShiftRegisterH; // 16 bit shift register for the background tile pattern high bit plane.
+
         //TempPPUAddr
         public byte PPU_FineXScroll; // Set when writing to address $2005. 3 bits. This is up to a 7 pixel offset when rendering the screen.
 
@@ -1250,7 +1267,10 @@ namespace TriCNES
         byte PPU_HighBitPlane;// Temporary value used in background shift register preparation.
         byte PPU_Attribute; // Temporary value used in background shift register preparation.
 
-        public ushort PPU_PatternAddressRegister; // PAR
+        public ushort PPU_PatternAddressRegister_CHR; // PAR
+        public ushort PPU_PatternAddressRegister_NT;  // PAR
+        public ushort PPU_PatternAddressRegister_AT;  // PAR
+        public ushort PPU_PAR_MUX;                    // PAR
 
         bool PPU_CanDetectSpriteZeroHit; // Only 1 sprite zero hit is allowed per frame. This gets set if a sprite zero hit occurs, and cleared at the end of vblank.
 
@@ -1323,22 +1343,6 @@ namespace TriCNES
                         PPU_t = (ushort)((PPU_t & 0b0000110000011111) | (((PPU_Update2005Value & 0xF8) << 2) | ((PPU_Update2005Value & 7) << 12))); // this also writes to 't'
                     }
                     PPUAddrLatch = !PPUAddrLatch; // flip the latch
-                }
-            }
-            // after writing to $2000, there's either a 1 or 2 cycle delay
-            if (PPU_Update2000Delay > 0)
-            {
-                PPU_Update2000Delay--;
-                if (PPU_Update2000Delay == 0)
-                {
-                    PPUControl_NMIEnabled = (PPU_Update2000Value & 0x80) != 0;
-                    PPUControlIncrementMode32 = (PPU_Update2000Value & 0x4) != 0;
-                    PPU_Spritex16 = (PPU_Update2000Value & 0x20) != 0;
-                    PPU_PatternSelect_Sprites = (PPU_Update2000Value & 0x8) != 0;
-                    PPU_PatternSelect_Background = (PPU_Update2000Value & 0x10) != 0;
-                    PPU_t = (ushort)((PPU_t & 0b0111001111111111) | ((PPU_Update2000Value & 0x3) << 10)); // change which nametable to render.
-
-
                 }
             }
 
@@ -1466,10 +1470,7 @@ namespace TriCNES
             PPUStatus_SpriteOverflow_Delayed = PPUStatus_SpriteOverflow;
 
 
-            if (Logging && LoggingPPU)
-            {
-                Debug_PPU();
-            }
+            
             // Right now, I'm only emulating MMC3's IRQ counter in this function.
             PPU_MapperSpecificFunctions();
             PPU_A12_Prev = (PPU_AddressBus & 0b0001000000000000) != 0; // Record the value of the A12. This is used in the PPU_MapperSpecificFunctions(), so if this changes between here and next ppu cycle, we'll know.
@@ -1496,15 +1497,10 @@ namespace TriCNES
 
             //but to complicate things, the delay after writing to $2001 happens between those 2 steps, and also on a specific alignment, this delay is 1 cycle longer for sprite evaluation.
 
-            // If this is NOT phase 1
-            if ((CPUClock & 3) != 3)
-            {
-                // sprite evaluation has a 1 ppu cycle delay before recognizing these flags were set or cleared.
-                PPU_Mask_ShowBackground_Delayed = PPU_Mask_ShowBackground;
-                PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
-            }
 
-            PPU_Render_CommitShiftRegistersAndBitPlanes();
+
+            
+
             PPU_DATA_StateMachine();
 
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
@@ -1515,61 +1511,16 @@ namespace TriCNES
                     PPU_Render_SpriteEvaluation(); // fill in secondary OAM, and set up various arrays of sprite properties.
                 }
             }
-            if ((CPUClock & 3) == 3)
-            {
-                // on phase 1,
-                // sprite evaluation has a 2 ppu cycle delay before recognizing these flags were set or cleared.
-                PPU_Mask_ShowBackground_Delayed = PPU_Mask_ShowBackground;
-                PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
-            }
+
+            // sprite evaluation has a 1 ppu cycle delay before recognizing these flags were set or cleared.
+            PPU_Mask_ShowBackground_Delayed = PPU_Mask_ShowBackground;
+            PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
+
             if (!PPU_Mask_ShowBackground && !PPU_Mask_ShowSprites)
             {
                 PPU_AddressBus = PPU_v; // the address bus is always v when rendering is disabled.
                 // TODO: Is this occuring one ppu cycles too late???
                 // I specifically moved this here (outside of the following if statements) because it broke nes_reset_state_detect-letters.nes on alignment 1.
-            }
-            // after sprite evaluation, but before screen rendering...
-            if (PPU_Update2001Delay > 0) // if we wrote to 2001 recently
-            {
-                PPU_Update2001Delay--;
-                if (PPU_Update2001Delay == 0) // if we've waited enough cycles, apply the changes
-                {
-                    PPU_Mask_8PxShowBackground = (PPU_Update2001Value & 0x02) != 0;
-                    PPU_Mask_8PxShowSprites = (PPU_Update2001Value & 0x04) != 0;
-                    PPU_Mask_ShowBackground = (PPU_Update2001Value & 0x08) != 0;
-                    PPU_Mask_ShowSprites = (PPU_Update2001Value & 0x10) != 0;
-
-                    PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
-                    PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
-                }
-            }
-            if (PPU_Update2001OAMCorruptionDelay > 0) // if we wrote to 2001 recently
-            {
-                PPU_Update2001OAMCorruptionDelay--;
-                if (PPU_Update2001OAMCorruptionDelay == 0) // if we've waited enough cycles, apply the changes
-                {
-                    if (PPU_WasRenderingBefore2001Write && (PPU_Update2001Value & 0x08) == 0 && (PPU_Update2001Value & 0x10) == 0)
-                    {
-                        if ((PPU_Scanline < 240 || PPU_Scanline == 261)) // if this is the pre-render line, or any line before vblank
-                        {
-                            if (!PPU_PendingOAMCorruption) // due to OAM corruption occurring inside OAM evaluation before this even occurs, make sure OAM isn't already corrupt
-                            {
-                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank = true;
-                            }
-                        }
-                    }
-                }
-            }
-            if (PPU_Update2001EmphasisBitsDelay > 0)
-            {
-                PPU_Update2001EmphasisBitsDelay--;
-                if (PPU_Update2001EmphasisBitsDelay == 0)
-                {
-                    PPU_Mask_Greyscale = (PPU_Update2001Value & 0x01) != 0;
-                    PPU_Mask_EmphasizeRed = (PPU_Update2001Value & 0x20) != 0;
-                    PPU_Mask_EmphasizeGreen = (PPU_Update2001Value & 0x40) != 0;
-                    PPU_Mask_EmphasizeBlue = (PPU_Update2001Value & 0x80) != 0;
-                }
             }
 
             PrevPrevPrevDotColor = PrevPrevDotColor; // Drawing a color to the screen has a 3(?) ppu cycle delay between deciding the color, and drawing it.
@@ -1656,16 +1607,25 @@ namespace TriCNES
                 ntsc_signal += 8;
                 ntsc_signal %= 12;
             }
+
+            if (Logging && LoggingPPU)
+            {
+                Debug_PPU();
+            }
+
         } // and that's all for the PPU cycle!
 
+        bool PPUActiveForShiftRegisterUpdate;
         void _EmulateHalfPPU()
         {
-            // Oh boy, it's time for half PPU cycles.
-            
-            PPU_Render_CommitShiftRegistersAndBitPlanes_HalfDot();
+            // Oh boy, it's time for half PPU cycles.            
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
             {
-                if ((PPU_Dot >= 0 && PPU_Dot < 257) || (PPU_Dot >= 320 && PPU_Dot < 336)) // if this is a visible pixel, or preparing the start of next scanline
+                if(PPU_Dot == 320)
+                {
+
+                }
+                if ((PPU_Dot > 0 && PPU_Dot <= 257) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
                 {
                     if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
                     {
@@ -1673,16 +1633,9 @@ namespace TriCNES
                     }
                 }
             }
-            if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
-            {
-                if ((PPU_Dot >= 0 && PPU_Dot < 257) || (PPU_Dot >= 320 && PPU_Dot < 336)) // if this is a visible pixel, or preparing the start of next scanline
-                {
-                    if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
-                    {
-                        PPU_Render_ShiftRegistersAndBitPlanes_HalfDot(); // Check if we need to reload the shift registers.
-                    }
-                }
-            }
+
+            PPU_Render_CommitShiftRegistersAndBitPlanes();
+            
             PPU_VSET = false;
             if (PPU_PendingVBlank)
             {
@@ -1772,7 +1725,6 @@ namespace TriCNES
             PPU_2007_Read_H0_Latch = (PPU_Dot - 1 & 1) != 0;
 
 
-
             PPU_READ = (PPU_2007_PD_RB || (!BLNK && PPU_2007_Read_H0_Latch)); // even ppu cycles outside of blanking always read. Also read if we are reading $2007.
 
             PPU_2007_Write_Latches[0] = PPU_2007_Write_SR;
@@ -1788,8 +1740,7 @@ namespace TriCNES
             PPU_2007_TStep = (PPU_2007_TStep_Latch || PPU_2007_PD_RB);
             PPU_2007_TStep_Latch = PPU_2007_DB_PAR;
 
-
-
+           
             bool b = (!BLNK && !H0_DASH); // If you are on an even dot out of a blanking period
             PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE || b);
 
@@ -1804,7 +1755,7 @@ namespace TriCNES
         }
         void PPU_DATA_StateMachine2()
         {
-            if (PPU_2007_TStep)
+            if (PPU_2007_TStep) // If this occurs inside PPU_DATA_StateMachine() instead, the timing is wrong, and this breaks SMB1's title screen.
             {
                 PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
                 if (!PPU_2007_BLNK_Latch)
@@ -2330,14 +2281,13 @@ namespace TriCNES
                     double Y = 0;
                     double U = 0;
                     double V = 0;
-                    int k = 0;
                     for (int p = begin; p < end; ++p) // Collect and accumulate samples
                     {
                         float sample = bordered ? (Bordered_NTSC_Samples[p]) : (NTSC_Samples[p]);
                         Y += sample;
-                        U += (sample * SinTable[(phase + p) % 12]);
-                        V += (sample * CosTable[(phase + p) % 12]);
-                        k++;
+                        int rotation = (phase + p) % 12;
+                        U += (sample * SinTable[rotation]);
+                        V += (sample * CosTable[rotation]);
                     }
 
                     //U *= (0.35355339 * 2);
@@ -2510,7 +2460,7 @@ namespace TriCNES
                             SpriteEvaluationTick = 0;
                             OAMAddressOverflowedDuringSpriteEvaluation = false;
                         }
-                        if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
+                        if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank || PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant)
                         {
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
                             PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
@@ -2549,7 +2499,7 @@ namespace TriCNES
                         }
                         else
                         {
-                            if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank)
+                            if (PPU_OAMCorruptionRenderingDisabledOutOfVBlank || PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant)
                             {
                                 PPU_OAMCorruptionRenderingDisabledOutOfVBlank = false;
                                 PPU_OAMCorruptionRenderingDisabledOutOfVBlank_Instant = false;
@@ -2842,20 +2792,22 @@ namespace TriCNES
                     // case 7 then leads back to case 0.
 
                     case 0: // Y position         dot 257, (+8), (+16) ...
-                        if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
+                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
                         {
                             // set this object's Y position in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
                             PPU_SpriteYposition[OAM2Address / 4] = PPU_OAMLatch;
 
-                            PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
+                            PPU_PatternAddressRegister_NT = (ushort)(0x2000 + (PPU_v & 0x0FFF));
+                            PPU_PAR_MUX = PPU_PatternAddressRegister_NT;
+                            PPU_AddressBus = PPU_PAR_MUX;
 
                             InRangeCheck = (ushort)((PPU_Scanline & 0xFF) - PPU_OAMLatch);
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
                         break;
                     case 1: // Pattern            dot 258, (+8), (+16) ...
-                        if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
+                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
                         {
                             // set this object's pattern in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2865,29 +2817,31 @@ namespace TriCNES
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
                         break;
                     case 2: // Attribute          dot 259, (+8), (+16) ...
-                        if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
+                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
                         {
                             // set this object's attribute in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
                             PPU_SpriteAttribute[OAM2Address / 4] = PPU_OAMLatch;
 
-                            PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
+                            PPU_PatternAddressRegister_NT = (ushort)(0x2000 + (PPU_v & 0x0FFF));
+                            PPU_PAR_MUX = PPU_PatternAddressRegister_NT;
+                            PPU_AddressBus = PPU_PAR_MUX;
                         }
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
                         break;
                     case 3: // X position         dot 260, (+8), (+16) ...
-                        if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
+                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
                         {
                             // set this object's X position in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
                             PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch;
-                            PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch
-                            
+                            PPU_SpriteShifterCounter[OAM2Address / 4] = PPU_OAMLatch;
+                            PPU_Render_ShiftRegistersAndBitPlanes(); // Dummy Nametable Fetch                            
                         }
                         // notably, the secondary OAM address does not get incremented until case 7
                         break;
                     case 4: // X position (again) dot 261, (+8), (+16) ...
-                        if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
+                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
                         {
                             // set this object's X position in the array... again.
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2895,18 +2849,22 @@ namespace TriCNES
                             // But also: Find the PPU address of this sprite's graphical data inside the Pattern Tables.
                             PPU_SpriteEvaluation_GetSpriteAddress((byte)(OAM2Address / 4));
                             PPU_CheckPAR();
-                            PPU_PatternAddressRegister &= 0b1111111110111;
-                            PPU_AddressBus = PPU_PatternAddressRegister;
+                            PPU_PatternAddressRegister_CHR &= 0b1111111110111;
+                            PPU_PAR_MUX = PPU_PatternAddressRegister_CHR;
+                            PPU_AddressBus = PPU_PAR_MUX;
                         }
 
                         break;
                     case 5: // X position (again)  dot 262, (+8), (+16) ...
-                        if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering has been enabled for at least 1 cycle.
+                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
                         {
                             // set this object's X position in the array... again.
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
                             PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch;
                             // but also: set up the bit plane shift register.
+
+                            PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_CHR & 0xFF00) | PPU_OctalLatch);
+
                             PPU_SpritePatternL = Cart.MapperChip.FetchPPU();
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
                             {
@@ -2923,7 +2881,7 @@ namespace TriCNES
 
                         break;
                     case 6: // X position (again)  dot 263, (+8), (+16) ...
-                        if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
+                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
                         {
                             // set this object's X position in the array... again.
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2932,19 +2890,23 @@ namespace TriCNES
                             PPU_SpriteEvaluation_GetSpriteAddress((byte)(OAM2Address / 4)); // we need to recalculate this. Slow, but accurate. (TODO: Can we test for this with a well timed write to $2000?)
                             PPU_AddressBus |= 8;
                             PPU_CheckPAR();
-                            PPU_PatternAddressRegister |= 8;
-                            PPU_AddressBus = PPU_PatternAddressRegister;
+                            PPU_PatternAddressRegister_CHR |= 8;
+                            PPU_PAR_MUX = PPU_PatternAddressRegister_CHR;
+                            PPU_AddressBus = PPU_PAR_MUX;
                         }
 
                         break;
 
                     case 7: // X position (again)  dot 264, (+8), (+16) ...
-                        if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed))
+                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
                         {
                             // set this object's X position in the array... again.
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
                             PPU_SpriteXposition[OAM2Address / 4] = PPU_OAMLatch; // read X pos again
                             // but also: set up the second bit plane
+
+                            PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_CHR & 0xFF00) | PPU_OctalLatch);
+
                             PPU_SpritePatternH = Cart.MapperChip.FetchPPU();
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
                             {
@@ -3004,7 +2966,6 @@ namespace TriCNES
                     {
                         if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground))
                         {
-                            PPU_SpriteShifterCounter[i] = PPU_SpriteXposition[i];
                         }
                         else
                         {
@@ -3570,39 +3531,49 @@ namespace TriCNES
             switch (cycleTick)
             {
                 case 0:
-                    PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
+                    PPU_PatternAddressRegister_NT = (ushort)(0x2000 + (PPU_v & 0x0FFF));
+                    PPU_PAR_MUX = PPU_PatternAddressRegister_NT;
+                    PPU_AddressBus = PPU_PAR_MUX;
                     break;
                 case 1:
                     // fetch byte from Nametable
+                    PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_NT & 0xFF00) | PPU_OctalLatch);
                     PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                     PPU_Commit_NametableFetch = true;
                     break;
                 case 2:
-                    PPU_AddressBus = (ushort)(0x23C0 | (PPU_v & 0x0C00) | ((PPU_v >> 4) & 0x38) | ((PPU_v >> 2) & 0x07));
+                    PPU_PatternAddressRegister_AT = (ushort)(0x23C0 | (PPU_v & 0x0C00) | ((PPU_v >> 4) & 0x38) | ((PPU_v >> 2) & 0x07));
+                    PPU_PAR_MUX = PPU_PatternAddressRegister_AT;
+                    PPU_AddressBus = PPU_PAR_MUX;
                     break;
                 case 3:
                     // fetch attribute byte from attribute table
+                    PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_AT & 0xFF00) | PPU_OctalLatch);
                     PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                     PPU_Commit_AttributeFetch = true;
                     // now we only have the 2 bits we're looking for
                     break;
                 case 4:
                     PPU_CheckPAR();
-                    PPU_PatternAddressRegister &= 0b1111111110111;
-                    PPU_AddressBus = PPU_PatternAddressRegister;
+                    PPU_PatternAddressRegister_CHR &= 0b1111111110111;
+                    PPU_PAR_MUX = PPU_PatternAddressRegister_CHR;
+                    PPU_AddressBus = PPU_PAR_MUX;
                     break;
                 case 5:
                     // fetch pattern bits from value read off the nametable
+                    PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_CHR & 0xFF00) | PPU_OctalLatch);
                     PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                     PPU_Commit_PatternLowFetch = true;
                     break;
                 case 6:
                     PPU_CheckPAR();
-                    PPU_PatternAddressRegister |= 8;
-                    PPU_AddressBus = PPU_PatternAddressRegister;
+                    PPU_PatternAddressRegister_CHR |= 8;
+                    PPU_PAR_MUX = PPU_PatternAddressRegister_CHR;
+                    PPU_AddressBus = PPU_PAR_MUX;
                     break;
                 case 7:
                     // fetch pattern bits with the new address
+                    PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_CHR & 0xFF00) | PPU_OctalLatch);
                     PPU_RenderTemp = Cart.MapperChip.FetchPPU();
                     PPU_Commit_PatternHighFetch = true;
                     break;
@@ -3615,41 +3586,19 @@ namespace TriCNES
 
         }
 
-        bool PPU_Commit_LoadShiftRegisters;
-        void PPU_Render_ShiftRegistersAndBitPlanes_HalfDot()
-        {
-            byte cycleTick; // for the switch statement below, this checks which case to run on a given ppu cycle.
-            cycleTick = (byte)((PPU_Dot+7) & 7);
-
-            switch (cycleTick)
-            {
-                case 0:
-                case 1:
-                case 2:
-                case 3:
-                case 4:
-                case 5:
-                case 6:
-                    break;
-                case 7:
-                    PPU_Commit_LoadShiftRegisters = true;
-                    break;
-            }
-        }
-
         void PPU_Render_CommitShiftRegistersAndBitPlanes()
         {
             if (PPU_Commit_NametableFetch)
             {
                 PPU_Commit_NametableFetch = false;
-                PPU_PatternAddressRegister &= 0b1000000001111;
+                PPU_PatternAddressRegister_CHR &= 0b1000000001111;
                 if (PPU_Dot < 256 || PPU_Dot > 320)
                 {
-                    PPU_PatternAddressRegister |= (ushort)(PPU_RenderTemp << 4);
+                    PPU_PatternAddressRegister_CHR |= (ushort)( (byte)(PPU_AddressBus) << 4);
                 }
                 else
                 {
-                    PPU_PatternAddressRegister |= (ushort)(OAM2[(OAM2Address&0x1C)+1]<< 4);
+                    PPU_PatternAddressRegister_CHR |= (ushort)(OAM2[(OAM2Address&0x1C)+1]<< 4);
                 }
             }
             if (PPU_Commit_AttributeFetch)
@@ -3676,15 +3625,8 @@ namespace TriCNES
             {
                 PPU_Commit_PatternHighFetch = false;
                 PPU_HighBitPlane = PPU_RenderTemp;
-                PPU_IncrementScrollX();
-            }
-        }
-        void PPU_Render_CommitShiftRegistersAndBitPlanes_HalfDot()
-        {
-            if (PPU_Commit_LoadShiftRegisters)
-            {
-                PPU_Commit_LoadShiftRegisters = false;
                 PPU_LoadShiftRegisters();
+                PPU_IncrementScrollX();
             }
         }
 
@@ -3699,8 +3641,8 @@ namespace TriCNES
             if (PPU_Dot == 0)
             {
                 PPU_CheckPAR();
-                PPU_PatternAddressRegister &= 0b1111111110111;
-                PPU_AddressBus = PPU_PatternAddressRegister;
+                PPU_PatternAddressRegister_CHR &= 0b1111111110111;
+                PPU_AddressBus = PPU_PatternAddressRegister_CHR;
             }
             else
             {
@@ -3740,9 +3682,9 @@ namespace TriCNES
             if(PPU_Dot < 256 || PPU_Dot > 320)
             {
                 // Which pattern table do we use for nametable fetches?
-                PPU_PatternAddressRegister &= 0b0111111111000;
-                PPU_PatternAddressRegister |= (ushort)(PPU_PatternSelect_Background ? 0b1000000000000 : 0);
-                PPU_PatternAddressRegister |= (ushort)((PPU_v & 0b0111000000000000) >> 12);
+                PPU_PatternAddressRegister_CHR &= 0b0111111111000;
+                PPU_PatternAddressRegister_CHR |= (ushort)(PPU_PatternSelect_Background ? 0b1000000000000 : 0);
+                PPU_PatternAddressRegister_CHR |= (ushort)((PPU_v & 0b0111000000000000) >> 12);
             }
             else
             {
@@ -3750,17 +3692,17 @@ namespace TriCNES
                 if(!PPU_Spritex16)
                 {
                     bool flipy = (OAM2[(OAM2Address & 0x1C) + 2] & 0x80) != 0;
-                    PPU_PatternAddressRegister &= 0b0111111111000;
-                    PPU_PatternAddressRegister |= (ushort)(PPU_PatternSelect_Sprites ? 0b1000000000000 : 0);
-                    PPU_PatternAddressRegister |= (ushort)(flipy ? 7-(InRangeCheck & 0x7) : (InRangeCheck & 0x7));
+                    PPU_PatternAddressRegister_CHR &= 0b0111111111000;
+                    PPU_PatternAddressRegister_CHR |= (ushort)(PPU_PatternSelect_Sprites ? 0b1000000000000 : 0);
+                    PPU_PatternAddressRegister_CHR |= (ushort)(flipy ? 7-(InRangeCheck & 0x7) : (InRangeCheck & 0x7));
                 }
                 else
                 {
                     bool flipy = (OAM2[(OAM2Address & 0x1C) + 2] & 0x80) != 0;
-                    PPU_PatternAddressRegister &= 0b0111111101000;
-                    PPU_PatternAddressRegister |= (ushort)(((OAM2[(OAM2Address&0x1C)+1] & 1) != 0) ? 0b1000000000000 : 0); // Bit 0 of the OAM2 Pattern
-                    PPU_PatternAddressRegister |= (ushort)(flipy ? 7 - (InRangeCheck & 0x7) : (InRangeCheck & 0x7));
-                    PPU_PatternAddressRegister |= (ushort)(((InRangeCheck & 0x08) ^ (flipy ? 8 : 0)) <<1);
+                    PPU_PatternAddressRegister_CHR &= 0b0111111101000;
+                    PPU_PatternAddressRegister_CHR |= (ushort)(((OAM2[(OAM2Address&0x1C)+1] & 1) != 0) ? 0b1000000000000 : 0); // Bit 0 of the OAM2 Pattern
+                    PPU_PatternAddressRegister_CHR |= (ushort)(flipy ? 7 - (InRangeCheck & 0x7) : (InRangeCheck & 0x7));
+                    PPU_PatternAddressRegister_CHR |= (ushort)(((InRangeCheck & 0x08) ^ (flipy ? 8 : 0)) <<1);
                 }
             }
         }
@@ -8862,12 +8804,7 @@ namespace TriCNES
         byte PPU_Update2006Delay;   // The number of PPU cycles to wait between writing to $2006 and the ppu from updating
         byte PPU_Update2005Delay;   // The number of PPU cycles to wait between writing to $2004 and the ppu from updating
         byte PPU_Update2005Value;   // The value written to $2005, for use when the delay has ended.
-        byte PPU_Update2001Delay;   // The number of PPU cycles to wait between writing to $2001 and the ppu from updating
-        byte PPU_Update2001EmphasisBitsDelay;   // The number of PPU cycles to wait between writing to $2001 and the ppu from updating the emphasis bits and greyscale
-        byte PPU_Update2001OAMCorruptionDelay;  // The number of PPU cycles to wait before OAM gets corrupted if OAM corruption is occurring.
         byte PPU_Update2001Value;   // The value written to $2001, for use when the delay has ended.
-        byte PPU_Update2000Delay;   // The number of PPU cycles to wait between writing to $2000 and the ppu from updating
-        byte PPU_Update2000Value;   // The value written to $2000, for use when the delay has ended.
         ushort PPU_Update2006Value;   // The value written to $2006, for use when the delay has ended.
         ushort PPU_Update2006Value_Temp;
 
@@ -8882,6 +8819,7 @@ namespace TriCNES
 
         public bool PPU_PatternSelect_Sprites; //which pattern table is used for sprites / background
         public bool PPU_PatternSelect_Background; //which pattern table is used for sprites / background
+        public bool PPU_EXT_Enable; // I can toggle this boolean, but it is otherwise unimplemented.
 
         //for logging purposes. doesn't update databus.
         bool DebugObserve = false;
@@ -9419,6 +9357,9 @@ namespace TriCNES
 
         public void StorePPURegisters(ushort Addr, byte In)
         {
+            //EmulateNMasterClockCycles(1); // wait for PPUSEL to go high
+            // Okay, I KNOW this shouldn't be commented out. TODO: figure out why the timing on this is off by one.
+
             ushort AddrT = (ushort)((Addr & 0x2007));
             switch (AddrT)
             {
@@ -9431,29 +9372,20 @@ namespace TriCNES
                         return;
                     }
 
-                    // NOTE: This uses the contents of the databus (instead of "In") for a single ppu cycle. (alignment dependent)
-                    // this will be fixed on the next PPU cycle. no worries :)
-                    // In other words, this can cause a visual bug if this write occurs on the wrong ppu cycle. (dot 257 of a visible scanline)
+                    
+                    // now that PPUSEL is high, the value of the databus is written to the PPU register.
+                    PPU_t = (ushort)((PPU_t & 0b0111001111111111) | ((dataBus & 0x3) << 10)); // This early write to the t register is the cause of the scanline bug in SMB1.
+                    PPU_EXT_Enable = (dataBus & 0x40) == 0x40;
+                    // technically this changes PPUControl_NMIEnabled here too, but it's invisible as the NMI polling has already happened and it will be re-enabled before then.
+
+                    EmulateNMasterClockCycles(2); // wait for the CPU databus to change. (that's right, it doesn't happen at the start of the write cycle!)
                     PPUControl_NMIEnabled = (In & 0x80) != 0;
-                    PPUControlIncrementMode32 = (dataBus & 0x4) != 0;
-                    PPU_Spritex16 = (dataBus & 0x20) != 0;           // these bits don't seem to be affected by open bus
-                    PPU_PatternSelect_Sprites = (In & 0x8) != 0;     // these bits don't seem to be affected by open bus
-                    PPU_PatternSelect_Background = (In & 0x10) != 0; // these bits don't seem to be affected by open bus
-                    PPU_t = (ushort)((PPU_t & 0b0111001111111111) | ((dataBus & 0x3) << 10)); // using 'databus' here for 1 ppu cycle is the cause of the scanline bug.
-
-                    switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
-                    {
-                        case 0:
-                            PPU_Update2000Delay = 2; break;
-                        case 1:
-                            PPU_Update2000Delay = 2; break;
-                        case 2:
-                            PPU_Update2000Delay = 1; break; // the bug does not happen, as this PPU cycle fixes it.
-                        case 3:
-                            PPU_Update2000Delay = 1; break; // the bug does not happen, as this PPU cycle fixes it.
-                    }
-                    PPU_Update2000Value = In;
-
+                    PPUControlIncrementMode32 = (In & 0x4) != 0;
+                    PPU_Spritex16 = (In & 0x20) != 0;
+                    PPU_PatternSelect_Sprites = (In & 0x8) != 0;
+                    PPU_PatternSelect_Background = (In & 0x10) != 0;
+                    PPU_t = (ushort)((PPU_t & 0b0111001111111111) | ((In & 0x3) << 10)); // change which nametable to render.
+                    PPU_EXT_Enable = (In & 0x40) == 0x40;
 
                     break;
 
@@ -9466,27 +9398,35 @@ namespace TriCNES
                     {
                         return;
                     }
-                    switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
-                    {
-                        case 0:
-                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; PPU_Update2001OAMCorruptionDelay = 2; break;
-                        case 1:
-                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 1; PPU_Update2001OAMCorruptionDelay = 3; break; // PPU_Update2001EmphasisBitsDelay is actually 2, but different behavior than case 0 and 3.
-                        case 2:
-                            PPU_Update2001Delay = 3; PPU_Update2001EmphasisBitsDelay = 1; PPU_Update2001OAMCorruptionDelay = 3; break; // PPU_Update2001EmphasisBitsDelay is actually 2, but different behavior than case 0 and 3.
-                        case 3:
-                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; PPU_Update2001OAMCorruptionDelay = 2; break;
-                    }
+
+                    EmulateNMasterClockCycles(1); // wait for PPUSEL to go high
+
+
+                    PPU_Mask_EmphasizeBlue = (dataBus & 0x80) != 0;
+                    PPU_Mask_Greyscale = (dataBus & 0x1) != 0;
+
+                    EmulateNMasterClockCycles(3); // wait for the CPU databus to change. (that's right, it doesn't happen at the start of the write cycle!)
+
+                    PPU_Mask_EmphasizeBlue = (In & 0x80) != 0;
+                    PPU_Mask_EmphasizeGreen = (In & 0x40) != 0;
+                    PPU_Mask_EmphasizeRed = (In & 0x20) != 0;
+                    PPU_Mask_Greyscale = (In & 0x1) != 0;
+
+                    EmulateNMasterClockCycles(3); // wait for PPUSEL to go low.
+
                     PPU_WasRenderingBefore2001Write = PPU_Mask_ShowBackground || PPU_Mask_ShowSprites;
+
+                    PPU_Mask_8PxShowBackground = (In & 0x02) != 0;
+                    PPU_Mask_8PxShowSprites = (In & 0x04) != 0;
+                    PPU_Mask_ShowBackground = (In & 0x08) != 0;
+                    PPU_Mask_ShowSprites = (In & 0x10) != 0;
+
+                    PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
+                    PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
+
+                    // TODO: Remove this hard-coded junk:
                     bool temp_rendering = PPU_WasRenderingBefore2001Write;
                     bool temp_renderingFromInput = ((In & 0x08) != 0) || ((In & 0x10) != 0);
-                    //PPU_Mask_8PxShowBackground = (dataBus & 0x02) != 0;
-                    //PPU_Mask_8PxShowSprites = (dataBus & 0x04) != 0;
-                    PPU_Mask_ShowBackground_Instant = (dataBus & 0x08) != 0;
-                    PPU_Mask_ShowSprites_Instant = (dataBus & 0x10) != 0;
-
-
-
                     // disabling rendering can cause OAM corruption.
                     if (temp_rendering && !temp_renderingFromInput)
                     {
@@ -9526,21 +9466,6 @@ namespace TriCNES
                             }
                         }
                     }
-
-                    // this part happens immediately though?
-                    if (PPU_Update2001EmphasisBitsDelay == 2)
-                    {
-                        PPU_Mask_Greyscale = (dataBus & 0x01) != 0;
-                        PPU_Mask_EmphasizeBlue = (dataBus & 0x80) != 0;
-                    }
-                    else
-                    {
-                        PPU_Update2001EmphasisBitsDelay++; // it's always 2.
-                    }
-                    PPU_Mask_EmphasizeRed = (In & 0x20) != 0;
-                    PPU_Mask_EmphasizeGreen = (In & 0x40) != 0;
-
-                    PPU_Update2001Value = In;
 
                     break;
 
@@ -9627,10 +9552,10 @@ namespace TriCNES
                         PPU_Update2006Value_Temp = PPU_v;
                         switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
                         {
-                            case 0: PPU_Update2006Delay = 5; break;
-                            case 1: PPU_Update2006Delay = 5; break;
-                            case 2: PPU_Update2006Delay = 6; break;
-                            case 3: PPU_Update2006Delay = 5; break;
+                            case 0: PPU_Update2006Delay = 4; break;
+                            case 1: PPU_Update2006Delay = 4; break;
+                            case 2: PPU_Update2006Delay = 5; break;
+                            case 3: PPU_Update2006Delay = 4; break;
                         }
                     }
                     PPUAddrLatch = !PPUAddrLatch;
@@ -9642,7 +9567,7 @@ namespace TriCNES
                     PPUBus = In;
                     PPU_2007_WriteData = PPUBus;
                     for (int i = 0; i < 8; i++) { PPUBusDecay[i] = PPUBusDecayConstant; }
-                    EmulateUntilEndOfRead(); // or in this case, write.
+                    EmulateNMasterClockCycles(7); // wait for PPUSEL to go low
                     PPU_2007_Write = true;
                     PPU_2007_Write_SR = true; // set the SR latch at the end of the CPU write. Here's where the clock alignment differences begin. :)
                     break;
@@ -10427,16 +10352,25 @@ namespace TriCNES
             string Addr = "Address: " + PPU_AddressBus.ToString("X4") + "\t";
             string Octal = "OctalLatch: " + PPU_OctalLatch.ToString("X2") + "\t";
             string enabled = "[" + (PPU_Mask_ShowSprites ? "S" : "-") + (PPU_Mask_ShowBackground ? "B" : "-") + "]\t";
+            string ALE = "ALE: " + (PPU_ALE?"1":"0") + "\t";
+            string RD = "RD: " + (PPU_READ ? "1" : "0") + "\t";
+            string BSR_Lo = "BSRL: " + Convert.ToString(PPU_BackgroundPatternShiftRegisterL, 2).PadLeft(16, '0') + "\t";
+            string BSR_Hi = "BSRH: " + Convert.ToString(PPU_BackgroundPatternShiftRegisterH, 2).PadLeft(16, '0') + "\t";
+
             string EightCycleRead = "";
             if ((PPU_Dot >= 1 && PPU_Dot <= 256) || (PPU_Dot >= 321 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
             {
                 if(PPU_Mask_ShowSprites || PPU_Mask_ShowBackground)
                 {
-                    EightCycleRead =  "8CycleReadTick: " + ((byte)((PPU_Dot + 7) & 7)).ToString();
+                    EightCycleRead =  "8CycleReadTick: " + ((byte)((PPU_Dot + 7) & 7)).ToString() + "\t";
+                }
+                else
+                {
+                    EightCycleRead = "8CycleReadTick: -\t";
                 }
             }
 
-            string LogLine = "(" + PPU_Scanline.ToString() + ", " + PPU_Dot.ToString() + ")  \t" + Addr + Octal + EightCycleRead + dotColor + enabled + MMC3;
+            string LogLine = "(" + PPU_Scanline.ToString() + ", " + PPU_Dot.ToString() + ")  \t" + Addr + Octal + EightCycleRead + dotColor + enabled + MMC3 + ALE + RD + BSR_Lo + BSR_Hi;
             DebugLog.AppendLine(LogLine);
         }
 
@@ -10669,7 +10603,6 @@ namespace TriCNES
             State.Add((byte)(PPU_Commit_AttributeFetch ? 1 : 0));
             State.Add((byte)(PPU_Commit_PatternLowFetch ? 1 : 0));
             State.Add((byte)(PPU_Commit_PatternHighFetch ? 1 : 0));
-            State.Add((byte)(PPU_Commit_LoadShiftRegisters ? 1 : 0));
 
             State.Add((byte)PPU_VRAM_MysteryAddress);
             State.Add((byte)(PPU_VRAM_MysteryAddress >> 8));
@@ -10678,12 +10611,7 @@ namespace TriCNES
             State.Add(PPU_Update2006Delay);
             State.Add(PPU_Update2005Delay);
             State.Add(PPU_Update2005Value);
-            State.Add(PPU_Update2001Delay);
-            State.Add(PPU_Update2001EmphasisBitsDelay);
-            State.Add(PPU_Update2001OAMCorruptionDelay);
             State.Add(PPU_Update2001Value);
-            State.Add(PPU_Update2000Delay);
-            State.Add(PPU_Update2000Value);
             State.Add((byte)PPU_Update2006Value);
             State.Add((byte)(PPU_Update2006Value >> 8));
             State.Add((byte)PPU_Update2006Value_Temp);
@@ -10707,8 +10635,8 @@ namespace TriCNES
             State.Add((byte)(DMCDMA_Halt ? 1 : 0));
             State.Add(OAM_InternalBus);
 
-            State.Add((byte)PPU_PatternAddressRegister);
-            State.Add((byte)(PPU_PatternAddressRegister >> 8));
+            State.Add((byte)PPU_PatternAddressRegister_CHR);
+            State.Add((byte)(PPU_PatternAddressRegister_CHR >> 8));
             State.Add((byte)(PPU_ALE ? 1 : 0));
             State.Add(PPU_OctalLatch);
 
@@ -10976,7 +10904,6 @@ namespace TriCNES
             PPU_Commit_AttributeFetch = (State[p++] & 1) == 1;
             PPU_Commit_PatternLowFetch = (State[p++] & 1) == 1;
             PPU_Commit_PatternHighFetch = (State[p++] & 1) == 1;
-            PPU_Commit_LoadShiftRegisters = (State[p++] & 1) == 1;
 
             PPU_VRAM_MysteryAddress = State[p++];
             PPU_VRAM_MysteryAddress |= (ushort)(State[p++] << 8);
@@ -10985,12 +10912,7 @@ namespace TriCNES
             PPU_Update2006Delay = State[p++];
             PPU_Update2005Delay = State[p++];
             PPU_Update2005Value = State[p++];
-            PPU_Update2001Delay = State[p++];
-            PPU_Update2001EmphasisBitsDelay = State[p++];
-            PPU_Update2001OAMCorruptionDelay = State[p++];
             PPU_Update2001Value = State[p++];
-            PPU_Update2000Delay = State[p++];
-            PPU_Update2000Value = State[p++];
             PPU_Update2006Value = State[p++];
             PPU_Update2006Value |= (ushort)(State[p++] << 8);
             PPU_Update2006Value_Temp = State[p++];
@@ -11014,8 +10936,8 @@ namespace TriCNES
             DMCDMA_Halt = (State[p++] & 1) == 1;
             OAM_InternalBus = State[p++];
 
-            PPU_PatternAddressRegister = State[p++];
-            PPU_PatternAddressRegister |= (ushort)(State[p++] << 8);
+            PPU_PatternAddressRegister_CHR = State[p++];
+            PPU_PatternAddressRegister_CHR |= (ushort)(State[p++] << 8);
             PPU_ALE = (State[p++] & 1) == 1;
             PPU_OctalLatch = State[p++];
 
