@@ -683,7 +683,9 @@ namespace TriCNES
                 _6502(); // This is where I run the CPU
                 totalCycles++;         // for debugging mostly
                 Cart.MapperChip.CPUClock(); // If the mapper chip does every cpu cycle... (see FME-7)
-
+            }
+            if (CPUClock == 4)
+            {
                 NMILine |= PPUControl_NMIEnabled && PPUStatus_VBlank;
                 if (operationCycle == 0 && !(PPUStatus_VBlank && PPUControl_NMIEnabled))
                 {
