@@ -102,6 +102,7 @@ namespace TriCNES
 
             MapperChip = new Mapper_FDS(ROM);
             MapperChip.Cart = this;
+            FDS.Cart = this;
         }
 
         public bool NametableHorizontalMirroring;
@@ -208,6 +209,10 @@ namespace TriCNES
         {
         }
 
+        public virtual void FDS_ByteTransferFlag()
+        {
+        }
+
         protected void EndFetchPRG(bool Observe, byte data)
         {
             if (!Observe)
@@ -225,6 +230,7 @@ namespace TriCNES
 
     public class DiskDrive
     {
+        public Cartridge Cart;
         public byte[] Disk;
         public byte ShiftRegister;
         public bool IRQ;
@@ -239,6 +245,10 @@ namespace TriCNES
             {
                 clock = 0;
 
+                // disk drive is ready.
+                // raise the byte transfer flag!
+                Status_ByteTransferFlag = true;
+                Cart.MapperChip.FDS_ByteTransferFlag(); // Trigger an IRQ if $4025.7 is set.
 
             }
         }
@@ -649,7 +659,6 @@ namespace TriCNES
             while (!FrameAdvance_ReachedVBlank)
             {
                 _EmulatorCore();
-                _EmulatorCoreHalf();
             }
         }
 
@@ -661,7 +670,6 @@ namespace TriCNES
             while (i < 12)
             {
                 _EmulatorCore();
-                _EmulatorCoreHalf();
                 i++;
             }
             CycleCountForCycleTAS++;
@@ -691,6 +699,15 @@ namespace TriCNES
                 {
                     NMILine = false;
                 }
+            }
+            if (CPUClock == 7) //M2 going low.
+            {
+                IRQLine = IRQ_LevelDetector;
+                if (APU_Status_FrameInterrupt && !APU_FrameCounterInhibitIRQ)
+                {
+                    IRQ_LevelDetector = true; // if the APU frame counter flag is never cleared, you will get another IRQ when the I flag is cleared.
+                }
+                Cart.MapperChip.CPUClockRise(); // If the mapper chip does something when M2 rises... (see MMC3)
             }
             if (PPUClock == 4)
             {
@@ -728,21 +745,6 @@ namespace TriCNES
                 Cart.FDS.Clock();
             }
         }
-        public void _EmulatorCoreHalf()
-        {
-            // half master clock cycles.
-            if (CPUClock == 7) //M2 going low.
-            {
-                IRQLine = IRQ_LevelDetector;
-                if (APU_Status_FrameInterrupt && !APU_FrameCounterInhibitIRQ)
-                {
-                    IRQ_LevelDetector = true; // if the APU frame counter flag is never cleared, you will get another IRQ when the I flag is cleared.
-                }
-                Cart.MapperChip.CPUClockRise(); // If the mapper chip does something when M2 rises... (see MMC3)
-            }
-
-        }
-
 
         public void EmulateUntilEndOfRead()
         {
@@ -751,7 +753,6 @@ namespace TriCNES
             for (int i = 0; i < 7; i++)
             {
                 _EmulatorCore();
-                _EmulatorCoreHalf();
             }
         }
 
@@ -761,7 +762,6 @@ namespace TriCNES
             for (int i = 0; i < n; i++)
             {
                 _EmulatorCore();
-                _EmulatorCoreHalf();
             }
         }
 
@@ -1499,9 +1499,13 @@ namespace TriCNES
 
             //but to complicate things, the delay after writing to $2001 happens between those 2 steps, and also on a specific alignment, this delay is 1 cycle longer for sprite evaluation.
 
-
-
-            
+            // If this is NOT phase 1
+            if ((CPUClock & 3) != 3)
+            {
+                // sprite evaluation has a 1 ppu cycle delay before recognizing these flags were set or cleared.
+                PPU_Mask_ShowBackground_Delayed = PPU_Mask_ShowBackground;
+                PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
+            }
 
             PPU_DATA_StateMachine();
 
@@ -1514,15 +1518,62 @@ namespace TriCNES
                 }
             }
 
-            // sprite evaluation has a 1 ppu cycle delay before recognizing these flags were set or cleared.
-            PPU_Mask_ShowBackground_Delayed = PPU_Mask_ShowBackground;
-            PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
+            if ((CPUClock & 3) == 3)
+            {
+                // on phase 1,
+                // sprite evaluation has a 2 ppu cycle delay before recognizing these flags were set or cleared.
+                PPU_Mask_ShowBackground_Delayed = PPU_Mask_ShowBackground;
+                PPU_Mask_ShowSprites_Delayed = PPU_Mask_ShowSprites;
+            }
 
             if (!PPU_Mask_ShowBackground && !PPU_Mask_ShowSprites)
             {
                 PPU_AddressBus = PPU_v; // the address bus is always v when rendering is disabled.
-                // TODO: Is this occuring one ppu cycles too late???
+                // TODO: Is this occuring one ppu cycle too late???
                 // I specifically moved this here (outside of the following if statements) because it broke nes_reset_state_detect-letters.nes on alignment 1.
+            }
+            // after sprite evaluation, but before screen rendering...
+            if (PPU_Update2001Delay > 0) // if we wrote to 2001 recently
+            {
+                PPU_Update2001Delay--;
+                if (PPU_Update2001Delay == 0) // if we've waited enough cycles, apply the changes
+                {
+                    PPU_Mask_8PxShowBackground = (PPU_Update2001Value & 0x02) != 0;
+                    PPU_Mask_8PxShowSprites = (PPU_Update2001Value & 0x04) != 0;
+                    PPU_Mask_ShowBackground = (PPU_Update2001Value & 0x08) != 0;
+                    PPU_Mask_ShowSprites = (PPU_Update2001Value & 0x10) != 0;
+
+                    PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
+                    PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
+                }
+            }
+            if (PPU_Update2001OAMCorruptionDelay > 0) // if we wrote to 2001 recently
+            {
+                PPU_Update2001OAMCorruptionDelay--;
+                if (PPU_Update2001OAMCorruptionDelay == 0) // if we've waited enough cycles, apply the changes
+                {
+                    if (PPU_WasRenderingBefore2001Write && (PPU_Update2001Value & 0x08) == 0 && (PPU_Update2001Value & 0x10) == 0)
+                    {
+                        if ((PPU_Scanline < 240 || PPU_Scanline == 261)) // if this is the pre-render line, or any line before vblank
+                        {
+                            if (!PPU_PendingOAMCorruption) // due to OAM corruption occurring inside OAM evaluation before this even occurs, make sure OAM isn't already corrupt
+                            {
+                                PPU_OAMCorruptionRenderingDisabledOutOfVBlank = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (PPU_Update2001EmphasisBitsDelay > 0)
+            {
+                PPU_Update2001EmphasisBitsDelay--;
+                if (PPU_Update2001EmphasisBitsDelay == 0)
+                {
+                    PPU_Mask_Greyscale = (PPU_Update2001Value & 0x01) != 0;
+                    PPU_Mask_EmphasizeRed = (PPU_Update2001Value & 0x20) != 0;
+                    PPU_Mask_EmphasizeGreen = (PPU_Update2001Value & 0x40) != 0;
+                    PPU_Mask_EmphasizeBlue = (PPU_Update2001Value & 0x80) != 0;
+                }
             }
 
             PrevPrevPrevDotColor = PrevPrevDotColor; // Drawing a color to the screen has a 3(?) ppu cycle delay between deciding the color, and drawing it.
@@ -1532,14 +1583,14 @@ namespace TriCNES
             {
                 if ((PPU_Dot >= 1 && PPU_Dot <= 256) || (PPU_Dot >= 321 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
                 {
-                    if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
+                    if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering background or sprites
                     {
                         PPU_Render_ShiftRegistersAndBitPlanes(); // update shift registers for the background.
                     }
                 }
                 else if (PPU_Dot >= 337 || PPU_Dot == 0)
                 {
-                    if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
+                    if ((PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed)) // if rendering background or sprites
                     {
                         PPU_Render_ShiftRegistersAndBitPlanes_DummyNT();
                     }
@@ -1738,10 +1789,7 @@ namespace TriCNES
             PPU_2007_Write_Latches[4] = !PPU_2007_Write_Latches[3];
             PPU_2007_WriteALE = !PPU_2007_Write_Latches[4] && PPU_2007_Write_Latches[2];
 
-
-            PPU_2007_TStep = (PPU_2007_TStep_Latch || PPU_2007_PD_RB);
             PPU_2007_TStep_Latch = PPU_2007_DB_PAR;
-
            
             bool b = (!BLNK && !H0_DASH); // If you are on an even dot out of a blanking period
             PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE || b);
@@ -1757,16 +1805,17 @@ namespace TriCNES
         }
         void PPU_DATA_StateMachine2()
         {
-            if (PPU_2007_TStep) // If this occurs inside PPU_DATA_StateMachine() instead, the timing is wrong, and this breaks SMB1's title screen.
-            {
-                PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
-                if (!PPU_2007_BLNK_Latch)
-                {
-                    PPU_IncrementScrollY();
-                }
-            }
+            
             if (PPU_2007_PD_RB)
             {
+                if(PPU_v == 0x1F00)
+                {
+
+                }
+                if (PPU_v == 0x1EFF)
+                {
+
+                }
                 PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
                 if (PPU_ALE)
                 {
@@ -1776,8 +1825,17 @@ namespace TriCNES
         }
         void PPU_DATA_StateMachine_Half()
         {
-            PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE);
+            PPU_2007_TStep = (PPU_2007_TStep_Latch || PPU_2007_PD_RB);
+            if (PPU_2007_TStep) // If this occurs inside PPU_DATA_StateMachine() instead, the timing is wrong, and this breaks SMB1's title screen.
+            {
+                PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
+                if (!PPU_2007_BLNK_Latch)
+                {
+                    PPU_IncrementScrollY();
+                }
+            }
 
+            PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE);
             if (PPU_2007_PD_RB)
             {
                 PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
@@ -2794,7 +2852,7 @@ namespace TriCNES
                     // case 7 then leads back to case 0.
 
                     case 0: // Y position         dot 257, (+8), (+16) ...
-                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
+                        if (PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed) // if rendering has been enabled for at least one cycle
                         {
                             // set this object's Y position in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2809,7 +2867,7 @@ namespace TriCNES
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
                         break;
                     case 1: // Pattern            dot 258, (+8), (+16) ...
-                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
+                        if (PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed) // if rendering has been enabled for at least one cycle
                         {
                             // set this object's pattern in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2819,7 +2877,7 @@ namespace TriCNES
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
                         break;
                     case 2: // Attribute          dot 259, (+8), (+16) ...
-                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
+                        if (PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed) // if rendering has been enabled for at least one cycle
                         {
                             // set this object's attribute in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2832,7 +2890,7 @@ namespace TriCNES
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
                         break;
                     case 3: // X position         dot 260, (+8), (+16) ...
-                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
+                        if (PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed) // if rendering has been enabled for at least one cycle
                         {
                             // set this object's X position in the array
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2843,7 +2901,7 @@ namespace TriCNES
                         // notably, the secondary OAM address does not get incremented until case 7
                         break;
                     case 4: // X position (again) dot 261, (+8), (+16) ...
-                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
+                        if (PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed) // if rendering has been enabled for at least one cycle
                         {
                             // set this object's X position in the array... again.
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2858,7 +2916,7 @@ namespace TriCNES
 
                         break;
                     case 5: // X position (again)  dot 262, (+8), (+16) ...
-                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
+                        if (PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed) // if rendering has been enabled for at least one cycle
                         {
                             // set this object's X position in the array... again.
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2883,7 +2941,7 @@ namespace TriCNES
 
                         break;
                     case 6: // X position (again)  dot 263, (+8), (+16) ...
-                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
+                        if (PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed) // if rendering has been enabled for at least one cycle
                         {
                             // set this object's X position in the array... again.
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -2900,7 +2958,7 @@ namespace TriCNES
                         break;
 
                     case 7: // X position (again)  dot 264, (+8), (+16) ...
-                        if (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) // if rendering is enabled
+                        if (PPU_Mask_ShowBackground_Delayed || PPU_Mask_ShowSprites_Delayed) // if rendering has been enabled for at least one cycle
                         {
                             // set this object's X position in the array... again.
                             PPU_OAMLatch = OAM2[OAM2Address]; // Updating PPU_SpriteEvaluationTemp so reading from $2004 works properly.
@@ -8810,6 +8868,10 @@ namespace TriCNES
         ushort PPU_Update2006Value;   // The value written to $2006, for use when the delay has ended.
         ushort PPU_Update2006Value_Temp;
 
+        byte PPU_Update2001Delay;   // The number of PPU cycles to wait between writing to $2001 and the ppu from updating
+        byte PPU_Update2001OAMCorruptionDelay; // I plan to refactor 2001 writes and remove the hard-coded delays. This will be removed eventually.
+        byte PPU_Update2001EmphasisBitsDelay; //  I plan to refactor 2001 writes and remove the hard-coded delays. This will be removed eventually.
+
         bool PPU_WasRenderingBefore2001Write; // Were we rendering before writing to $2001? (used for OAM corruption)
 
         byte PPU_ReadBuffer = 0; // when reading from $2007, this buffer holds the value from VRAM that gets read. Updated after reading from $2007.
@@ -9400,21 +9462,25 @@ namespace TriCNES
                     {
                         return;
                     }
-
+                    // Okay look, I *know* this hard-coded solution is jank and sloppy.
+                    // It is temporary.
+                    // I want to re-do the picture processing unit from the ground up, honestly.
+                    // In the mean time, let's go back to the hard-coded delays. I got the correct results from the tests while doing this.
+                    // And we can fix it later.
+                    /*
                     EmulateNMasterClockCycles(1); // wait for PPUSEL to go high
-
 
                     PPU_Mask_EmphasizeBlue = (dataBus & 0x80) != 0;
                     PPU_Mask_Greyscale = (dataBus & 0x1) != 0;
 
-                    EmulateNMasterClockCycles(3); // wait for the CPU databus to change. (that's right, it doesn't happen at the start of the write cycle!)
+                    EmulateNMasterClockCycles(2); // wait for the CPU databus to change. (that's right, it doesn't happen at the start of the write cycle!)
 
                     PPU_Mask_EmphasizeBlue = (In & 0x80) != 0;
                     PPU_Mask_EmphasizeGreen = (In & 0x40) != 0;
                     PPU_Mask_EmphasizeRed = (In & 0x20) != 0;
                     PPU_Mask_Greyscale = (In & 0x1) != 0;
 
-                    EmulateNMasterClockCycles(3); // wait for PPUSEL to go low.
+                    EmulateNMasterClockCycles(4); // wait for PPUSEL to go low.
 
                     PPU_WasRenderingBefore2001Write = PPU_Mask_ShowBackground || PPU_Mask_ShowSprites;
 
@@ -9425,7 +9491,23 @@ namespace TriCNES
 
                     PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
                     PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
+                    */
 
+
+                    switch (PPUClock & 3) //depending on CPU/PPU alignment, the delay could be different.
+                    {
+                        case 0:
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; PPU_Update2001OAMCorruptionDelay = 2; break;
+                        case 1:
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 1; PPU_Update2001OAMCorruptionDelay = 3; break; // PPU_Update2001EmphasisBitsDelay is actually 2, but different behavior than case 0 and 3.
+                        case 2:
+                            PPU_Update2001Delay = 3; PPU_Update2001EmphasisBitsDelay = 1; PPU_Update2001OAMCorruptionDelay = 3; break; // PPU_Update2001EmphasisBitsDelay is actually 2, but different behavior than case 0 and 3.
+                        case 3:
+                            PPU_Update2001Delay = 2; PPU_Update2001EmphasisBitsDelay = 2; PPU_Update2001OAMCorruptionDelay = 2; break;
+                    }
+                    PPU_WasRenderingBefore2001Write = PPU_Mask_ShowBackground || PPU_Mask_ShowSprites;
+                    PPU_Mask_ShowBackground_Instant = PPU_Mask_ShowBackground; // now that the PPU has updated, OAM evaluation will also recognize the change
+                    PPU_Mask_ShowSprites_Instant = PPU_Mask_ShowSprites;
                     // TODO: Remove this hard-coded junk:
                     bool temp_rendering = PPU_WasRenderingBefore2001Write;
                     bool temp_renderingFromInput = ((In & 0x08) != 0) || ((In & 0x10) != 0);
@@ -9468,6 +9550,21 @@ namespace TriCNES
                             }
                         }
                     }
+
+                    // This is temp. I know it's wrong (we're not even waiting for PPUSEL here.) but I'll fix it after redoing the entire ppu or something.
+                    if (PPU_Update2001EmphasisBitsDelay == 2)
+                    {
+                        PPU_Mask_Greyscale = (dataBus & 0x01) != 0;
+                        PPU_Mask_EmphasizeBlue = (dataBus & 0x80) != 0;
+                    }
+                    else
+                    {
+                        PPU_Update2001EmphasisBitsDelay++; // it's always 2.
+                    }
+                    PPU_Mask_EmphasizeRed = (In & 0x20) != 0;
+                    PPU_Mask_EmphasizeGreen = (In & 0x40) != 0;
+
+                    PPU_Update2001Value = In;
 
                     break;
 
@@ -10662,6 +10759,11 @@ namespace TriCNES
             State.Add(PPU_2007_WriteData);
             State.Add((byte)(PPU_WRITE ? 1 : 0));
 
+            State.Add(PPU_Update2001Delay);              // TEMPORARY
+            State.Add(PPU_Update2001OAMCorruptionDelay); // TEMPORARY
+            State.Add(PPU_Update2001EmphasisBitsDelay);  // TEMPORARY
+
+
             foreach (Byte b in RAM) { State.Add(b); }
             foreach (Byte b in VRAM) { State.Add(b); }
             foreach (Byte b in OAM) { State.Add(b); }
@@ -10962,6 +11064,10 @@ namespace TriCNES
             PPU_2007_PaletteRAMEnable = (State[p++] & 1) == 1;
             PPU_2007_WriteData = State[p++];
             PPU_WRITE = (State[p++] & 1) == 1;
+            
+            PPU_Update2001Delay = State[p++];              //TOMPORARY
+            PPU_Update2001OAMCorruptionDelay = State[p++]; //TOMPORARY
+            PPU_Update2001EmphasisBitsDelay = State[p++];  //TOMPORARY
 
             for (int i = 0; i < RAM.Length; i++) { RAM[i] = State[p++]; }
             for (int i = 0; i < VRAM.Length; i++) { VRAM[i] = State[p++]; }
