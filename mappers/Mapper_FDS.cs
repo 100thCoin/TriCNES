@@ -8,6 +8,7 @@ namespace TriCNES.mappers
         // The Famicom Disk System
         public byte[] FDS_BIOS;
 
+        public byte FDS_4023_IOEnable;
         public byte FDS_4025_Control;
 
         public Mapper_FDS(byte[] fds_bios)
@@ -44,6 +45,13 @@ namespace TriCNES.mappers
                     case 0:
                         {
                             // FDS Status ($4030)
+                            notFloating = true;
+                            data = 0;
+
+                            data |= (byte)((FDS_4025_Control >> 3) & 1); // 4030.3 = 4025.3
+
+                            data |= (byte)(Cart.FDS.Status_ByteTransferFlag ? 0x80 : 0); // 4030.7 = Byte Transfer Flag
+
 
                         }
                         break;
@@ -51,7 +59,8 @@ namespace TriCNES.mappers
                         {
                             // Disk Data Input ($4031)
                             notFloating = true;
-                            data = Cart.FDS.ShiftRegister;
+                            data = Cart.FDS.ShiftRegisterLatch;
+                            Cart.FDS.Status_ByteTransferFlag = false;
                             Cart.Emu.IRQ_LevelDetector = false; //acknowledge the IRQ
                         }
                         break;
@@ -94,6 +103,18 @@ namespace TriCNES.mappers
                 ushort tempo = (ushort)(Address & 0x40FF);
                 switch (tempo)
                 {
+                    case 0x4023:
+                        FDS_4023_IOEnable = Input;
+                        if((FDS_4023_IOEnable & 1) == 0)
+                        {
+                            // Disable disk I/O registers
+                            Cart.Emu.IRQ_LevelDetector = false; //acknowledge the IRQ
+                            FDS_4025_Control = 6;
+                        }
+                        return;
+                    case 0x4024:
+                        Cart.FDS.Status_ByteTransferFlag = false;
+                        return;
                     case 0x4025:
                         FDS_4025_Control = Input;
                         return;
@@ -108,6 +129,10 @@ namespace TriCNES.mappers
                 Cart.Emu.IRQ_LevelDetector = true;
             }
         }
+        public override byte FDS_Get4025()
+        {
+            return FDS_4025_Control;
+        }
 
         public override List<byte> SaveMapperRegisters()
         {
@@ -119,6 +144,10 @@ namespace TriCNES.mappers
             State.Add((byte)Cart.FDS.clock);
             State.Add((byte)(Cart.FDS.clock >> 8));
             State.Add((byte)Cart.FDS.ShiftRegister);
+            State.Add((byte)Cart.FDS.ShiftRegisterLatch);            
+            State.Add((byte)Cart.FDS.DiskAddress);
+            State.Add((byte)(Cart.FDS.DiskAddress >> 8));
+            State.Add((byte)Cart.FDS.DiskAddressFine);
             return State;
         }
         public override void LoadMapperRegisters(List<byte> State, int startIndex, out int exitIndex)
@@ -131,6 +160,10 @@ namespace TriCNES.mappers
             Cart.FDS.clock = State[p++];
             Cart.FDS.clock |= (ushort)(State[p++] << 8);
             Cart.FDS.ShiftRegister = State[p++];
+            Cart.FDS.ShiftRegisterLatch = State[p++];
+            Cart.FDS.DiskAddress = State[p++];
+            Cart.FDS.DiskAddress |= (ushort)(State[p++] << 8);
+            Cart.FDS.DiskAddressFine = State[p++];
 
             exitIndex = p;
         }

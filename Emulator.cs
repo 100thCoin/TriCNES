@@ -212,6 +212,10 @@ namespace TriCNES
         public virtual void FDS_ByteTransferFlag()
         {
         }
+        public virtual byte FDS_Get4025()
+        {
+            return 0;
+        }
 
         protected void EndFetchPRG(bool Observe, byte data)
         {
@@ -233,18 +237,42 @@ namespace TriCNES
         public Cartridge Cart;
         public byte[] Disk;
         public byte ShiftRegister;
+        public byte ShiftRegisterLatch;
         public bool IRQ;
         public ushort clock; // every 1792 master clock cycles,
+
+        public ushort DiskAddress;
+        public byte DiskAddressFine;
 
         public bool Status_ByteTransferFlag;
 
         public void Clock()
         {
             clock++;
+            if(clock % 244 == 0)
+            {
+                if ((Cart.MapperChip.FDS_Get4025() & 0x46) == 0x44)
+                {
+                    // reading
+
+                    byte ShiftBit = (byte)((Disk[DiskAddress] << DiskAddressFine) & 1);
+                    ShiftRegister <<= 1;
+                    ShiftRegister |= ShiftBit;
+                    DiskAddressFine++;
+                    if (DiskAddressFine == 8)
+                    {
+                        DiskAddressFine = 0;
+                        DiskAddress++;
+                    }
+                }
+            }
+
             if(clock == 1792)
             {
                 clock = 0;
+                DiskAddressFine = 0;
 
+                ShiftRegisterLatch = ShiftRegister;
                 // disk drive is ready.
                 // raise the byte transfer flag!
                 Status_ByteTransferFlag = true;
@@ -305,6 +333,8 @@ namespace TriCNES
         public byte H = 0;           // The High byte of the target address. A couple unofficial instructions use this value.
         public bool IgnoreH;         // However, with a well-timed DMA, the H register isn't actually part of the equation on some of those.
         public byte dataBus = 0;     // The Data Bus.
+        public byte internalBus = 0; // The Data Bus (internal to address $4015)
+
         public ushort addressBus = 0;// The Address Bus. "Where are we reading/writing"
         public byte specialBus = 0;  // The Special Bus is used in certain instructions. (The special bus is mostly used in half-CPU-cycles connecting the various registers to the alu)
         public byte dl = 0;          // Data Latch. This holds values between CPU cycles that are used in later cycles within an instruction.
@@ -1808,14 +1838,6 @@ namespace TriCNES
             
             if (PPU_2007_PD_RB)
             {
-                if(PPU_v == 0x1F00)
-                {
-
-                }
-                if (PPU_v == 0x1EFF)
-                {
-
-                }
                 PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
                 if (PPU_ALE)
                 {
@@ -1828,10 +1850,13 @@ namespace TriCNES
             PPU_2007_TStep = (PPU_2007_TStep_Latch || PPU_2007_PD_RB);
             if (PPU_2007_TStep) // If this occurs inside PPU_DATA_StateMachine() instead, the timing is wrong, and this breaks SMB1's title screen.
             {
-                PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
                 if (!PPU_2007_BLNK_Latch)
                 {
                     PPU_IncrementScrollY();
+                }
+                else
+                {
+                    PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
                 }
             }
 
@@ -3568,15 +3593,11 @@ namespace TriCNES
         }
 
 
-
-
-
         byte PPU_RenderTemp; // a variable used in the following function to store information between ppu cycles.
         bool PPU_Commit_NametableFetch;
         bool PPU_Commit_AttributeFetch;
         bool PPU_Commit_PatternLowFetch;
         bool PPU_Commit_PatternHighFetch;
-
 
         void PPU_Render_ShiftRegistersAndBitPlanes()
         {
@@ -9077,16 +9098,14 @@ namespace TriCNES
                 if (Reg == 0x15)
                 {
 
-                    byte InternalBus = dataBus;
-
-                    InternalBus &= 0x20;
-                    InternalBus |= (byte)(APU_Status_DMCInterrupt ? 0x80 : 0);
-                    InternalBus |= (byte)(APU_Status_FrameInterrupt ? 0x40 : 0);
-                    InternalBus |= (byte)((APU_DMC_BytesRemaining != 0 && APU_Status_DelayedDMC) ? 0x10 : 0); // see footnote.
-                    InternalBus |= (byte)((APU_LengthCounter_Noise != 0) ? 0x08 : 0);
-                    InternalBus |= (byte)((APU_LengthCounter_Triangle != 0) ? 0x04 : 0);
-                    InternalBus |= (byte)((APU_LengthCounter_Pulse2 != 0) ? 0x02 : 0);
-                    InternalBus |= (byte)((APU_LengthCounter_Pulse1 != 0) ? 0x01 : 0);
+                    internalBus &= 0x20;
+                    internalBus |= (byte)(APU_Status_DMCInterrupt ? 0x80 : 0);
+                    internalBus |= (byte)(APU_Status_FrameInterrupt ? 0x40 : 0);
+                    internalBus |= (byte)((APU_DMC_BytesRemaining != 0 && APU_Status_DelayedDMC) ? 0x10 : 0); // see footnote.
+                    internalBus |= (byte)((APU_LengthCounter_Noise != 0) ? 0x08 : 0);
+                    internalBus |= (byte)((APU_LengthCounter_Triangle != 0) ? 0x04 : 0);
+                    internalBus |= (byte)((APU_LengthCounter_Pulse2 != 0) ? 0x02 : 0);
+                    internalBus |= (byte)((APU_LengthCounter_Pulse1 != 0) ? 0x01 : 0);
 
                     Clearing_APU_FrameInterrupt = true;
 
@@ -9096,7 +9115,7 @@ namespace TriCNES
                     // The APU_DMC_BytesRemaining byte isn't cleared until 3 or 4 cycles after writing 0 to $4015.
                     // However, reading from $4015 after the needs to immediately have bit 4 cleared.
 
-                    return InternalBus; // reading from $4015 can not affect the databus
+                    return internalBus; // reading from $4015 can not affect the databus
                 }
                 else if (Reg == 0x16 || Reg == 0x17)
                 {
@@ -9127,6 +9146,7 @@ namespace TriCNES
                 }
             }
 
+            internalBus = dataBus;
             return dataBus;
         }
         public byte ObservePPU(ushort Address)
@@ -10762,7 +10782,6 @@ namespace TriCNES
             State.Add(PPU_Update2001Delay);              // TEMPORARY
             State.Add(PPU_Update2001OAMCorruptionDelay); // TEMPORARY
             State.Add(PPU_Update2001EmphasisBitsDelay);  // TEMPORARY
-
 
             foreach (Byte b in RAM) { State.Add(b); }
             foreach (Byte b in VRAM) { State.Add(b); }

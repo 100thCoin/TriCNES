@@ -396,38 +396,44 @@ namespace TriCNES
             return NametableBitmap.Bitmap;
         }
 
+        string fds_bios; // file path to the FDS bios if one is loaded.
         public bool LoadROM(string FilePath)
         {
             if (FDS)
             {
-                string InitDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                if (Directory.Exists(AppDomain.CurrentDomain.BaseDirectory + @"roms\"))
+                if (fds_bios == null || fds_bios.Length == 0)
                 {
-                    InitDirectory += @"roms\";
-                }
-                OpenFileDialog ofd = new OpenFileDialog()
-                {
-                    FileName = "",
-                    Title = "Select FDS BIOS",
-                    InitialDirectory = InitDirectory
-                };
-                if (ofd.ShowDialog() == DialogResult.OK)
-                {
-                    string fds_bios = ofd.FileName;
-                    byte[] FDS_BIOS = File.ReadAllBytes(fds_bios);
-                    if (FDS_BIOS.Length != 0x2000)
+                    string InitDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                    if (Directory.Exists(AppDomain.CurrentDomain.BaseDirectory + @"roms\"))
+                    {
+                        InitDirectory += @"roms\";
+                    }
+                    OpenFileDialog ofd = new OpenFileDialog()
+                    {
+                        FileName = "",
+                        Title = "Select FDS BIOS",
+                        InitialDirectory = InitDirectory
+                    };
+                    if (ofd.ShowDialog() == DialogResult.OK)
+                    {
+                        fds_bios = ofd.FileName;
+                        byte[] FDS_BIOS = File.ReadAllBytes(fds_bios);
+                        if (FDS_BIOS.Length != 0x2000)
+                        {
+                            fds_bios = "";
+                            return false;
+                        }
+                    }
+                    else
                     {
                         return false;
                     }
-                    Cartridge Cart = new Cartridge(filePath, fds_bios);
-                    EMU.Cart = Cart;
-                    Cart.Emu = EMU;
-                    return true;
                 }
-                else
-                {
-                    return false;
-                }
+
+                Cartridge Cart = new Cartridge(filePath, fds_bios);
+                EMU.Cart = Cart;
+                Cart.Emu = EMU;
+                return true;
             }
             else
             {
