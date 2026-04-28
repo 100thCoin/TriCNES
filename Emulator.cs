@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using TriCNES.mappers;
+using static System.Windows.Forms.AxHost;
 
 namespace TriCNES
 {
@@ -238,53 +239,212 @@ namespace TriCNES
         public byte[] Disk;
         public byte ShiftRegister;
         public byte ShiftRegisterLatch;
-        public bool IRQ;
-        public ushort clock; // every 1792 master clock cycles,
+        public int clock;
 
-        public ushort DiskAddress;
+        public int DiskAddress;
         public byte DiskAddressFine;
 
         public bool Status_ByteTransferFlag;
 
+        public enum RamAdapterState
+        {
+            RUNNING,
+            INSERTING,
+            SPINUP,
+            RESET,
+            IDLE
+        }
+
+        public RamAdapterState CurrentState;
+        public bool lookingForEndOfGap;
+
         public void Clock()
         {
             clock++;
-            if(clock % 244 == 0)
+            
+            switch(CurrentState)
             {
-                if ((Cart.MapperChip.FDS_Get4025() & 0x46) == 0x44)
-                {
-                    // reading
-
-                    byte ShiftBit = (byte)((Disk[DiskAddress] << DiskAddressFine) & 1);
-                    ShiftRegister <<= 1;
-                    ShiftRegister |= ShiftBit;
-                    DiskAddressFine++;
-                    if (DiskAddressFine == 8)
+                case RamAdapterState.RUNNING:
+                    if (clock == 244)
                     {
-                        DiskAddressFine = 0;
-                        DiskAddress++;
+                        clock = 0;
+                        if((Cart.MapperChip.FDS_Get4025() & 0x2) == 0x2)
+                        {
+                            DiskAddress += 625; // Just doing what Neshawk does here... Basically fast forwarding until DiskAddress reaches the end?
+                        }
+                        else if ((Cart.MapperChip.FDS_Get4025() & 0x4) == 0x4)
+                        {
+                            // reading
+                            byte ShiftBit = (byte)((Disk[DiskAddress] >> (DiskAddressFine)) & 1);
+
+                            if (lookingForEndOfGap && (Cart.MapperChip.FDS_Get4025() & 0x10) == 0)
+                            {
+                                if (ShiftBit == 1)
+                                {
+                                    // we found the end of the gap! :tada:
+                                    lookingForEndOfGap = false;
+                                    DiskAddressFine = 0;
+                                    DiskAddress++;
+                                }
+                                else
+                                {
+                                    DiskAddressFine++;
+                                    if (DiskAddressFine == 8)
+                                    {
+                                        DiskAddressFine = 0;
+                                        DiskAddress++;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                ShiftRegister >>= 1;
+                                ShiftRegister |= (byte)(ShiftBit*0x80);
+                                DiskAddressFine++;
+                                if (DiskAddressFine == 8)
+                                {
+                                    DiskAddressFine = 0;
+                                    DiskAddress++;
+
+                                    ShiftRegisterLatch = ShiftRegister;
+                                    // disk drive is ready.
+                                    // raise the byte transfer flag!
+                                    Status_ByteTransferFlag = true;
+                                    Cart.MapperChip.FDS_ByteTransferFlag(); // Trigger an IRQ if $4025.7 is set.
+                                    if (Cart.Emu.IRQ_LevelDetector)
+                                    {
+                                        // debugging, put breakpoint here:
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            DiskAddressFine = 0;
+                        }
+                        if (DiskAddress >= Disk.Length)
+                        {
+                            CurrentState = RamAdapterState.RESET;
+                        }
                     }
-                }
+                    break;
+                case RamAdapterState.RESET:
+                case RamAdapterState.INSERTING:
+                    if (clock == 2140000)
+                    {
+                        clock = 0;
+                        DiskAddress = 0;
+                        CurrentState = RamAdapterState.IDLE;
+                    }
+                    break;
+                case RamAdapterState.SPINUP:
+                    if (clock == 4280000)
+                    {
+                        clock = 0;
+                        CurrentState = RamAdapterState.RUNNING;
+                    }
+                    break;
+                case RamAdapterState.IDLE:
+                    clock = 0;                    
+                    break;
             }
 
-            if(clock == 1792)
-            {
-                clock = 0;
-                DiskAddressFine = 0;
 
-                ShiftRegisterLatch = ShiftRegister;
-                // disk drive is ready.
-                // raise the byte transfer flag!
-                Status_ByteTransferFlag = true;
-                Cart.MapperChip.FDS_ByteTransferFlag(); // Trigger an IRQ if $4025.7 is set.
-
-            }
         }
 
 
         public void InsertDisk(string filepath)
         {
             Disk = File.ReadAllBytes(filepath); // Reads the file from the provided file path, and stores every byte into an array.
+            Disk = FixFDSDiskSide(Disk);
+            CurrentState = RamAdapterState.INSERTING;
+        }
+
+        private byte[] FixFDSDiskSide(byte[] disk)
+        {
+            // I haven't found any documentation on this stuff, so I'm just copying what Neshawk does.
+            // TODO: Learn about this?
+
+            MemoryStream ms = new MemoryStream(disk, false);
+            BinaryReader br = new BinaryReader(ms);
+            MemoryStream ret = new MemoryStream();
+
+            byte[] header = br.ReadBytes(56);
+            byte[] compare = { 0x01, 0x2a, 0x4e, 0x49, 0x4e, 0x54, 0x45, 0x4e, 0x44, 0x4f, 0x2d, 0x48, 0x56, 0x43, 0x2a };
+            for (int i = 0; i < compare.Length; i++)
+            {
+                if (compare[i] != header[i])
+                    throw new Exception("Corrupt FDS block 1");
+            }
+            WriteBlock(ret, header, 3537);
+
+            byte[] numfileblock = br.ReadBytes(2);
+            if (numfileblock[0] != 0x02)
+            {
+                throw new Exception("Corrupt FDS block 2");
+            }
+            int numfiles = numfileblock[1];
+            WriteBlock(ret, numfileblock, 122);
+
+            for (int i = 0; i < numfiles; i++)
+            {
+                byte[] fileheader = br.ReadBytes(16);
+                if (fileheader[0] != 0x03)
+                {
+                    // Instead of exceptions, display strong warnings
+                    Console.WriteLine("WARNING: INVALID FILE, BLOCK 3 ERROR");
+                    //throw new Exception("Corrupt FDS block 3");
+                }
+                int filesize = fileheader[13] + fileheader[14] * 256;
+
+                byte[] file = br.ReadBytes(filesize + 1);
+                if (file[0] != 0x04)
+                {
+                    Console.WriteLine("WARNING: INVALID FILE, BLOCK 4 ERROR");
+                    //throw new Exception("Corrupt FDS block 4");
+                }
+
+                WriteBlock(ret, fileheader, 122);
+                WriteBlock(ret, file, 122);
+            }
+
+            ret.Close();
+            byte[] tmp = ret.GetBuffer(); // don't care too much about actual "length" since extra is all 0
+            Array.Resize(ref tmp, 65500); // might truncate
+            return tmp;
+        }
+
+        private static void WriteBlock(Stream dest, byte[] data, int pregap)
+        {
+            for (int i = 0; i < pregap - 1; i++)
+                dest.WriteByte(0);
+            ushort crc = 0;
+            dest.WriteByte(0x80); // end of gap marker
+            crc = CCITT_8(crc, 0x80);
+            for (int i = 0; i < data.Length; i++)
+            {
+                dest.WriteByte(data[i]);
+                crc = CCITT_8(crc, data[i]);
+            }
+            dest.WriteByte((byte)(crc & 0xff));
+            dest.WriteByte((byte)(crc >> 8));
+        }
+        private static ushort CCITT_8(ushort crc, byte b)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                int bit = (b >> i) & 1;
+                crc = CCITT(crc, bit);
+            }
+            return crc;
+        }
+        private static ushort CCITT(ushort crc, int bit)
+        {
+            int bitc = crc & 1;
+            crc >>= 1;
+            if ((bitc ^ bit) != 0)
+                crc ^= 0x8408;
+            return crc;
         }
     }
 

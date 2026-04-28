@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 
 namespace TriCNES.mappers
 {
@@ -50,6 +51,9 @@ namespace TriCNES.mappers
 
                             data |= (byte)((FDS_4025_Control >> 3) & 1); // 4030.3 = 4025.3
 
+                            data |= (byte)((Cart.FDS.DiskAddress >= Cart.FDS.Disk.Length) ? 0x40 : 0); // 4030.6 = End of Disk
+
+
                             data |= (byte)(Cart.FDS.Status_ByteTransferFlag ? 0x80 : 0); // 4030.7 = Byte Transfer Flag
 
 
@@ -67,7 +71,16 @@ namespace TriCNES.mappers
                     case 2:
                         {
                             // Disk Drive Status ($4032)
-
+                            notFloating = true;
+                            data = 0;
+                            if(Cart.FDS.CurrentState == DiskDrive.RamAdapterState.INSERTING)
+                            {
+                                data |= 1;
+                            }
+                            if (!(((FDS_4025_Control & 2) == 0) && (Cart.FDS.CurrentState == DiskDrive.RamAdapterState.RUNNING || Cart.FDS.CurrentState == DiskDrive.RamAdapterState.IDLE)))
+                            {
+                                data |= 2;
+                            }
                         }
                         break;
                     case 3:
@@ -109,17 +122,52 @@ namespace TriCNES.mappers
                         {
                             // Disable disk I/O registers
                             Cart.Emu.IRQ_LevelDetector = false; //acknowledge the IRQ
-                            FDS_4025_Control = 6;
+                            FDS_4025_Control &= 0xF3;
+                            FDS_4025_Control |= 6;
                         }
                         return;
                     case 0x4024:
                         Cart.FDS.Status_ByteTransferFlag = false;
                         return;
                     case 0x4025:
+                        if((FDS_4025_Control & 0x40) == 0 && (Input & 0x40) != 0)
+                        {
+                            Cart.FDS.lookingForEndOfGap = true;
+                        }
                         FDS_4025_Control = Input;
+                        if ((Input & 1) != 0)
+                        {
+                            if (Cart.FDS.CurrentState == DiskDrive.RamAdapterState.IDLE)
+                            {
+                                Cart.FDS.CurrentState = DiskDrive.RamAdapterState.SPINUP;
+                            }
+                        }
+                        if((FDS_4025_Control & 2) != 0)
+                        {
+                            // debugging: put breakpoint here
+                        }
+                        if ((FDS_4025_Control & 2) == 0)
+                        {
+                            // debugging: put breakpoint here
+                        }
                         return;
                 }
             }
+        }
+
+        public override ushort MirrorNametable(ushort Address)
+        {
+
+            if (((FDS_4025_Control >> 3) & 1) == 1) //horizontal
+            {
+                return (ushort)((Address & 0x33FF) | ((Address & 0x0800) >> 1)); // mask away $0C00, bit 10 becomes the former bit 11
+            }
+            else //vertical
+            {
+                return (ushort)(Address & 0x37FF); // mask away $0800
+            }
+            
+            return Address;
         }
 
         public override void FDS_ByteTransferFlag()
@@ -143,11 +191,19 @@ namespace TriCNES.mappers
             State.Add(FDS_4025_Control);
             State.Add((byte)Cart.FDS.clock);
             State.Add((byte)(Cart.FDS.clock >> 8));
-            State.Add((byte)Cart.FDS.ShiftRegister);
-            State.Add((byte)Cart.FDS.ShiftRegisterLatch);            
+            State.Add((byte)(Cart.FDS.clock >> 16));
+            State.Add((byte)(Cart.FDS.clock >> 24));
+            State.Add((byte)Cart.FDS.CurrentState);
+            State.Add(Cart.FDS.ShiftRegister);
+            State.Add(Cart.FDS.ShiftRegisterLatch);            
             State.Add((byte)Cart.FDS.DiskAddress);
             State.Add((byte)(Cart.FDS.DiskAddress >> 8));
-            State.Add((byte)Cart.FDS.DiskAddressFine);
+            State.Add((byte)(Cart.FDS.DiskAddress >> 16));
+            State.Add((byte)(Cart.FDS.DiskAddress >> 24));
+            State.Add(Cart.FDS.DiskAddressFine);
+            State.Add((byte)(Cart.FDS.Status_ByteTransferFlag ? 1 : 0));
+            State.Add((byte)(Cart.FDS.lookingForEndOfGap ? 1 : 0));
+
             return State;
         }
         public override void LoadMapperRegisters(List<byte> State, int startIndex, out int exitIndex)
@@ -159,11 +215,18 @@ namespace TriCNES.mappers
             FDS_4025_Control = State[p++];
             Cart.FDS.clock = State[p++];
             Cart.FDS.clock |= (ushort)(State[p++] << 8);
+            Cart.FDS.clock |= (ushort)(State[p++] << 16);
+            Cart.FDS.clock |= (ushort)(State[p++] << 24);
+            Cart.FDS.CurrentState = (DiskDrive.RamAdapterState)State[p++];
             Cart.FDS.ShiftRegister = State[p++];
             Cart.FDS.ShiftRegisterLatch = State[p++];
             Cart.FDS.DiskAddress = State[p++];
             Cart.FDS.DiskAddress |= (ushort)(State[p++] << 8);
+            Cart.FDS.DiskAddress |= (ushort)(State[p++] << 16);
+            Cart.FDS.DiskAddress |= (ushort)(State[p++] << 24);
             Cart.FDS.DiskAddressFine = State[p++];
+            Cart.FDS.Status_ByteTransferFlag = State[p++] == 1;
+            Cart.FDS.lookingForEndOfGap = State[p++] == 1;
 
             exitIndex = p;
         }
