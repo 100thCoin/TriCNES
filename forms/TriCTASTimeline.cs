@@ -935,6 +935,7 @@ namespace TriCNES
                     fs.WriteByte((byte)Inputs[i]);
                     if (UseController2) { fs.WriteByte((byte)(Inputs[i] >> 8)); }
                     if (UseResets) { fs.WriteByte((byte)((Resets[i] ? 0x80 : 0) | (i < LagFrames.Count ? (LagFrames[i] ? 1 : 0) : 0))); }
+                    else { fs.WriteByte((byte)(i < LagFrames.Count ? (LagFrames[i] ? 1 : 0) : 0)); }
                 }
 
                 for (int i = 0; i < TimelineSavestates.Count; i++)

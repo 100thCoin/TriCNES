@@ -1542,10 +1542,16 @@ namespace TriCNES
                         List<List<byte>> saveStates2 = new List<List<byte>>();
                         List<bool> lagFrames = new List<bool>();
 
+                        int FrameCountMult = 2;
+                        if (UseController2)
+                        {
+                            FrameCountMult++;
+                        }
+
                         byte b = 0;
                         byte b2 = 0;
                         int i = 16;
-                        while (i < frameCount * 3 + 16)
+                        while (i < frameCount * FrameCountMult + 16)
                         {
                             b = ByteArray[i];
                             i++;
