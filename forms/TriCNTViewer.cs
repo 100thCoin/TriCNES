@@ -1,11 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace TriCNES
@@ -16,13 +10,16 @@ namespace TriCNES
         public TriCNTViewer()
         {
             InitializeComponent();
-            FormClosing += new FormClosingEventHandler(TriCNTViewer_Closing);
+            FormClosing += TriCNTViewer_Closing;
         }
 
         private void TriCNTViewer_Closing(Object sender, FormClosingEventArgs e)
         {
-            MainGUI.NametableViewer = null;
-            this.Dispose();
+            if (MainGUI != null)
+            {
+                MainGUI.NametableViewer = null;
+            }
+            Dispose();
         }
 
         public void Update(Bitmap b)

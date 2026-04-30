@@ -1,15 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Net.NetworkInformation;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.IO.Compression;
 
 namespace TriCNES
 {
@@ -18,6 +10,16 @@ namespace TriCNES
         public TASProperties()
         {
             InitializeComponent();
+            FormClosing += TASProperties_Closing;
+        }
+
+        private void TASProperties_Closing(Object sender, FormClosingEventArgs e)
+        {
+            if (MainGUI != null)
+            {
+                MainGUI.TASPropertiesForm = null;
+            }
+            Dispose();
         }
 
         public string TasFilePath;

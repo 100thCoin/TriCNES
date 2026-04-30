@@ -1,13 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace TriCNES
 {
@@ -22,6 +16,15 @@ namespace TriCNES
             Scope = "RAM";
             Resize += TriCHexEditor_Resize;
             vScrollBar1.ValueChanged += Scrollbar_ValueChanged;
+            FormClosing += TriCHexEditor_Closing;
+        }
+        public void TriCHexEditor_Closing(object sender, FormClosingEventArgs e)
+        {
+            if(MainGUI != null)
+            {
+                MainGUI.HexEditor = null;
+            }
+            Dispose();
         }
 
         public TriCNESGUI MainGUI;

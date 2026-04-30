@@ -49,12 +49,12 @@ namespace TriCNES
         public Thread EmuClock;
         string filePath;
         bool FDS;
-        TASProperties TASPropertiesForm;
-        TASProperties3ct TASPropertiesForm3ct;
+        public TASProperties TASPropertiesForm;
+        public TASProperties3ct TASPropertiesForm3ct;
         public TriCTraceLogger? TraceLogger;
         public TriCNTViewer? NametableViewer;
         public TriCTASTimeline? TasTimeline;
-        public TriCHexEditor? HexExditor;
+        public TriCHexEditor? HexEditor;
 
         void RunUpkeep()
         {
@@ -123,9 +123,9 @@ namespace TriCNES
                 EMU.Logging = false;
                 EMU.DebugLog = new StringBuilder();
             }
-            if(HexExditor != null)
+            if(HexEditor != null)
             {
-                HexExditor.Update();
+                HexEditor.Update();
             }
         }
 
@@ -855,9 +855,9 @@ namespace TriCNES
             {
                 TasTimeline.Dispose();
             }
-            if (HexExditor != null)
+            if (HexEditor != null)
             {
-                HexExditor.Dispose();
+                HexEditor.Dispose();
             }
             Application.Exit();
         }
@@ -1083,15 +1083,15 @@ namespace TriCNES
 
         private void hexEditorToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (HexExditor != null)
+            if (HexEditor != null)
             {
-                HexExditor.Focus();
+                HexEditor.Focus();
                 return;
             }
-            HexExditor = new TriCHexEditor();
-            HexExditor.MainGUI = this;
-            HexExditor.Show();
-            HexExditor.Location = Location;
+            HexEditor = new TriCHexEditor();
+            HexEditor.MainGUI = this;
+            HexEditor.Show();
+            HexEditor.Location = Location;
         }
 
         List<Byte> Savestate = new List<byte>();

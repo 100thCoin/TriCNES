@@ -1,13 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Timers;
 using System.Windows.Forms;
-using static System.Windows.Forms.AxHost;
 
 namespace TriCNES
 {
@@ -110,6 +106,16 @@ namespace TriCNES
 
 
             Shown += TriCTASTimeline_Shown;
+            FormClosing += TriCTASTimeline_Closing;
+        }
+
+        private void TriCTASTimeline_Closing(Object sender, FormClosingEventArgs e)
+        {
+            if (MainGUI != null)
+            {
+                MainGUI.TasTimeline = null;
+            }
+            Dispose();
         }
 
         private void mouseWheelEvent(object sender, MouseEventArgs e)
