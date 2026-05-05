@@ -3116,13 +3116,15 @@ namespace TriCNES
                                 PPU_SpritePatternL = Flip(PPU_SpritePatternL);
                             }
                             PPU_SpriteShiftRegisterL[OAM2Address / 4] = PPU_SpritePatternL;
+
+                            // in-range check. (The pre-render line ends up checking scanline 5 due to the `& 0xFF`.
+                            if (!(InRangeCheck < (PPU_Spritex16 ? 16 : 8)))
+                            {
+                                PPU_SpriteShiftRegisterL[OAM2Address / 4] = 0; // clear the value in this shift register if this object isn't in range.
+                            }
                         }
 
-                        // in-range check. (The pre-render line ends up checking scanline 5 due to the `& 0xFF`.
-                        if (!(InRangeCheck < (PPU_Spritex16 ? 16 : 8)))
-                        {
-                            PPU_SpriteShiftRegisterL[OAM2Address / 4] = 0; // clear the value in this shift register if this object isn't in range.
-                        }
+                       
 
                         break;
                     case 6: // X position (again)  dot 263, (+8), (+16) ...
@@ -3158,19 +3160,13 @@ namespace TriCNES
                                 PPU_SpritePatternH = Flip(PPU_SpritePatternH);
                             }
                             PPU_SpriteShiftRegisterH[OAM2Address / 4] = PPU_SpritePatternH;
-                        }
 
-                        // in-range check. (The pre-render line ends up checking scanline 5 due to the `& 0xFF`.
-                        if (!(InRangeCheck < (PPU_Spritex16 ? 16 : 8)))
-                        {
-                            PPU_SpriteShiftRegisterH[OAM2Address / 4] = 0; // clear the value in this shift register if this object isn't in range.
+                            // in-range check. (The pre-render line ends up checking scanline 5 due to the `& 0xFF`.
+                            if (!(InRangeCheck < (PPU_Spritex16 ? 16 : 8)))
+                            {
+                                PPU_SpriteShiftRegisterH[OAM2Address / 4] = 0; // clear the value in this shift register if this object isn't in range.
+                            }
                         }
-
-                        if (PPU_SpriteShiftRegisterH[OAM2Address / 4] != 0)
-                        { 
-                        
-                        }
-
 
                         OAM2Address++; // and increment the Secondary OAM address for next cycle
 
