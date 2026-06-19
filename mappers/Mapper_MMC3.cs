@@ -403,5 +403,10 @@ namespace TriCNES.mappers
                 }
             }
         }
+
+        public override string AppendToDebugLog()
+        {
+            return "\tPPU_Coords (" + Cart.Emu.PPU_Scanline + ", " + Cart.Emu.PPU_Dot + ")\tIRQTimer:" + Mapper_4_IRQCounter + "\tIRQLatch: " + Mapper_4_IRQLatch + "\tIRQEnabled: " + Mapper_4_EnableIRQ + "\tDoIRQ: " + Cart.Emu.DoIRQ + "\tPPU_ADDR_Prev: " + (Cart.Emu.PPU_A12_Prev ? "1" : "0");
+        }
     }
 }
