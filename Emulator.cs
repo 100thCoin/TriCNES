@@ -149,6 +149,12 @@ namespace TriCNES
         }
         public virtual byte FetchPPU()
         {
+            // TODO: I think this is correct? I need to look into this more. I added this while looking into the Stein's Gate visual bug.
+            if (Cart.Emu.CopyV)
+            {
+                Cart.Emu.PPU_AddressBus = Cart.Emu.PPU_v;
+            }
+
             // This will always use the upper 8 bits of the address bus | the octal latch. This replaces the lower 8 bits of the address bus.
             ushort Address = (ushort)((Cart.Emu.PPU_AddressBus & 0x3F00) | Cart.Emu.PPU_OctalLatch);
             bool CIRAM = Address >= 0x2000;
@@ -1485,7 +1491,7 @@ namespace TriCNES
         public bool NMILine; // Set to true if $2000.7 and $2002.7 are both set. This is checked during the second half od a CPU cycle.
         public bool IRQLine; // Set during phi2 to true if the IRQ level detector is low.
 
-        bool CopyV = false; // set by writes to $2006. If it occurs on the same dot the scroll values are naturally incremented, some bugs occur.
+        public bool CopyV = false; // set by writes to $2006. If it occurs on the same dot the scroll values are naturally incremented, some bugs occur.
         bool SkippedPreRenderDot341 = false;
 
         void _EmulatePPU()
@@ -1494,29 +1500,6 @@ namespace TriCNES
             // When writing to ppu registers, there's a slight delay before resulting action is taken.
             // This delay can vary depending on the CPU/PPU alignment.
 
-            // For instance, after writing to $2006, this delay value will either be 4 or 5.
-            CopyV = false;
-            if (PPU_Update2006Delay > 0)
-            {
-                PPU_Update2006Delay--; // this counts down,
-                if (PPU_Update2006Delay == 0) // and when it reaches zero
-                {
-                    ushort temp_Prev_V = PPU_v;
-                    CopyV = true;
-                    PPU_v = PPU_t; // the PPU_ReadWriteAddress is updated!
-                    PPU_AddressBus = PPU_v; // This value is the same thing.
-                    if ((temp_Prev_V & 0x3FFF) >= 0x3F00 && (PPU_AddressBus & 0x3FFF) < 0x3F00) // Palette corruption check. Are we leaving Palette ram?
-                    {
-                        if ((PPU_Scanline < 240) && PPU_Dot <= 256) // if this dot is visible
-                        {
-                            if ((temp_Prev_V & 0xF) != 0)  // also, Palette corruption only happens if the previous address did not end in a 0
-                            {
-                                PPU_VRegisterChangedOutOfVBlank = true;
-                            }
-                        }
-                    }
-                }
-            }
             // after writing to $2005, there is either a 1 or 2 cycle delay.
             if (PPU_Update2005Delay > 0)
             {
@@ -1661,11 +1644,9 @@ namespace TriCNES
 
             PPUStatus_SpriteOverflow_Delayed = PPUStatus_SpriteOverflow;
 
+            Cart.MapperChip.PPUClock(); // If the mapper chip does something every ppu clock... (See MMC3)
+            PPU_A12_Prev = (PPU_AddressBus & 0b0001000000000000) != 0; // Record the value of the A12. This is needed for MMC3.
 
-            
-            // Right now, I'm only emulating MMC3's IRQ counter in this function.
-            PPU_MapperSpecificFunctions();
-            PPU_A12_Prev = (PPU_AddressBus & 0b0001000000000000) != 0; // Record the value of the A12. This is used in the PPU_MapperSpecificFunctions(), so if this changes between here and next ppu cycle, we'll know.
             if (PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
             {
                 if (PPU_Scanline == 261 && PPU_Dot == 340)
@@ -1677,6 +1658,8 @@ namespace TriCNES
                     SkippedPreRenderDot341 = true;
                 }
             }
+
+
             if (PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites) && PPU_Scanline == 0 && PPU_Dot == 2)
             {
                 SkippedPreRenderDot341 = false; // This variable is used for some esoteric business on dot 1 of scanline 0.
@@ -1698,6 +1681,32 @@ namespace TriCNES
             }
 
             PPU_DATA_StateMachine();
+
+            // TODO: Does this use a state machine like $2007?
+            CopyV = false;
+            if (PPU_Update2006Delay > 0)
+            {
+                PPU_Update2006Delay--; // this counts down,
+                if (PPU_Update2006Delay == 0) // and when it reaches zero
+                {
+                    ushort temp_Prev_V = PPU_v;
+                    CopyV = true;
+                    PPU_v = PPU_t; // the PPU_ReadWriteAddress is updated!
+                    PPU_AddressBus = PPU_v; // This value is the same thing.
+                    if ((temp_Prev_V & 0x3FFF) >= 0x3F00 && (PPU_AddressBus & 0x3FFF) < 0x3F00) // Palette corruption check. Are we leaving Palette ram?
+                    {
+                        if ((PPU_Scanline < 240) && PPU_Dot <= 256) // if this dot is visible
+                        {
+                            if ((temp_Prev_V & 0xF) != 0)  // also, Palette corruption only happens if the previous address did not end in a 0
+                            {
+                                PPU_VRegisterChangedOutOfVBlank = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+
 
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
             {
@@ -1986,7 +1995,7 @@ namespace TriCNES
 
             if ((PPU_2007_ReadALE || PPU_2007_WriteALE))
             {
-                if (!PPU_READ)
+                if (!PPU_READ) // TODO: this if statement doesn't seem to change the results of the 2007 stress test in any way.
                 {
                     PPU_AddressBus = PPU_v;
                     PPU_OctalLatch = (byte)PPU_AddressBus;
@@ -2624,11 +2633,6 @@ namespace TriCNES
                 }
                 i++;
             }
-        }
-
-        void PPU_MapperSpecificFunctions()
-        {
-            Cart.MapperChip.PPUClock(); // If the mapper chip does something every ppu clock... (See MMC3)
         }
 
         // If OAM corruption is pending, it occurs on the first rendered dot.
@@ -10623,7 +10627,12 @@ namespace TriCNES
             {
                 dotColor = "COLOR: " + DotColor.ToString("X2") + "\t";
             }
+            else
+            {
+                dotColor = "COLOR: BL\t";
+            }
             string MMC3 = "";
+            string v = "v: " + PPU_v.ToString("X4") + "\t";
             string Addr = "Address: " + PPU_AddressBus.ToString("X4") + "\t";
             string Octal = "OctalLatch: " + PPU_OctalLatch.ToString("X2") + "\t";
             string enabled = "[" + (PPU_Mask_ShowSprites ? "S" : "-") + (PPU_Mask_ShowBackground ? "B" : "-") + "]\t";
@@ -10633,19 +10642,37 @@ namespace TriCNES
             string BSR_Hi = "BSRH: " + Convert.ToString(PPU_BackgroundPatternShiftRegisterH, 2).PadLeft(16, '0') + "\t";
 
             string EightCycleRead = "";
-            if ((PPU_Dot >= 1 && PPU_Dot <= 256) || (PPU_Dot >= 321 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
+            if ((PPU_Dot <= 256) || (PPU_Dot >= 321)) // if this is a visible pixel, or preparing the start of next scanline
             {
-                if(PPU_Mask_ShowSprites || PPU_Mask_ShowBackground)
+                if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground) && (PPU_Scanline < 240))
                 {
-                    EightCycleRead =  "8CycleReadTick: " + ((byte)((PPU_Dot + 7) & 7)).ToString() + "\t";
+                    if (PPU_Dot >= 1)
+                    {
+                        EightCycleRead = "8CycleReadTick (bg): " + ((byte)((PPU_Dot + 7) & 7)).ToString() + "\t";
+                    }
+                    else
+                    {
+                        EightCycleRead = "8CycleReadTick (bg): 4" + "\t";
+                    }
                 }
                 else
                 {
-                    EightCycleRead = "8CycleReadTick: -\t";
+                    EightCycleRead = "8CycleReadTick (bg): -\t";
+                }
+            }
+            else
+            {   // HBlank, or dot 0.
+                if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground) && (PPU_Scanline < 240))
+                {
+                    EightCycleRead = "8CycleReadTick (sp): " + ((byte)((PPU_Dot + 7) & 7)).ToString() + "\t";
+                }
+                else
+                {
+                    EightCycleRead = "8CycleReadTick (sp): -\t";
                 }
             }
 
-            string LogLine = "(" + PPU_Scanline.ToString() + ", " + PPU_Dot.ToString() + ")  \t" + Addr + Octal + EightCycleRead + dotColor + enabled + MMC3 + ALE + RD + BSR_Lo + BSR_Hi;
+                string LogLine = "(" + PPU_Scanline.ToString() + ", " + PPU_Dot.ToString() + ")  \t" + v + Addr + Octal + EightCycleRead + dotColor + enabled + MMC3 + ALE + RD + BSR_Lo + BSR_Hi;
             DebugLog.AppendLine(LogLine);
         }
 
