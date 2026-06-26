@@ -1653,12 +1653,11 @@ namespace TriCNES
 
             if (PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
             {
-                if (PPU_Scanline == 261 && PPU_Dot == 340)
+                if (PPU_Scanline == 0 && PPU_Dot == 0)
                 {
                     // On every other frame, dot 0 of scanline 0 is skipped.
                     // this cycle is technically (0,0), but this still makes the Nametable fetch during the last cycle of the pre-render line
-                    PPU_Scanline = 0;
-                    PPU_Dot = 0;
+                    PPU_Dot++;
                     SkippedPreRenderDot341 = true;
                 }
             }
