@@ -149,12 +149,6 @@ namespace TriCNES
         }
         public virtual byte FetchPPU()
         {
-            // TODO: I think this is correct? I need to look into this more. I added this while looking into the Stein's Gate visual bug.
-            if (Cart.Emu.CopyV)
-            {
-                Cart.Emu.PPU_AddressBus = Cart.Emu.PPU_v;
-            }
-
             // This will always use the upper 8 bits of the address bus | the octal latch. This replaces the lower 8 bits of the address bus.
             ushort Address = (ushort)((Cart.Emu.PPU_AddressBus & 0x3F00) | Cart.Emu.PPU_OctalLatch);
             bool CIRAM = Address >= 0x2000;
@@ -1870,16 +1864,21 @@ namespace TriCNES
 
         } // and that's all for the PPU cycle!
 
+        byte FetchVideoMemory()
+        {
+            if (Cart.Emu.CopyV)
+            {
+                Cart.Emu.PPU_AddressBus = Cart.Emu.PPU_v;
+            }
+            return Cart.MapperChip.FetchPPU();
+        }
+
         bool PPUActiveForShiftRegisterUpdate;
         void _EmulateHalfPPU()
         {
             // Oh boy, it's time for half PPU cycles.            
             if ((PPU_Scanline < 240 || PPU_Scanline == 261))// if this is the pre-render line, or any line before vblank
             {
-                if(PPU_Dot == 320)
-                {
-
-                }
                 if ((PPU_Dot > 0 && PPU_Dot <= 257) || (PPU_Dot > 320 && PPU_Dot <= 336)) // if this is a visible pixel, or preparing the start of next scanline
                 {
                     if ((PPU_Mask_ShowBackground || PPU_Mask_ShowSprites)) // if rendering background or sprites
@@ -2010,7 +2009,7 @@ namespace TriCNES
             
             if (PPU_2007_PD_RB)
             {
-                PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
+                PPU_ReadBuffer = FetchVideoMemory();
                 if (PPU_ALE)
                 {
                     PPU_OctalLatch = (byte)PPU_AddressBus;
@@ -2035,7 +2034,7 @@ namespace TriCNES
             PPU_ALE = (PPU_2007_ReadALE || PPU_2007_WriteALE);
             if (PPU_2007_PD_RB)
             {
-                PPU_ReadBuffer = Cart.MapperChip.FetchPPU();
+                PPU_ReadBuffer = FetchVideoMemory();
                 if (PPU_ALE)
                 {
                     // pretty sure this can never happen, but keep it just in case.
@@ -3117,7 +3116,7 @@ namespace TriCNES
 
                             PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_CHR & 0xFF00) | PPU_OctalLatch);
 
-                            PPU_SpritePatternL = Cart.MapperChip.FetchPPU();
+                            PPU_SpritePatternL = FetchVideoMemory();
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
                             {
                                 PPU_SpritePatternL = Flip(PPU_SpritePatternL);
@@ -3161,7 +3160,7 @@ namespace TriCNES
 
                             PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_CHR & 0xFF00) | PPU_OctalLatch);
 
-                            PPU_SpritePatternH = Cart.MapperChip.FetchPPU();
+                            PPU_SpritePatternH = FetchVideoMemory();
                             if (((PPU_SpriteAttribute[OAM2Address / 4] >> 6) & 1) == 1) // Attributes are set up to flip X
                             {
                                 PPU_SpritePatternH = Flip(PPU_SpritePatternH);
@@ -3782,7 +3781,7 @@ namespace TriCNES
                 case 1:
                     // fetch byte from Nametable
                     PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_NT & 0xFF00) | PPU_OctalLatch);
-                    PPU_RenderTemp = Cart.MapperChip.FetchPPU();
+                    PPU_RenderTemp = FetchVideoMemory();
                     PPU_Commit_NametableFetch = true;
                     break;
                 case 2:
@@ -3793,7 +3792,7 @@ namespace TriCNES
                 case 3:
                     // fetch attribute byte from attribute table
                     PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_AT & 0xFF00) | PPU_OctalLatch);
-                    PPU_RenderTemp = Cart.MapperChip.FetchPPU();
+                    PPU_RenderTemp = FetchVideoMemory();
                     PPU_Commit_AttributeFetch = true;
                     // now we only have the 2 bits we're looking for
                     break;
@@ -3806,7 +3805,7 @@ namespace TriCNES
                 case 5:
                     // fetch pattern bits from value read off the nametable
                     PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_CHR & 0xFF00) | PPU_OctalLatch);
-                    PPU_RenderTemp = Cart.MapperChip.FetchPPU();
+                    PPU_RenderTemp = FetchVideoMemory();
                     PPU_Commit_PatternLowFetch = true;
                     break;
                 case 6:
@@ -3818,7 +3817,7 @@ namespace TriCNES
                 case 7:
                     // fetch pattern bits with the new address
                     PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_CHR & 0xFF00) | PPU_OctalLatch);
-                    PPU_RenderTemp = Cart.MapperChip.FetchPPU();
+                    PPU_RenderTemp = FetchVideoMemory();
                     PPU_Commit_PatternHighFetch = true;
                     break;
             }
@@ -3904,7 +3903,7 @@ namespace TriCNES
                     case 1:
                         // fetch byte from Nametable
                         PPU_AddressBus = (ushort)(0x2000 + (PPU_v & 0x0FFF));
-                        PPU_RenderTemp = Cart.MapperChip.FetchPPU();
+                        PPU_RenderTemp = FetchVideoMemory();
                         PPU_Commit_NametableFetch = true;
                         break;
                     case 2:
@@ -3912,7 +3911,7 @@ namespace TriCNES
                         break;
                     case 3:
                         // fetch attribute byte from attribute table
-                        PPU_RenderTemp = Cart.MapperChip.FetchPPU();
+                        PPU_RenderTemp = FetchVideoMemory();
                         //IGNORED NT FETCH: This actually doesn't update the NT register.
                         break;
                 }
