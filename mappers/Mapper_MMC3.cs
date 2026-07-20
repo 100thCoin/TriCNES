@@ -226,54 +226,35 @@ namespace TriCNES.mappers
                 else { Address &= 0x7FF; return Cart.CHRROM[(Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
             }
         }
-        public override byte FetchPPU()
+        public override byte FetchNametable()
         {
-            // This will always use the upper 8 bits of the address bus | the octal latch. This replaces the lower 8 bits of the address bus.
             ushort Address = (ushort)((Cart.Emu.PPU_AddressBus & 0x3F00) | Cart.Emu.PPU_OctalLatch);
-            bool CIRAM = Address >= 0x2000;
-            if (!CIRAM)
+            Address = Cart.MapperChip.MirrorNametable(Address);
+            byte t = 0;
+            if (Cart.AlternativeNametableArrangement)
             {
-                if (Cart.UsingCHRRAM)
+                if ((Address & 0x800) != 0)
                 {
-                    Cart.Emu.PPU_AddressBus &= 0xFF00;
-                    Cart.Emu.PPU_AddressBus |= Cart.CHRRAM[Address];
-                }
-                else
-                {
-                    //Pattern Table
-                    Cart.Emu.PPU_AddressBus &= 0xFF00;
-                    Cart.Emu.PPU_AddressBus |= Cart.MapperChip.FetchCHR(Address, false);
-                }
-            }
-            else // if the VRAM address is >= $2000, we need to consider nametable mirroring.
-            {
-                Address = MirrorNametable(Address);
-
-                if (Cart.AlternativeNametableArrangement)
-                {
-
-                    if ((Address & 0x800) != 0)
-                    {
-                        // using the extra PRG VRAM.
-                        Address &= 0x7FF;
-                        Cart.Emu.PPU_AddressBus &= 0xFF00;
-                        Cart.Emu.PPU_AddressBus |= Cart.PRGVRAM[Address];
-                    }
-                    else
-                    {
-                        Address &= 0x7FF;
-                        Cart.Emu.PPU_AddressBus &= 0xFF00;
-                        Cart.Emu.PPU_AddressBus |= Cart.Emu.VRAM[Address];
-                    }
+                    // Oh wait- we *are* reading from the cartridge!
+                    // using the extra PRG VRAM.
+                    Address = Connector_ReadPPUAddressPins();
+                    Address &= 0x7FF;
+                    byte b = Cart.PRGVRAM[Address];
+                    Connector_SetUpPPUDataPins(b);
+                    t = Connector_ReadPPUDataPins();
                 }
                 else
                 {
                     Address &= 0x7FF;
-                    Cart.Emu.PPU_AddressBus &= 0xFF00;
-                    Cart.Emu.PPU_AddressBus |= Cart.Emu.VRAM[Address];
+                    t = Cart.Emu.VRAM[Address];
                 }
             }
-            return (byte)Cart.Emu.PPU_AddressBus;
+            else
+            {
+                Address &= 0x7FF;
+                t = Cart.Emu.VRAM[Address];
+            }
+            return t;
         }
         public override ushort MirrorNametable(ushort Address)
         {

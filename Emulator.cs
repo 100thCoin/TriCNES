@@ -6,7 +6,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using TriCNES.mappers;
-using static System.Windows.Forms.AxHost;
 
 namespace TriCNES
 {
@@ -82,6 +81,7 @@ namespace TriCNES
                 default:
                 case 0: MapperChip = new Mapper_NROM(); break;
                 case 1: MapperChip = new Mapper_MMC1(); break;
+                case 71:
                 case 2: MapperChip = new Mapper_UxROM(); break;
                 case 3: MapperChip = new Mapper_CNROM(); break;
                 case 4: MapperChip = new Mapper_MMC3(); break;
@@ -122,6 +122,10 @@ namespace TriCNES
         // Default to NROM behavior.
         public virtual void FetchPRG(ushort Address, bool Observe)
         {
+            if (!Observe)
+            {
+                Address = Connector_ReadCPUAddressPins();
+            }
             bool notFloating = false;
             byte data = 0;
             if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
@@ -147,33 +151,31 @@ namespace TriCNES
         {
             return Cart.CHRROM[Address & 0x1FFF];
         }
-        public virtual byte FetchPPU()
+        public virtual void FetchPPU()
         {
-            // This will always use the upper 8 bits of the address bus | the octal latch. This replaces the lower 8 bits of the address bus.
+            // This will always use the upper 8 bits of the address bus | the octal latch. This Octal Latch replaces the lower 8 bits of the address bus.
+            ushort Address = Connector_ReadPPUAddressPins();
+
+            byte t = 0;
+
+            if (Cart.UsingCHRRAM)
+            {
+                t = Cart.CHRRAM[Address];
+            }
+            else
+            {
+                //Pattern Table
+                t = Cart.MapperChip.FetchCHR(Address, false);
+            }
+
+            Connector_SetUpPPUDataPins(t);
+        }
+        public virtual byte FetchNametable()
+        {
             ushort Address = (ushort)((Cart.Emu.PPU_AddressBus & 0x3F00) | Cart.Emu.PPU_OctalLatch);
-            bool CIRAM = Address >= 0x2000;
-            if (!CIRAM)
-            {
-                if (Cart.UsingCHRRAM)
-                {
-                    Cart.Emu.PPU_AddressBus &= 0xFF00;
-                    Cart.Emu.PPU_AddressBus |= Cart.CHRRAM[Address];
-                }
-                else
-                {
-                    //Pattern Table
-                    Cart.Emu.PPU_AddressBus &= 0xFF00;
-                    Cart.Emu.PPU_AddressBus |= Cart.MapperChip.FetchCHR(Address, false);
-                }
-            }
-            else // if the VRAM address is >= $2000, we need to consider nametable mirroring.
-            {
-                Address = MirrorNametable(Address);
-                Address &= 0x7FF;
-                Cart.Emu.PPU_AddressBus &= 0xFF00;
-                Cart.Emu.PPU_AddressBus |= Cart.Emu.VRAM[Address];                
-            }
-            return (byte)Cart.Emu.PPU_AddressBus;
+            Address = Cart.MapperChip.MirrorNametable(Address);
+            Address &= 0x7FF;
+            return Cart.Emu.VRAM[Address];
         }
         public virtual ushort MirrorNametable(ushort Address)
         {
@@ -227,13 +229,138 @@ namespace TriCNES
             if (!Observe)
             {
                 dataPinsAreNotFloating = true;
-                dataBus = data;
+                Connector_SetUpCPUDataPins(data);
             }
             else
             {
                 observedDataPinsAreNotFloating = true;
                 observedDataBus = data;
             }
+        }
+        public void Connector_SetUpPPUAddressPins()
+        {
+            Cart.Emu.SeventyTwoPinConnector[28] = (Cart.Emu.PPU_OctalLatch & 0x01) != 0; // PPU A0
+            Cart.Emu.SeventyTwoPinConnector[27] = (Cart.Emu.PPU_OctalLatch & 0x02) != 0; // PPU A1
+            Cart.Emu.SeventyTwoPinConnector[26] = (Cart.Emu.PPU_OctalLatch & 0x04) != 0; // PPU A2
+            Cart.Emu.SeventyTwoPinConnector[25] = (Cart.Emu.PPU_OctalLatch & 0x08) != 0; // PPU A3
+            Cart.Emu.SeventyTwoPinConnector[24] = (Cart.Emu.PPU_OctalLatch & 0x10) != 0; // PPU A4
+            Cart.Emu.SeventyTwoPinConnector[23] = (Cart.Emu.PPU_OctalLatch & 0x20) != 0; // PPU A5
+            Cart.Emu.SeventyTwoPinConnector[22] = (Cart.Emu.PPU_OctalLatch & 0x40) != 0; // PPU A6
+            Cart.Emu.SeventyTwoPinConnector[58] = (Cart.Emu.PPU_OctalLatch & 0x80) != 0; // PPU A7
+            Cart.Emu.SeventyTwoPinConnector[59] = (Cart.Emu.PPU_AddressBus & 0x0100) != 0; // PPU A8
+            Cart.Emu.SeventyTwoPinConnector[60] = (Cart.Emu.PPU_AddressBus & 0x0200) != 0; // PPU A9
+            Cart.Emu.SeventyTwoPinConnector[62] = (Cart.Emu.PPU_AddressBus & 0x0400) != 0; // PPU A10
+            Cart.Emu.SeventyTwoPinConnector[61] = (Cart.Emu.PPU_AddressBus & 0x0800) != 0; // PPU A11
+            Cart.Emu.SeventyTwoPinConnector[63] = (Cart.Emu.PPU_AddressBus & 0x1000) != 0; // PPU A12
+            Cart.Emu.SeventyTwoPinConnector[64] = (Cart.Emu.PPU_AddressBus & 0x2000) != 0; // PPU A13
+        }
+        public ushort Connector_ReadPPUAddressPins()
+        {
+            ushort Address = 0;
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[64] ? 0x2000 : 0); // PPU A13
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[63] ? 0x1000 : 0); // PPU A12
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[61] ? 0x0800 : 0); // PPU A11
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[62] ? 0x0400 : 0); // PPU A10
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[60] ? 0x0200 : 0); // PPU A9
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[59] ? 0x0100 : 0); // PPU A8
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[58] ? 0x0080 : 0); // PPU A7
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[22] ? 0x0040 : 0); // PPU A6
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[23] ? 0x0020 : 0); // PPU A5
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[24] ? 0x0010 : 0); // PPU A4
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[25] ? 0x0008 : 0); // PPU A3
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[26] ? 0x0004 : 0); // PPU A2
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[27] ? 0x0002 : 0); // PPU A1
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[28] ? 0x0001 : 0); // PPU A0
+            return Address;
+        }
+        public void Connector_SetUpPPUDataPins(byte t)
+        {
+            Cart.Emu.SeventyTwoPinConnector[29] = (t & 0x01) != 0; // PPU D0
+            Cart.Emu.SeventyTwoPinConnector[30] = (t & 0x02) != 0; // PPU D1
+            Cart.Emu.SeventyTwoPinConnector[31] = (t & 0x04) != 0; // PPU D2
+            Cart.Emu.SeventyTwoPinConnector[32] = (t & 0x08) != 0; // PPU D3
+            Cart.Emu.SeventyTwoPinConnector[68] = (t & 0x10) != 0; // PPU D4
+            Cart.Emu.SeventyTwoPinConnector[67] = (t & 0x20) != 0; // PPU D5
+            Cart.Emu.SeventyTwoPinConnector[66] = (t & 0x40) != 0; // PPU D6
+            Cart.Emu.SeventyTwoPinConnector[65] = (t & 0x80) != 0; // PPU D7
+        }
+        public byte Connector_ReadPPUDataPins()
+        {
+            byte t = 0;
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[29] ? 0x01 : 0); // PPU D0
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[30] ? 0x02 : 0); // PPU D1
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[31] ? 0x04 : 0); // PPU D2
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[32] ? 0x08 : 0); // PPU D3
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[68] ? 0x10 : 0); // PPU D4
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[67] ? 0x20 : 0); // PPU D5
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[66] ? 0x40 : 0); // PPU D6
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[65] ? 0x80 : 0); // PPU D7
+            return t;
+        }
+
+        public void Connector_SetUpCPUAddressPins(ushort Address) // the 2A03 bus, not the 6502 bus.
+        {
+            Cart.Emu.SeventyTwoPinConnector[12] = (Address & 0x01) != 0; // CPU A0
+            Cart.Emu.SeventyTwoPinConnector[11] = (Address & 0x02) != 0; // CPU A1
+            Cart.Emu.SeventyTwoPinConnector[10] = (Address & 0x04) != 0; // CPU A2
+            Cart.Emu.SeventyTwoPinConnector[9] = (Address & 0x08) != 0; // CPU A3
+            Cart.Emu.SeventyTwoPinConnector[8] = (Address & 0x10) != 0; // CPU A4
+            Cart.Emu.SeventyTwoPinConnector[7] = (Address & 0x20) != 0; // CPU A5
+            Cart.Emu.SeventyTwoPinConnector[6] = (Address & 0x40) != 0; // CPU A6
+            Cart.Emu.SeventyTwoPinConnector[5] = (Address & 0x80) != 0; // CPU A7
+            Cart.Emu.SeventyTwoPinConnector[4] = (Address & 0x0100) != 0; // CPU A8
+            Cart.Emu.SeventyTwoPinConnector[3] = (Address & 0x0200) != 0; // CPU A9
+            Cart.Emu.SeventyTwoPinConnector[2] = (Address & 0x0400) != 0; // CPU A10
+            Cart.Emu.SeventyTwoPinConnector[1] = (Address & 0x0800) != 0; // CPU A11
+            Cart.Emu.SeventyTwoPinConnector[38] = (Address & 0x1000) != 0; // CPU A12
+            Cart.Emu.SeventyTwoPinConnector[39] = (Address & 0x2000) != 0; // CPU A13
+            Cart.Emu.SeventyTwoPinConnector[40] = (Address & 0x4000) != 0; // CPU A14
+            Cart.Emu.SeventyTwoPinConnector[49] = (Address & 0x8000) != 0; // CPU A15
+        }
+        public ushort Connector_ReadCPUAddressPins()
+        {
+            ushort Address = 0;
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[49] ? 0x8000 : 0); // CPU A0
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[40] ? 0x4000 : 0); // CPU A1
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[39] ? 0x2000 : 0); // CPU A2
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[38] ? 0x1000 : 0); // CPU A3
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[1] ? 0x0800 : 0); // CPU A4
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[2] ? 0x0400 : 0); // CPU A5
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[3] ? 0x0200 : 0); // CPU A6
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[4] ? 0x0100 : 0); // CPU A7
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[5] ? 0x0080 : 0); // CPU A8
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[6] ? 0x0040 : 0); // CPU A9
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[7] ? 0x0020 : 0); // CPU A10
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[8] ? 0x0010 : 0); // CPU A11
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[9] ? 0x0008 : 0); // CPU A12
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[10] ? 0x0004 : 0); // CPU A13
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[11] ? 0x0002 : 0); // CPU A14
+            Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[12] ? 0x0001 : 0); // CPU A15
+            return Address;
+        }
+        public void Connector_SetUpCPUDataPins(byte t)
+        {
+            Cart.Emu.SeventyTwoPinConnector[48] = (t & 0x01) != 0; // PPU D0
+            Cart.Emu.SeventyTwoPinConnector[47] = (t & 0x02) != 0; // PPU D1
+            Cart.Emu.SeventyTwoPinConnector[46] = (t & 0x04) != 0; // PPU D2
+            Cart.Emu.SeventyTwoPinConnector[45] = (t & 0x08) != 0; // PPU D3
+            Cart.Emu.SeventyTwoPinConnector[44] = (t & 0x10) != 0; // PPU D4
+            Cart.Emu.SeventyTwoPinConnector[43] = (t & 0x20) != 0; // PPU D5
+            Cart.Emu.SeventyTwoPinConnector[42] = (t & 0x40) != 0; // PPU D6
+            Cart.Emu.SeventyTwoPinConnector[41] = (t & 0x80) != 0; // PPU D7
+        }
+        public byte Connector_ReadCPUDataPins()
+        {
+            byte t = 0;
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[48] ? 0x01 : 0); // PPU D0
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[47] ? 0x02 : 0); // PPU D1
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[46] ? 0x04 : 0); // PPU D2
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[45] ? 0x08 : 0); // PPU D3
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[44] ? 0x10 : 0); // PPU D4
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[43] ? 0x20 : 0); // PPU D5
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[42] ? 0x40 : 0); // PPU D6
+            t |= (byte)(Cart.Emu.SeventyTwoPinConnector[41] ? 0x80 : 0); // PPU D7
+            return t;
         }
     }
 
@@ -461,6 +588,89 @@ namespace TriCNES
         public byte CPUClock;    // Counts down from 12. When it's 0, a CPU cycle occurs.
         public byte MasterClock; // Counts up every master clock cycle. Resets at 24.
 
+        public bool[] SeventyTwoPinConnector; // The 72 pin connector.
+        /* The actual pinout is 1-indexed, but I don't care, I'm zero-indexing this lad.
+         * Key:
+         *     -- Power and Ground
+         *     -> From console to cartridge
+         *     <- From cartridge to console
+         *     <> I/O between both cartridge and console.
+         * 
+         * 00 -- GND
+         * 01 -> CPU A11
+         * 02 -> CPU A10
+         * 03 -> CPU A9
+         * 04 -> CPU A8
+         * 05 -> CPU A7
+         * 06 -> CPU A6
+         * 07 -> CPU A5
+         * 08 -> CPU A4
+         * 09 -> CPU A3
+         * 10 -> CPU A2
+         * 11 -> CPU A1
+         * 12 -> CPU A0
+         * 13 -> CPU R/W
+         * 14 <- /IRQ
+         * 15    EXP 0 (unused)
+         * 16    EXP 1 (unused)
+         * 17    EXP 2 (unused)
+         * 18    EXP 3 (unused)
+         * 19    EXP 4 (unused)
+         * 20 -> PPU /RD
+         * 21 <- CIRAM A10
+         * 22 -> PPU A6
+         * 23 -> PPU A5
+         * 24 -> PPU A4
+         * 25 -> PPU A3
+         * 26 -> PPU A2
+         * 27 -> PPU A1
+         * 28 -> PPU A0
+         * 29 <> PPU D0
+         * 30 <> PPU D1
+         * 31 <> PPU D2
+         * 32 <> PPU D3
+         * 33 -> CIC toPak
+         * 34 <- CIC toMB
+         * 35 -- +5V
+         * 36 -> System CLK
+         * 37 -> M2
+         * 38 -> CPU A12
+         * 39 -> CPU A13
+         * 40 -> CPU A14
+         * 41 <> CPU D7
+         * 42 <> CPU D6
+         * 43 <> CPU D5
+         * 44 <> CPU D4
+         * 45 <> CPU D3
+         * 46 <> CPU D2
+         * 47 <> CPU D1
+         * 48 <> CPU D0
+         * 49 -> /ROMSEL
+         * 50    EXP 9 (unused)
+         * 51    EXP 8 (unused)
+         * 52    EXP 7 (unused)
+         * 53    EXP 6 (unused)
+         * 54    EXP 5 (unused)
+         * 55 -> PPU /WR
+         * 56 <- CIRAM /CE
+         * 57 -> PPU /A13
+         * 58 -> PPU A7
+         * 59 -> PPU A8
+         * 60 -> PPU A9
+         * 61 -> PPU A11 (Not a typo, A11 and A10 are counterintuitively arranged)
+         * 62 -> PPU A10 (Not a typo, A11 and A10 are counterintuitively arranged)
+         * 63 -> PPU A12
+         * 64 -> PPU A13
+         * 65 <> PPU D7
+         * 66 <> PPU D6
+         * 67 <> PPU D5
+         * 68 <> PPU D4
+         * 69 -> CIC +RST
+         * 70 -> CIC CLK
+         * 71 -- GND
+         * 
+         */
+
         public byte APUAlignment; // at power on or reset, is this a get/put, and how long until the DMC DMA?
 
         public bool APU_PutCycle = false; // The APU needs to know if this is a "get" or "put" cycle.
@@ -580,6 +790,8 @@ namespace TriCNES
             {
                 OAM2[oam2_init] = 0xFF;
             }
+
+            SeventyTwoPinConnector = new bool[72];
 
             // set up RAM and PPU RAM Pattern
             int i = 0;
@@ -1866,11 +2078,27 @@ namespace TriCNES
 
         byte FetchVideoMemory()
         {
-            if (Cart.Emu.CopyV)
+            Cart.MapperChip.Connector_SetUpPPUAddressPins();
+
+            byte t = 0;
+
+            if (Cart.Emu.PPU_AddressBus >= 0x2000)
             {
-                Cart.Emu.PPU_AddressBus = Cart.Emu.PPU_v;
+                // We're reading from on-console VRAM, not the cartridge.
+                t = Cart.MapperChip.FetchNametable();
             }
-            return Cart.MapperChip.FetchPPU();
+            else
+            { 
+                // We're reading from the cartridge.
+                Cart.MapperChip.FetchPPU();
+                t = Cart.MapperChip.Connector_ReadPPUDataPins();
+            }
+
+
+            Cart.Emu.PPU_AddressBus &= 0xFF00;
+            Cart.Emu.PPU_AddressBus |= t;
+
+            return t;
         }
 
         bool PPUActiveForShiftRegisterUpdate;
@@ -3780,6 +4008,7 @@ namespace TriCNES
                     break;
                 case 1:
                     // fetch byte from Nametable
+                    PPU_PatternAddressRegister_NT = (ushort)(0x2000 + (PPU_v & 0x0FFF)); // this happens again.
                     PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_NT & 0xFF00) | PPU_OctalLatch);
                     PPU_RenderTemp = FetchVideoMemory();
                     PPU_Commit_NametableFetch = true;
@@ -3791,6 +4020,7 @@ namespace TriCNES
                     break;
                 case 3:
                     // fetch attribute byte from attribute table
+                    PPU_PatternAddressRegister_AT = (ushort)(0x23C0 | (PPU_v & 0x0C00) | ((PPU_v >> 4) & 0x38) | ((PPU_v >> 2) & 0x07)); // this happens again.
                     PPU_AddressBus = (ushort)((PPU_PatternAddressRegister_AT & 0xFF00) | PPU_OctalLatch);
                     PPU_RenderTemp = FetchVideoMemory();
                     PPU_Commit_AttributeFetch = true;
@@ -4564,7 +4794,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x04: //DOP ***
+                    case 0x04: //NOP zp ***
                         if (operationCycle == 1)
                         {
                             GetAddressZeroPage();
@@ -4683,7 +4913,7 @@ namespace TriCNES
 
                         break;
 
-                    case 0x0C: //TOP ***
+                    case 0x0C: //NOP Absolute ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -4855,7 +5085,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x14: //DOP ***
+                    case 0x14: //NOP zp, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -4907,7 +5137,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x17: //SLO zp X *** 
+                    case 0x17: //SLO zp, X *** 
                         switch (operationCycle)
                         {
                             case 1:
@@ -4979,7 +5209,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x1C: //TOP ***
+                    case 0x1C: //NOP Abs, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -5456,7 +5686,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x34: //DOP ***
+                    case 0x34: //NOP zp, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -5580,7 +5810,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x3C: //TOP ***
+                    case 0x3C: //NOP Absolute, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -5761,7 +5991,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x44: //DOP ***
+                    case 0x44: //NOP zp ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -6045,7 +6275,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x54: //DOP ***
+                    case 0x54: //NOP zp, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -6060,7 +6290,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x55: //EOR zp , X
+                    case 0x55: //EOR zp, X
                         switch (operationCycle)
                         {
                             case 1:
@@ -6172,7 +6402,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x5C: //TOP ***
+                    case 0x5C: //NOP Absolute, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -6348,7 +6578,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x64: //DOP ***
+                    case 0x64: //NOP zp ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -6643,7 +6873,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x74: //DOP ***
+                    case 0x74: //NOP zp, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -6658,7 +6888,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x75: //ADC Zp, X
+                    case 0x75: //ADC zp, X
 
                         switch (operationCycle)
                         {
@@ -6769,7 +6999,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x7C: //TOP ***
+                    case 0x7C: //NOP Absolute, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -6844,7 +7074,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x80: //DOP ***
+                    case 0x80: //NOP Immediate ***
                         PollInterrupts();
                         GetImmediate();
                         CompleteOperation();
@@ -6869,7 +7099,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0x82: //DOP ***
+                    case 0x82: //NOP Immediate ***
                         PollInterrupts();
                         GetImmediate();
                         CompleteOperation();
@@ -6963,7 +7193,7 @@ namespace TriCNES
 
                         break;
 
-                    case 0x89: //DOP ***
+                    case 0x89: //NOP Immediate ***
                         PollInterrupts();
                         GetImmediate();
                         CompleteOperation();
@@ -7937,7 +8167,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0xC2: //DOP ***
+                    case 0xC2: //NOP Immediate ***
                         PollInterrupts();
                         GetImmediate();
                         CompleteOperation();
@@ -8259,7 +8489,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0xD4: //DOP ***
+                    case 0xD4: //NOP zp, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -8387,7 +8617,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0xDC: //TOP ***
+                    case 0xDC: //NOP Absolute, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -8488,7 +8718,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0xE2: //DOP ***
+                    case 0xE2: //NOP Immediate ***
                         PollInterrupts();
                         GetImmediate();
                         CompleteOperation();
@@ -8800,7 +9030,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0xF4: //DOP ***
+                    case 0xF4: //NOP zp, X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -8928,7 +9158,7 @@ namespace TriCNES
                         }
                         break;
 
-                    case 0xFC: //TOP ***
+                    case 0xFC: //NOP Absolute ,X ***
                         switch (operationCycle)
                         {
                             case 1:
@@ -9398,11 +9628,12 @@ namespace TriCNES
 
         void MapperFetch(ushort Address, byte Mapper)
         {
+            Cart.MapperChip.Connector_SetUpCPUAddressPins(Address);
             Cart.MapperChip.FetchPRG(Address, false);
             dataPinsAreNotFloating = Cart.MapperChip.dataPinsAreNotFloating;
             if (dataPinsAreNotFloating)
-            {
-                dataBus = Cart.MapperChip.dataBus;
+            {                
+                dataBus = Cart.MapperChip.Connector_ReadCPUDataPins();
             }
             return;
         }
@@ -9427,11 +9658,13 @@ namespace TriCNES
         public bool SyncFM2; // This is set if we're running an FM2 TAS, which (due to FCEUX's very incorrect timing of the first frame after power on) I need to start execution on scanline 240, and prevent the vblank flag from being set.
         public void Store(byte Input, ushort Address)
         {
+            Cart.MapperChip.Connector_SetUpCPUAddressPins(Address);
+            Cart.MapperChip.Connector_SetUpCPUDataPins(Input);
             // This is used whenever writing anywhere with the CPU
             if (Address < 0x2000)
             {
                 //guaranteed to be RAM
-
+                // Even still, the address pins on the 72 pin connector get updated.
                 RAM[Address & 0x7FF] = Input;
 
             }
@@ -9865,6 +10098,15 @@ namespace TriCNES
 
         void StorePPUData(ushort Address, byte In)
         {
+            Cart.Emu.SeventyTwoPinConnector[29] = (In & 0x01) != 0; // PPU D0
+            Cart.Emu.SeventyTwoPinConnector[30] = (In & 0x02) != 0; // PPU D1
+            Cart.Emu.SeventyTwoPinConnector[31] = (In & 0x04) != 0; // PPU D2
+            Cart.Emu.SeventyTwoPinConnector[32] = (In & 0x08) != 0; // PPU D3
+            Cart.Emu.SeventyTwoPinConnector[68] = (In & 0x10) != 0; // PPU D4
+            Cart.Emu.SeventyTwoPinConnector[67] = (In & 0x20) != 0; // PPU D5
+            Cart.Emu.SeventyTwoPinConnector[66] = (In & 0x40) != 0; // PPU D6
+            Cart.Emu.SeventyTwoPinConnector[65] = (In & 0x80) != 0; // PPU D7
+
             // writing to the PPU's VRAM.
             // first, check if the address has any mirroring going on:
             Address = PPUAddressWithMirroring(Address);
@@ -9891,7 +10133,6 @@ namespace TriCNES
                     }
                 }
                 VRAM[Address & 0x7FF] = In;
-
             }
         }
 
@@ -10608,11 +10849,11 @@ namespace TriCNES
 
                 //string TempLine_PPU = LogLine + "\t$2000:" + Observe(0x2000).ToString("X2") + "\t$2001:" + Observe(0x2001).ToString("X2") + "\t$2002:" + Observe(0x2002).ToString("X2") + "\tR/W Addr:" + PPU_v.ToString("X4") + "\tPPUAddrLatch:" + PPUAddrLatch + "\tPPU AddressBus: " + PPU_AddressBus.ToString("X4");
                 //string TempLine_PPU2 = LogLine + "\tVRAMAddress:" + PPU_v.ToString("X4") + "\tPPUReadBuffer:" + PPU_ReadBuffer.ToString("X2");
-                //string TempLine_PPU3 = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\todd:" + PPU_OddFrame.ToString() + "\tv: " + PPU_v.ToString("X4");
+                string TempLine_PPU3 = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\todd:" + PPU_OddFrame.ToString() + "\tv: " + PPU_v.ToString("X4");
 
-                String TempLine_Mapper = LogLine + Cart.MapperChip.AppendToDebugLog();
+                //String TempLine_Mapper = LogLine + Cart.MapperChip.AppendToDebugLog();
 
-                DebugLog.AppendLine(TempLine_Mapper);
+                DebugLog.AppendLine(TempLine_PPU3);
             }
             else
             {
