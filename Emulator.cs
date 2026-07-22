@@ -156,19 +156,24 @@ namespace TriCNES
             // This will always use the upper 8 bits of the address bus | the octal latch. This Octal Latch replaces the lower 8 bits of the address bus.
             ushort Address = Connector_ReadPPUAddressPins();
 
-            byte t = 0;
-
-            if (Cart.UsingCHRRAM)
+            byte t = Cart.Emu.PPU_OctalLatch;
+            if (Cart.Emu.SeventyTwoPinConnector[57] && Address < 0x2000) // Addresses $2000 through $3FFF do NOT read from the cartrdige.
             {
-                t = Cart.CHRRAM[Address];
+                if (Cart.UsingCHRRAM)
+                {
+                    t = Cart.CHRRAM[Address];
+                }
+                else
+                {
+                    //Pattern Table
+                    t = Cart.MapperChip.FetchCHR(Address, false);
+                }
             }
-            else
-            {
-                //Pattern Table
-                t = Cart.MapperChip.FetchCHR(Address, false);
-            }
-
             Connector_SetUpPPUDataPins(t);
+        }
+        public virtual void CheckCIRAM()
+        {
+            Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
         }
         public virtual byte FetchNametable()
         {
@@ -253,6 +258,7 @@ namespace TriCNES
             Cart.Emu.SeventyTwoPinConnector[61] = (Cart.Emu.PPU_AddressBus & 0x0800) != 0; // PPU A11
             Cart.Emu.SeventyTwoPinConnector[63] = (Cart.Emu.PPU_AddressBus & 0x1000) != 0; // PPU A12
             Cart.Emu.SeventyTwoPinConnector[64] = (Cart.Emu.PPU_AddressBus & 0x2000) != 0; // PPU A13
+            Cart.Emu.SeventyTwoPinConnector[57] = (Cart.Emu.PPU_AddressBus & 0x2000) == 0; // PPU \A13
         }
         public ushort Connector_ReadPPUAddressPins()
         {
@@ -2079,24 +2085,22 @@ namespace TriCNES
         byte FetchVideoMemory()
         {
             Cart.MapperChip.Connector_SetUpPPUAddressPins();
-
+            Cart.MapperChip.CheckCIRAM();
             byte t = 0;
 
-            if (Cart.Emu.PPU_AddressBus >= 0x2000)
+            // Always attempt to read from the cartridge. The data pins would not be updated if reading from the nametable.
+            Cart.MapperChip.FetchPPU();
+            t = Cart.MapperChip.Connector_ReadPPUDataPins();
+
+            if (PPU_AddressBus >= 0x2000 && Cart.Emu.SeventyTwoPinConnector[56])
             {
                 // We're reading from on-console VRAM, not the cartridge.
+                // NOTE: In theory you could trigger bus conflicts with this. I'm currently just assuming the bus is free.
                 t = Cart.MapperChip.FetchNametable();
             }
-            else
-            { 
-                // We're reading from the cartridge.
-                Cart.MapperChip.FetchPPU();
-                t = Cart.MapperChip.Connector_ReadPPUDataPins();
-            }
 
-
-            Cart.Emu.PPU_AddressBus &= 0xFF00;
-            Cart.Emu.PPU_AddressBus |= t;
+            PPU_AddressBus &= 0xFF00;
+            PPU_AddressBus |= t;
 
             return t;
         }

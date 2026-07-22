@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 
 namespace TriCNES.mappers
 {
@@ -226,35 +227,46 @@ namespace TriCNES.mappers
                 else { Address &= 0x7FF; return Cart.CHRROM[(Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
             }
         }
-        public override byte FetchNametable()
+        public override void CheckCIRAM()
         {
-            ushort Address = (ushort)((Cart.Emu.PPU_AddressBus & 0x3F00) | Cart.Emu.PPU_OctalLatch);
-            Address = Cart.MapperChip.MirrorNametable(Address);
-            byte t = 0;
             if (Cart.AlternativeNametableArrangement)
             {
-                if ((Address & 0x800) != 0)
-                {
-                    // Oh wait- we *are* reading from the cartridge!
-                    // using the extra PRG VRAM.
-                    Address = Connector_ReadPPUAddressPins();
-                    Address &= 0x7FF;
-                    byte b = Cart.PRGVRAM[Address];
-                    Connector_SetUpPPUDataPins(b);
-                    t = Connector_ReadPPUDataPins();
-                }
-                else
-                {
-                    Address &= 0x7FF;
-                    t = Cart.Emu.VRAM[Address];
-                }
+                Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57] && !Cart.Emu.SeventyTwoPinConnector[61];
             }
             else
             {
-                Address &= 0x7FF;
-                t = Cart.Emu.VRAM[Address];
+                Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
             }
-            return t;
+        }
+        public override void FetchPPU()
+        {
+            // This will always use the upper 8 bits of the address bus | the octal latch. This Octal Latch replaces the lower 8 bits of the address bus.
+            ushort Address = Connector_ReadPPUAddressPins();
+
+            byte t = Cart.Emu.PPU_OctalLatch;
+            if (Cart.Emu.SeventyTwoPinConnector[57] && Address < 0x2000) // Addresses $2000 through $3FFF do NOT read from the cartrdige.
+            {
+                if (Cart.UsingCHRRAM)
+                {
+                    t = Cart.CHRRAM[Address];
+                }
+                else
+                {
+                    //Pattern Table
+                    t = Cart.MapperChip.FetchCHR(Address, false);
+                }
+            }
+            else if (Cart.AlternativeNametableArrangement && (Address & 0x800) != 0)
+            {
+                // Oh wait- we *are* reading from the cartridge!
+                // using the extra PRG VRAM.
+                Address = Connector_ReadPPUAddressPins();
+                Address &= 0x7FF;
+                byte b = Cart.PRGVRAM[Address];
+                Connector_SetUpPPUDataPins(b);
+                t = Connector_ReadPPUDataPins();
+            }
+            Connector_SetUpPPUDataPins(t);
         }
         public override ushort MirrorNametable(ushort Address)
         {
