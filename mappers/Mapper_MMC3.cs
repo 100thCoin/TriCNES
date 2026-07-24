@@ -123,7 +123,7 @@ namespace TriCNES.mappers
                     {
                         if (Address >= 0x7000 && Address <= 0x71FF)
                         {
-                            if ((Mapper_4_PRGRAMProtect & 0x10) != 0)
+                            if ((Mapper_4_PRGRAMProtect & 0x10) == 0)
                             {
                                 Cart.PRGRAM[Address & 0x3FF] = Input;
 
@@ -131,14 +131,14 @@ namespace TriCNES.mappers
                         }
                         else if (Address >= 0x7200 && Address <= 0x73FF)
                         {
-                            if ((Mapper_4_PRGRAMProtect & 0x40) != 0)
+                            if ((Mapper_4_PRGRAMProtect & 0x40) == 0)
                             {
                                 Cart.PRGRAM[Address & 0x3FF] = Input;
                             }
                         }
                     }
                 }
-                else if ((Mapper_4_PRGRAMProtect & 0xC0) != 0) // bit 7 enables PRG RAM, bit 6 enables writing there.
+                else if ((Mapper_4_PRGRAMProtect & 0xC0) == 0x80) // bit 7 enables PRG RAM, bit 6 disables writing there.
                 {
                     Cart.PRGRAM[Address & 0x1FFF] = Input;
                 }
