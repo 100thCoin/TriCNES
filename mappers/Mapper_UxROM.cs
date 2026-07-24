@@ -9,6 +9,10 @@ namespace TriCNES.mappers
         public byte Mapper_2_BankSelect;
         public override void FetchPRG(ushort Address, bool Observe)
         {
+            if (!Observe)
+            {
+                Address = Connector_ReadCPUAddressPins();
+            }
             bool notFloating = false;
             byte data = 0;
             if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
@@ -46,7 +50,10 @@ namespace TriCNES.mappers
         {
             List<byte> State = new List<byte>();
             foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
-            foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
+            if (Cart.UsingCHRRAM)
+            {
+                foreach (Byte b in Cart.CHRROM) { State.Add(b); }
+            }
             State.Add(Mapper_2_BankSelect);
             return State;
         }
@@ -54,7 +61,10 @@ namespace TriCNES.mappers
         {
             int p = startIndex;
             for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
-            for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
+            if (Cart.UsingCHRRAM)
+            {
+                for (int i = 0; i < Cart.CHRROM.Length; i++) { Cart.CHRROM[i] = State[p++]; }
+            }
             Mapper_2_BankSelect = State[p++];
             exitIndex = p;
         }

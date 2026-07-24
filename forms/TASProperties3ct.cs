@@ -65,7 +65,17 @@ namespace TriCNES
                 while (i < CartridgeArray.Length)
                 {
                     CartridgeArray[i].PRGRAM = new byte[0x2000];
-                    CartridgeArray[i].CHRRAM = new byte[0x2000];
+                    if (CartridgeArray[i].UsingCHRRAM)
+                    {                        
+                        if ((64 << CartridgeArray[i].ROM[11]) == 0)
+                        {
+                            CartridgeArray[i].CHRROM = new byte[0x2000]; // Default to 0x2000 bytes of CHR RAM.
+                        }
+                        else
+                        {
+                            CartridgeArray[i].CHRROM = new byte[64 << CartridgeArray[i].ROM[11]]; // 0x2000 bytes of CHR ROM, multiplied by byte 5 of the iNES header.
+                        }                        
+                    }
                     Mapper MapperChip;
                     // clear all mapper stuff.
                     switch (CartridgeArray[i].MemoryMapper)

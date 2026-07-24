@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net;
 
 namespace TriCNES.mappers
 {
@@ -10,6 +9,10 @@ namespace TriCNES.mappers
         public byte Mapper_7_BankSelect;
         public override void FetchPRG(ushort Address, bool Observe)
         {
+            if (!Observe)
+            {
+                Address = Connector_ReadCPUAddressPins();
+            }
             bool notFloating = false;
             byte data = 0;
             if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
@@ -17,11 +20,11 @@ namespace TriCNES.mappers
 
             if (Address >= 0x8000)
             {
-                dataPinsAreNotFloating = true;
                 ushort tempo = (ushort)(Address & 0x7FFF);
-                dataBus = Cart.PRGROM[(0x8000 * (Mapper_7_BankSelect & 0x07) + tempo) & (Cart.PRGROM.Length - 1)];
+                data = Cart.PRGROM[(0x8000 * (Mapper_7_BankSelect & 0x07) + tempo) & (Cart.PRGROM.Length - 1)]; // Get the address from the ROM file. If the ROM only has $4000 bytes, this will make addresses > $BFFF mirrors of $8000 through $BFFF.
+                notFloating = true;
             }
-            // AOROM doesn't have any PRG RAM
+            //open bus
 
             if (notFloating)
             {
@@ -53,7 +56,10 @@ namespace TriCNES.mappers
         {
             List<byte> State = new List<byte>();
             foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
-            foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
+            if (Cart.UsingCHRRAM)
+            {
+                foreach (Byte b in Cart.CHRROM) { State.Add(b); }
+            }
             State.Add(Mapper_7_BankSelect);
             return State;
         }
@@ -61,7 +67,10 @@ namespace TriCNES.mappers
         {
             int p = startIndex;
             for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
-            for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
+            if (Cart.UsingCHRRAM)
+            {
+                for (int i = 0; i < Cart.CHRROM.Length; i++) { Cart.CHRROM[i] = State[p++]; }
+            }
             Mapper_7_BankSelect = State[p++];
             exitIndex = p;
         }

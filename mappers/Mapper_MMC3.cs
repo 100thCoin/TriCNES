@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net;
 
 namespace TriCNES.mappers
 {
@@ -25,6 +24,10 @@ namespace TriCNES.mappers
         public byte Mapper_4_M2Filter;
         public override void FetchPRG(ushort Address, bool Observe)
         {
+            if (!Observe)
+            {
+                Address = Connector_ReadCPUAddressPins();
+            }
             bool notFloating = false;
             byte data = 0;
             if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
@@ -205,26 +208,26 @@ namespace TriCNES.mappers
                 }
             }
         }
-        public override byte FetchCHR(ushort Address, bool Observe)
+        public override int FetchPatternAddress(ushort Address)
         {
             //Writes to $8000 determine the mode, writes to $8001 determine the banks
             if ((Mapper_4_8000 & 0x80) == 0) // bit 7 of the previous write to $8000 determines which pattern table is 2 2kb banks, and which is 4 1kb banks.
             {
-                if (Address < 0x800) { return Cart.CHRROM[(Mapper_4_CHR_2K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else if (Address < 0x1000) { Address &= 0x7FF; return Cart.CHRROM[(Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else if (Address < 0x1400) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_4_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else if (Address < 0x1800) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_4_CHR_1K4 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else if (Address < 0x1C00) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_4_CHR_1K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else { Address &= 0x3FF; return Cart.CHRROM[(Mapper_4_CHR_1KC * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                if (Address < 0x800)                         { return (Mapper_4_CHR_2K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else if (Address < 0x1000) { Address &= 0x7FF; return (Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else if (Address < 0x1400) { Address &= 0x3FF; return (Mapper_4_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else if (Address < 0x1800) { Address &= 0x3FF; return (Mapper_4_CHR_1K4 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else if (Address < 0x1C00) { Address &= 0x3FF; return (Mapper_4_CHR_1K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else                       { Address &= 0x3FF; return (Mapper_4_CHR_1KC * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
             }
             else
             {
-                if (Address < 0x400) { return Cart.CHRROM[(Mapper_4_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else if (Address < 0x800) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_4_CHR_1K4 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else if (Address < 0xC00) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_4_CHR_1K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else if (Address < 0x1000) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_4_CHR_1KC * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else if (Address < 0x1800) { Address &= 0x7FF; return Cart.CHRROM[(Mapper_4_CHR_2K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else { Address &= 0x7FF; return Cart.CHRROM[(Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+                if (Address < 0x400)                         { return (Mapper_4_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else if (Address < 0x800)  { Address &= 0x3FF; return (Mapper_4_CHR_1K4 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else if (Address < 0xC00)  { Address &= 0x3FF; return (Mapper_4_CHR_1K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else if (Address < 0x1000) { Address &= 0x3FF; return (Mapper_4_CHR_1KC * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else if (Address < 0x1800) { Address &= 0x7FF; return (Mapper_4_CHR_2K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+                else                       { Address &= 0x7FF; return (Mapper_4_CHR_2K8 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
             }
         }
         public override void CheckCIRAM()
@@ -246,15 +249,8 @@ namespace TriCNES.mappers
             byte t = Cart.Emu.PPU_OctalLatch;
             if (Cart.Emu.SeventyTwoPinConnector[57] && Address < 0x2000) // Addresses $2000 through $3FFF do NOT read from the cartrdige.
             {
-                if (Cart.UsingCHRRAM)
-                {
-                    t = Cart.CHRRAM[Address];
-                }
-                else
-                {
-                    //Pattern Table
-                    t = Cart.MapperChip.FetchCHR(Address, false);
-                }
+                int CHR_Address = FetchPatternAddress(Address);
+                t = Cart.CHRROM[CHR_Address];
             }
             else if (Cart.AlternativeNametableArrangement && (Address & 0x800) != 0)
             {
@@ -287,7 +283,10 @@ namespace TriCNES.mappers
         {
             List<byte> State = new List<byte>();
             foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
-            foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
+            if (Cart.UsingCHRRAM)
+            {
+                foreach (Byte b in Cart.CHRROM) { State.Add(b); }
+            }
             if (Cart.PRGVRAM != null)
             {
                 foreach (Byte b in Cart.PRGVRAM) { State.Add(b); }
@@ -314,7 +313,10 @@ namespace TriCNES.mappers
         {
             int p = startIndex;
             for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
-            for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
+            if (Cart.UsingCHRRAM)
+            {
+                for (int i = 0; i < Cart.CHRROM.Length; i++) { Cart.CHRROM[i] = State[p++]; }
+            }
             if (Cart.PRGVRAM != null)
             {
                 for (int i = 0; i < Cart.PRGVRAM.Length; i++) { Cart.PRGVRAM[i] = State[p++]; }

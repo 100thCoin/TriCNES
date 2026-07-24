@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 
 namespace TriCNES.mappers
 {
@@ -19,6 +18,10 @@ namespace TriCNES.mappers
 
         public override void FetchPRG(ushort Address, bool Observe)
         {
+            if (!Observe)
+            {
+                Address = Connector_ReadCPUAddressPins();
+            }
             bool notFloating = false;
             byte data = 0;
             if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
@@ -99,9 +102,9 @@ namespace TriCNES.mappers
             }
             return;
         }
-        public override byte FetchCHR(ushort Address, bool Observe)
+        public override int FetchPatternAddress(ushort Address)
         {
-            return Cart.CHRRAM[Address];
+            return Address;
         }
 
         public override void StorePRG(ushort Address, byte Input)
@@ -186,8 +189,10 @@ namespace TriCNES.mappers
         {
             List<byte> State = new List<byte>();
             foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
-            foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
-
+            if (Cart.UsingCHRRAM)
+            {
+                foreach (Byte b in Cart.CHRROM) { State.Add(b); }
+            }
             State.Add(FDS_4025_Control);
             State.Add((byte)Cart.FDS.clock);
             State.Add((byte)(Cart.FDS.clock >> 8));
@@ -210,8 +215,10 @@ namespace TriCNES.mappers
         {
             int p = startIndex;
             for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
-            for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
-
+            if (Cart.UsingCHRRAM)
+            {
+                for (int i = 0; i < Cart.CHRROM.Length; i++) { Cart.CHRROM[i] = State[p++]; }
+            }
             FDS_4025_Control = State[p++];
             Cart.FDS.clock = State[p++];
             Cart.FDS.clock |= (ushort)(State[p++] << 8);

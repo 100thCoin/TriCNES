@@ -27,6 +27,10 @@ namespace TriCNES.mappers
         public ushort Mapper_69_IRQCounter; // When enabled the 16-bit IRQ counter is decremented once per CPU cycle. When the IRQ counter is decremented from $0000 to $FFFF an IRQ is generated.
         public override void FetchPRG(ushort Address, bool Observe)
         {
+            if (!Observe)
+            {
+                Address = Connector_ReadCPUAddressPins();
+            }
             bool notFloating = false;
             byte data = 0;
             if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
@@ -127,16 +131,16 @@ namespace TriCNES.mappers
                 } // else do nothing
             }
         }
-        public override byte FetchCHR(ushort Address, bool Observe)
+        public override int FetchPatternAddress(ushort Address)
         {
-            if (Address < 0x400) { return Cart.CHRROM[(Mapper_69_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-            else if (Address < 0x800) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_69_CHR_1K1 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-            else if (Address < 0xC00) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_69_CHR_1K2 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-            else if (Address < 0x1000) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_69_CHR_1K3 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-            else if (Address < 0x1400) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_69_CHR_1K4 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-            else if (Address < 0x1800) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_69_CHR_1K5 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-            else if (Address < 0x1C00) { Address &= 0x3FF; return Cart.CHRROM[(Mapper_69_CHR_1K6 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
-            else { Address &= 0x3FF; return Cart.CHRROM[(Mapper_69_CHR_1K7 * 0x400 + Address) & (Cart.CHRROM.Length - 1)]; }
+            if (Address < 0x400) { return (Mapper_69_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+            else if (Address < 0x800) { Address &= 0x3FF; return (Mapper_69_CHR_1K1 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+            else if (Address < 0xC00) { Address &= 0x3FF; return (Mapper_69_CHR_1K2 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+            else if (Address < 0x1000) { Address &= 0x3FF; return (Mapper_69_CHR_1K3 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+            else if (Address < 0x1400) { Address &= 0x3FF; return (Mapper_69_CHR_1K4 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+            else if (Address < 0x1800) { Address &= 0x3FF; return (Mapper_69_CHR_1K5 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+            else if (Address < 0x1C00) { Address &= 0x3FF; return (Mapper_69_CHR_1K6 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
+            else { Address &= 0x3FF; return (Mapper_69_CHR_1K7 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
         }
         public override ushort MirrorNametable(ushort Address)
         {
@@ -162,7 +166,10 @@ namespace TriCNES.mappers
         {
             List<byte> State = new List<byte>();
             foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
-            foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
+            if (Cart.UsingCHRRAM)
+            {
+                foreach (Byte b in Cart.CHRROM) { State.Add(b); }
+            }
             State.Add(Mapper_69_CMD);
             State.Add(Mapper_69_CHR_1K0);
             State.Add(Mapper_69_CHR_1K1);
@@ -189,7 +196,10 @@ namespace TriCNES.mappers
         {
             int p = startIndex;
             for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
-            for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
+            if (Cart.UsingCHRRAM)
+            {
+                for (int i = 0; i < Cart.CHRROM.Length; i++) { Cart.CHRROM[i] = State[p++]; }
+            }
             Mapper_69_CMD = State[p++];
             Mapper_69_CHR_1K0 = State[p++];
             Mapper_69_CHR_1K1 = State[p++];

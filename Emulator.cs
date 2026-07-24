@@ -28,7 +28,6 @@ namespace TriCNES
         public byte CHR_Size;       // Header info: how many kb of CHR data does this cartridge have?
         public byte PRG_SizeMinus1; // PRG_Size-1; This is frequently used when grabbing data from PRG banks
 
-        public byte[] CHRRAM;       // If this cartridge has character RAM, this array is used.
         public bool UsingCHRRAM;    // Header info: CHR RAM doesn't exist on all cartridges.
 
         public byte[] PRGRAM;       // PRG RAM / Battery backed save RAM.
@@ -56,8 +55,21 @@ namespace TriCNES
 
 
             PRGROM = new byte[PRG_Size * 0x4000]; // 0x4000 bytes of PRG ROM, multiplied by byte 4 of the iNES header.
-            CHRROM = new byte[CHR_Size * 0x2000]; // 0x2000 bytes of CHR ROM, multiplied by byte 5 of the iNES header.
-            CHRRAM = new byte[0x2000];            // CHR RAM always has 2 kibibytes
+            if (!UsingCHRRAM)
+            {
+                CHRROM = new byte[CHR_Size * 0x2000]; // 0x2000 bytes of CHR ROM, multiplied by byte 5 of the iNES header.
+            }
+            else
+            {
+                if ((64 << ROM[11]) == 0)
+                {
+                    CHRROM = new byte[0x2000]; // Default to 0x2000 bytes of CHR RAM.
+                }
+                else
+                {
+                    CHRROM = new byte[64 << ROM[11]]; // 0x2000 bytes of CHR ROM, multiplied by byte 5 of the iNES header.
+                }
+            }
 
             NametableHorizontalMirroring = ((ROM[6] & 1) == 0); // The style in which the nametable is mirrored is part of the iNES header.
             AlternativeNametableArrangement = ((ROM[6] & 8) != 0); // Some mappers support other arrangements.
@@ -67,8 +79,10 @@ namespace TriCNES
             }
 
             Array.Copy(ROM, 0x10, PRGROM, 0, PRGROM.Length); // This sets up the PRG ROM array with the values from the .nes file
-            Array.Copy(ROM, 0x10 + PRGROM.Length, CHRROM, 0, CHRROM.Length); // This sets up the CHR ROM array with the values from the .nes file
-
+            if (!UsingCHRRAM)
+            {
+                Array.Copy(ROM, 0x10 + PRGROM.Length, CHRROM, 0, CHRROM.Length); // This sets up the CHR ROM array with the values from the .nes file
+            }
             // at this point, the ROM byte array is no longer needed, so null it to free up its memory.
             ROM = null;
 
@@ -98,7 +112,8 @@ namespace TriCNES
             FDS = new DiskDrive();
             FDS.InsertDisk(filepath);
             PRGRAM = new byte[0x8000]; // The FDS has 32Kib of PRG RAM!
-            CHRRAM = new byte[0x2000]; // and 8 Kib of CHR RAM.
+            CHRROM = new byte[0x2000]; // and 8 Kib of CHR RAM.
+            UsingCHRRAM = true;
             Name = filepath; // For debugging, it's nice to see the file name sometimes.
 
             MapperChip = new Mapper_FDS(ROM);
@@ -147,9 +162,9 @@ namespace TriCNES
         public virtual void StorePRG(ushort Address, byte Input)
         {
         }
-        public virtual byte FetchCHR(ushort Address, bool Observe)
+        public virtual int FetchPatternAddress(ushort Address)
         {
-            return Cart.CHRROM[Address & 0x1FFF];
+            return Address & 0x1FFF;
         }
         public virtual void FetchPPU()
         {
@@ -159,15 +174,8 @@ namespace TriCNES
             byte t = Cart.Emu.PPU_OctalLatch;
             if (Cart.Emu.SeventyTwoPinConnector[57] && Address < 0x2000) // Addresses $2000 through $3FFF do NOT read from the cartrdige.
             {
-                if (Cart.UsingCHRRAM)
-                {
-                    t = Cart.CHRRAM[Address];
-                }
-                else
-                {
-                    //Pattern Table
-                    t = Cart.MapperChip.FetchCHR(Address, false);
-                }
+                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
+                t = Cart.CHRROM[CHR_Address];
             }
             Connector_SetUpPPUDataPins(t);
         }
@@ -197,14 +205,20 @@ namespace TriCNES
         {
             List<byte> State = new List<byte>();
             foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
-            foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
+            if (Cart.UsingCHRRAM)
+            {
+                foreach (Byte b in Cart.CHRROM) { State.Add(b); }
+            }
             return State;
         }
         public virtual void LoadMapperRegisters(List<byte> State, int startIndex, out int exitIndex)
         {
             int p = startIndex;
             for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
-            for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
+            if (Cart.UsingCHRRAM)
+            {
+                for (int i = 0; i < Cart.CHRROM.Length; i++) { Cart.CHRROM[i] = State[p++]; }
+            }
             exitIndex = p;
         }
         public virtual void PPUClock() // runs every PPU clock. (See MMC3)
@@ -9559,15 +9573,8 @@ namespace TriCNES
             Address &= 0x3FFF;
             if (Address < 0x2000)
             {
-                if (Cart.UsingCHRRAM)
-                {
-                    return Cart.CHRRAM[Address];
-                }
-                else
-                {
-                    //Pattern Table
-                    return Cart.MapperChip.FetchCHR(Address, true);
-                }
+                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
+                return Cart.CHRROM[Address];
             }
             else // if the VRAM address is >= $2000, we need to consider nametable mirroring.
             {
@@ -10114,9 +10121,10 @@ namespace TriCNES
             // writing to the PPU's VRAM.
             // first, check if the address has any mirroring going on:
             Address = PPUAddressWithMirroring(Address);
-            if (Address < 0x2000) // if this is pointing to CHR RAM
+            if (Address < 0x2000 && Cart.UsingCHRRAM) // if this is pointing to CHR RAM
             {
-                Cart.CHRRAM[Address] = In;
+                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
+                Cart.CHRROM[CHR_Address] = In;
             }
             else if (Address >= 0x3F00)
             {

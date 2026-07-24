@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace TriCNES.mappers
 {
@@ -14,7 +13,7 @@ namespace TriCNES.mappers
             return;
         }
 
-        public override byte FetchCHR(ushort Address, bool Observe)
+        public override int FetchPatternAddress(ushort Address)
         {
             // there's no cartridge. TODO: Look into this. Supposedly this would likely be the lower 8 bits of the address bus, but CIRAM enable is also floating.
             return 0;

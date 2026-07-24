@@ -16,6 +16,10 @@ namespace TriCNES.mappers
         public bool Mapper_9_Latch1_FE; 
         public override void FetchPRG(ushort Address, bool Observe)
         {
+            if (!Observe)
+            {
+                Address = Connector_ReadCPUAddressPins();
+            }
             bool notFloating = false;
             byte data = 0;
             if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
@@ -69,14 +73,18 @@ namespace TriCNES.mappers
                 Mapper_9_NametableMirroring = (Input & 0x1) == 1;
             }
         }
-        public override byte FetchCHR(ushort Address, bool Observe)
+        public override void FetchPPU()
         {
-            byte temp = 0;
-            ushort Addr = Address;
-            if (Address < 0x1000) { temp = Cart.CHRROM[(Mapper_9_Latch0_FE ? Mapper_9_CHR0_FE : Mapper_9_CHR0_FD) * 0x1000 + Addr]; }
-            else { Addr &= 0xFFF; temp = Cart.CHRROM[(Mapper_9_Latch1_FE ? Mapper_9_CHR1_FE : Mapper_9_CHR1_FD) * 0x1000 + Addr]; }
-            if (!Observe)
+            // This will always use the upper 8 bits of the address bus | the octal latch. This Octal Latch replaces the lower 8 bits of the address bus.
+            ushort Address = Connector_ReadPPUAddressPins();
+
+            byte t = Cart.Emu.PPU_OctalLatch;
+            if (Cart.Emu.SeventyTwoPinConnector[57] && Address < 0x2000) // Addresses $2000 through $3FFF do NOT read from the cartrdige.
             {
+                int CHR_Address = FetchPatternAddress(Address);
+                t = Cart.CHRROM[CHR_Address];
+
+                // MMC2 has registers that do things based on the address being read.
                 if (Address == 0x0FD8)
                 {
                     Mapper_9_Latch0_FE = false;
@@ -94,7 +102,13 @@ namespace TriCNES.mappers
                     Mapper_9_Latch1_FE = true;
                 }
             }
-            return temp;
+            Connector_SetUpPPUDataPins(t);
+        }
+        public override int FetchPatternAddress(ushort Address)
+        {
+            ushort Addr = Address;
+            if (Address < 0x1000) { return (Mapper_9_Latch0_FE ? Mapper_9_CHR0_FE : Mapper_9_CHR0_FD) * 0x1000 + Addr; }
+            else { Addr &= 0xFFF; return (Mapper_9_Latch1_FE ? Mapper_9_CHR1_FE : Mapper_9_CHR1_FD) * 0x1000 + Addr; }
         }
         public override ushort MirrorNametable(ushort Address)
         {
@@ -112,7 +126,10 @@ namespace TriCNES.mappers
         {
             List<byte> State = new List<byte>();
             foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
-            foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
+            if (Cart.UsingCHRRAM)
+            {
+                foreach (Byte b in Cart.CHRROM) { State.Add(b); }
+            }
             State.Add(Mapper_9_BankSelect);
             State.Add(Mapper_9_CHR0_FD);
             State.Add(Mapper_9_CHR0_FE);
@@ -126,7 +143,10 @@ namespace TriCNES.mappers
         {
             int p = startIndex;
             for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
-            for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
+            if (Cart.UsingCHRRAM)
+            {
+                for (int i = 0; i < Cart.CHRROM.Length; i++) { Cart.CHRROM[i] = State[p++]; }
+            }
             Mapper_9_BankSelect = State[p++];
             Mapper_9_CHR0_FD = State[p++];
             Mapper_9_CHR0_FE = State[p++];

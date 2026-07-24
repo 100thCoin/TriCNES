@@ -14,6 +14,10 @@ namespace TriCNES.mappers
         public bool Mapper_1_PB;
         public override void FetchPRG(ushort Address, bool Observe)
         {
+            if (!Observe)
+            {
+                Address = Connector_ReadCPUAddressPins();
+            }
             bool notFloating = false;
             byte data = 0;
             if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
@@ -126,7 +130,7 @@ namespace TriCNES.mappers
                 Mapper_1_Control |= 0b01100;
             }
         }
-        public override byte FetchCHR(ushort Address, bool Observe)
+        public override int FetchPatternAddress(ushort Address)
         {
             // bit 4 of Mapper_1_Control controls how the pattern tables are swapped. if set, 2 banks of 4Kib. Otherwise, 1 8Kib bank
             if ((Mapper_1_Control & 0x10) != 0)
@@ -135,8 +139,8 @@ namespace TriCNES.mappers
                 // address < 0x1000 is the first pattern table, else, the second pattern table.
                 // if the final write for the MMC1 shift register was in the $A000 - $BFFF, this updates Mapper_1_CHR0
                 // if the final write for the MMC1 shift register was in the $B000 - $CFFF, this updates Mapper_1_CHR1
-                if (Address < 0x1000) { return Cart.CHRROM[((Mapper_1_CHR0 & 0x1F) * 0x1000 + Address) & (Cart.CHRROM.Length - 1)]; }
-                else { Address &= 0xFFF; return Cart.CHRROM[((Mapper_1_CHR1 & 0x1F) * 0x1000 + Address) & (Cart.CHRROM.Length - 1)]; }
+                if (Address < 0x1000) { return ((Mapper_1_CHR0 & 0x1F) * 0x1000 + Address) & (Cart.CHRROM.Length - 1); }
+                else { Address &= 0xFFF; return ((Mapper_1_CHR1 & 0x1F) * 0x1000 + Address) & (Cart.CHRROM.Length - 1); }
             }
             else // one swappable bank that changes both pattern tables.
             {
@@ -169,7 +173,10 @@ namespace TriCNES.mappers
         {
             List<byte> State = new List<byte>();
             foreach (Byte b in Cart.PRGRAM) { State.Add(b); }
-            foreach (Byte b in Cart.CHRRAM) { State.Add(b); }
+            if (Cart.UsingCHRRAM)
+            {
+                foreach (Byte b in Cart.CHRROM) { State.Add(b); }
+            }
             State.Add(Mapper_1_ShiftRegister);
             State.Add(Mapper_1_Control);
             State.Add(Mapper_1_CHR0);
@@ -182,7 +189,10 @@ namespace TriCNES.mappers
         {
             int p = startIndex;
             for (int i = 0; i < Cart.PRGRAM.Length; i++) { Cart.PRGRAM[i] = State[p++]; }
-            for (int i = 0; i < Cart.CHRRAM.Length; i++) { Cart.CHRRAM[i] = State[p++]; }
+            if (Cart.UsingCHRRAM)
+            {
+                for (int i = 0; i < Cart.CHRROM.Length; i++) { Cart.CHRROM[i] = State[p++]; }
+            }
             Mapper_1_ShiftRegister = State[p++];
             Mapper_1_Control = State[p++];
             Mapper_1_CHR0 = State[p++];
