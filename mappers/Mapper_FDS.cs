@@ -157,20 +157,18 @@ namespace TriCNES.mappers
                 }
             }
         }
-
-        public override ushort MirrorNametable(ushort Address)
+        public override void CheckCIRAM()
         {
+            Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
 
             if (((FDS_4025_Control >> 3) & 1) == 1) //horizontal
             {
-                return (ushort)((Address & 0x33FF) | ((Address & 0x0800) >> 1)); // mask away $0C00, bit 10 becomes the former bit 11
+                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61];
             }
             else //vertical
             {
-                return (ushort)(Address & 0x37FF); // mask away $0800
+                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62];
             }
-            
-            return Address;
         }
 
         public override void FDS_ByteTransferFlag()

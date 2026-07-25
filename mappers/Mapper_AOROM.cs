@@ -39,18 +39,17 @@ namespace TriCNES.mappers
                 Mapper_7_BankSelect = Input;
             }
         }
-        public override ushort MirrorNametable(ushort Address)
+        public override void CheckCIRAM()
         {
+            Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
             if ((Mapper_7_BankSelect & 0x10) == 0) // show nametable 0
             {
-                Address &= 0x33FF;
+                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62];
             }
             else // show nametable 1
             {
-                Address &= 0x33FF;
-                Address |= 0x400;
+                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61];
             }
-            return Address;
         }
         public override List<byte> SaveMapperRegisters()
         {

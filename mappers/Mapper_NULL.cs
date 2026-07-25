@@ -18,10 +18,6 @@ namespace TriCNES.mappers
             // there's no cartridge. TODO: Look into this. Supposedly this would likely be the lower 8 bits of the address bus, but CIRAM enable is also floating.
             return 0;
         }
-        public override ushort MirrorNametable(ushort Address)
-        {
-            return Address;
-        }
         public override List<byte> SaveMapperRegisters()
         {
             List<byte> State = new List<byte>();

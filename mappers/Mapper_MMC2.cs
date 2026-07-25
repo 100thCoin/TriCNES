@@ -110,17 +110,17 @@ namespace TriCNES.mappers
             if (Address < 0x1000) { return (Mapper_9_Latch0_FE ? Mapper_9_CHR0_FE : Mapper_9_CHR0_FD) * 0x1000 + Addr; }
             else { Addr &= 0xFFF; return (Mapper_9_Latch1_FE ? Mapper_9_CHR1_FE : Mapper_9_CHR1_FD) * 0x1000 + Addr; }
         }
-        public override ushort MirrorNametable(ushort Address)
+        public override void CheckCIRAM()
         {
+            Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
             if (Mapper_9_NametableMirroring) //horizontal
             {
-                Address = (ushort)((Address & 0x33FF) | ((Address & 0x0800) >> 1)); // mask away $0C00, bit 10 becomes the former bit 11
+                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61];
             }
             else //vertical
             {
-                Address &= 0x37FF; // mask away $0800
+                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62];
             }
-            return Address;
         }
         public override List<byte> SaveMapperRegisters()
         {

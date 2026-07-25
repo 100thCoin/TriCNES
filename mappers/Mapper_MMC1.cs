@@ -145,30 +145,31 @@ namespace TriCNES.mappers
             else // one swappable bank that changes both pattern tables.
             {
                 // this uses the value written to Mapper_1_CHR0
-                return Cart.CHRROM[((Mapper_1_CHR0 & 0b11111110) * 0x2000 + Address) & (Cart.CHRROM.Length - 1)];
+                return ((Mapper_1_CHR0 & 0b11111110) * 0x2000 + Address) & (Cart.CHRROM.Length - 1);
             }
         }
-        public override ushort MirrorNametable(ushort Address)
+        public override void CheckCIRAM()
         {
+            Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
+
             switch (Mapper_1_Control & 3)
             {
                 case 0: //one screen, low
-                    Address &= 0x33FF;
+                    Cart.Emu.SeventyTwoPinConnector[21] = false;
                     break;
                 case 1: //one screen, high
-                    Address &= 0x33FF;
-                    Address |= 0x400;
+                    Cart.Emu.SeventyTwoPinConnector[21] = true;
                     break;
                 case 2: //vertical
-                    Address &= 0x37FF; // mask away $0800
+                    Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62];
                     break;
                 case 3: //horizontal
-                    Address = (ushort)((Address & 0x33FF) | ((Address & 0x0800) >> 1)); // mask away $0C00, bit 10 becomes the former bit 11
+                    Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61];
 
                     break;
             }
-            return Address;
         }
+
         public override List<byte> SaveMapperRegisters()
         {
             List<byte> State = new List<byte>();
