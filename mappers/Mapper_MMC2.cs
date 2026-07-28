@@ -73,53 +73,55 @@ namespace TriCNES.mappers
                 Mapper_9_NametableMirroring = (Input & 0x1) == 1;
             }
         }
-        public override void FetchPPU()
-        {
-            // This will always use the upper 8 bits of the address bus | the octal latch. This Octal Latch replaces the lower 8 bits of the address bus.
-            ushort Address = Connector_ReadPPUAddressPins();
 
-            byte t = Cart.Emu.PPU_OctalLatch;
+        public override void AccessPPU()
+        {
+            ushort Address = Connector_ReadPPUAddressPins();
             if (Cart.Emu.SeventyTwoPinConnector[57] && Address < 0x2000) // Addresses $2000 through $3FFF do NOT read from the cartrdige.
             {
-                int CHR_Address = FetchPatternAddress(Address);
-                t = Cart.CHRROM[CHR_Address];
-
-                // MMC2 has registers that do things based on the address being read.
-                if (Address == 0x0FD8)
-                {
-                    Mapper_9_Latch0_FE = false;
-                }
-                else if (Address == 0x0FE8)
-                {
-                    Mapper_9_Latch0_FE = true;
-                }
-                else if (Address >= 0x1FD8 && Address <= 0x1FDF)
-                {
-                    Mapper_9_Latch1_FE = false;
-                }
-                else if (Address >= 0x1FE8 && Address <= 0x1FEF)
-                {
-                    Mapper_9_Latch1_FE = true;
-                }
+                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
+                byte t = (byte)Address;
+                byte input = Connector_ReadPPUDataPins();
+                if (!Cart.Emu.SeventyTwoPinConnector[20]) { 
+                    t = Cart.CHRROM[CHR_Address]; Connector_SetUpPPUDataPins(t);
+                    // MMC2 has registers that do things based on the address being read.
+                    if (Address == 0x0FD8)
+                    {
+                        Mapper_9_Latch0_FE = false;
+                    }
+                    else if (Address == 0x0FE8)
+                    {
+                        Mapper_9_Latch0_FE = true;
+                    }
+                    else if (Address >= 0x1FD8 && Address <= 0x1FDF)
+                    {
+                        Mapper_9_Latch1_FE = false;
+                    }
+                    else if (Address >= 0x1FE8 && Address <= 0x1FEF)
+                    {
+                        Mapper_9_Latch1_FE = true;
+                    }
+                } // Reads
+                if (!Cart.Emu.SeventyTwoPinConnector[55] && Cart.UsingCHRRAM) { Cart.CHRROM[CHR_Address] = input; } // Writes
             }
-            Connector_SetUpPPUDataPins(t);
         }
+
         public override int FetchPatternAddress(ushort Address)
         {
             ushort Addr = Address;
             if (Address < 0x1000) { return (Mapper_9_Latch0_FE ? Mapper_9_CHR0_FE : Mapper_9_CHR0_FD) * 0x1000 + Addr; }
             else { Addr &= 0xFFF; return (Mapper_9_Latch1_FE ? Mapper_9_CHR1_FE : Mapper_9_CHR1_FD) * 0x1000 + Addr; }
         }
-        public override void CheckCIRAM()
+        public override void Connector_CheckCIRAM()
         {
-            Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
+            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57]; }
             if (Mapper_9_NametableMirroring) //horizontal
             {
-                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61];
+                if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61]; }
             }
             else //vertical
             {
-                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62];
+                if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
             }
         }
         public override List<byte> SaveMapperRegisters()

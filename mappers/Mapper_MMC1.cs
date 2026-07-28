@@ -148,24 +148,22 @@ namespace TriCNES.mappers
                 return ((Mapper_1_CHR0 & 0b11111110) * 0x2000 + Address) & (Cart.CHRROM.Length - 1);
             }
         }
-        public override void CheckCIRAM()
+        public override void Connector_CheckCIRAM()
         {
-            Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
-
+            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57]; }
             switch (Mapper_1_Control & 3)
             {
                 case 0: //one screen, low
-                    Cart.Emu.SeventyTwoPinConnector[21] = false;
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = false; }
                     break;
                 case 1: //one screen, high
-                    Cart.Emu.SeventyTwoPinConnector[21] = true;
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = true; }
                     break;
                 case 2: //vertical
-                    Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62];
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
                     break;
                 case 3: //horizontal
-                    Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61];
-
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61]; }
                     break;
             }
         }

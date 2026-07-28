@@ -124,7 +124,7 @@ namespace TriCNES.mappers
                         case 10: Mapper_69_Bank_A = (byte)(Input & 0x3F); break;
                         case 11: Mapper_69_Bank_C = (byte)(Input & 0x3F); break;
                         case 12: Mapper_69_NametableMirroring = (byte)(Input & 0x3); break;
-                        case 13: Mapper_69_EnableIRQ = (Input & 0x1) != 0; Mapper_69_EnableIRQCounterDecrement = (Input & 0x80) != 0; Cart.Emu.IRQ_LevelDetector = false; break;
+                        case 13: Mapper_69_EnableIRQ = (Input & 0x1) != 0; Mapper_69_EnableIRQCounterDecrement = (Input & 0x80) != 0; Connector_IRQPin(false); break;
                         case 14: Mapper_69_IRQCounter = (ushort)((Mapper_69_IRQCounter & 0xFF00) | Input); break;
                         case 15: Mapper_69_IRQCounter = (ushort)((Mapper_69_IRQCounter & 0xFF) | (Input << 8)); break;
                     }
@@ -142,23 +142,22 @@ namespace TriCNES.mappers
             else if (Address < 0x1C00) { Address &= 0x3FF; return (Mapper_69_CHR_1K6 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
             else { Address &= 0x3FF; return (Mapper_69_CHR_1K7 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
         }
-        public override void CheckCIRAM()
+        public override void Connector_CheckCIRAM()
         {
-            Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
-
+            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57]; }
             switch (Mapper_69_NametableMirroring)
             {
                 case 0: //vertical
-                    Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62];
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
                     break;
                 case 1: //horizontal
-                    Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61];
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61]; }
                     break;
                 case 2: //one-screen A
-                    Cart.Emu.SeventyTwoPinConnector[21] = false;
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = false; }
                     break;
                 case 3: //one-screen B
-                    Cart.Emu.SeventyTwoPinConnector[21] = true;
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = true; }
                     break;
             }
         }
@@ -232,7 +231,7 @@ namespace TriCNES.mappers
                 Mapper_69_IRQCounter--;
                 if (Mapper_69_EnableIRQ && temp < Mapper_69_IRQCounter)
                 {
-                    Cart.Emu.IRQ_LevelDetector = true;
+                    Connector_IRQPin(true); // Run an IRQ!
                 }
             }
         }

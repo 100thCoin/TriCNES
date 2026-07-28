@@ -39,16 +39,16 @@ namespace TriCNES.mappers
                 Mapper_7_BankSelect = Input;
             }
         }
-        public override void CheckCIRAM()
+        public override void Connector_CheckCIRAM()
         {
-            Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57];
+            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57]; }
             if ((Mapper_7_BankSelect & 0x10) == 0) // show nametable 0
             {
-                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62];
+                if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = false; }
             }
             else // show nametable 1
             {
-                Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61];
+                if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = true; }
             }
         }
         public override List<byte> SaveMapperRegisters()
