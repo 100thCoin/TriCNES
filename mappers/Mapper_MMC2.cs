@@ -76,14 +76,15 @@ namespace TriCNES.mappers
 
         public override void AccessPPU()
         {
-            ushort Address = Connector_ReadPPUAddressPins();
-            if (Cart.Emu.SeventyTwoPinConnector[57] && Address < 0x2000) // Addresses $2000 through $3FFF do NOT read from the cartrdige.
+            Connector_ReadPPUAddressPins();
+            ushort Address = PPU_AddressIn;
+            if (!Cart.Emu.SeventyTwoPinConnector[64]) // (If PPU A13 is set, we don't do anything on the cartridge)
             {
                 int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
-                byte t = (byte)Address;
-                byte input = Connector_ReadPPUDataPins();
-                if (!Cart.Emu.SeventyTwoPinConnector[20]) { 
-                    t = Cart.CHRROM[CHR_Address]; Connector_SetUpPPUDataPins(t);
+                PPU_DataIn = Connector_ReadPPUDataPins(PPU_DataIn);
+                if (!Cart.Emu.SeventyTwoPinConnector[20]) {
+                    PPU_DataOut = Cart.CHRROM[CHR_Address];
+                    Connector_SetUpPPUDataPins(PPU_DataOut);
                     // MMC2 has registers that do things based on the address being read.
                     if (Address == 0x0FD8)
                     {
@@ -102,7 +103,7 @@ namespace TriCNES.mappers
                         Mapper_9_Latch1_FE = true;
                     }
                 } // Reads
-                if (!Cart.Emu.SeventyTwoPinConnector[55] && Cart.UsingCHRRAM) { Cart.CHRROM[CHR_Address] = input; } // Writes
+                if (!Cart.Emu.SeventyTwoPinConnector[55] && Cart.UsingCHRRAM) { Cart.CHRROM[CHR_Address] = PPU_DataIn; } // Writes
             }
         }
 

@@ -134,6 +134,10 @@ namespace TriCNES
         public bool dataPinsAreNotFloating;
         public bool observedDataPinsAreNotFloating;
 
+        public ushort PPU_AddressIn; // internal to the cartridge
+        public byte PPU_DataIn; // internal to the cartridge
+        public byte PPU_DataOut; // internal to the cartridge
+
         // Default to NROM behavior.
         public virtual void FetchPRG(ushort Address, bool Observe)
         {
@@ -170,14 +174,15 @@ namespace TriCNES
         }
         public virtual void AccessPPU()
         {
-            ushort Address = Connector_ReadPPUAddressPins();
-            if (Cart.Emu.SeventyTwoPinConnector[57] && Address < 0x2000) // Addresses $2000 through $3FFF do NOT read from the cartrdige.
+            Connector_ReadPPUAddressPins();
+            ushort Address = PPU_AddressIn;
+
+            if (!Cart.Emu.SeventyTwoPinConnector[64]) // (If PPU A13 is set, we don't do anything on the cartridge)
             {
                 int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
-                byte t = (byte)Address;
-                byte input = Connector_ReadPPUDataPins();
-                if (!Cart.Emu.SeventyTwoPinConnector[20]) { t = Cart.CHRROM[CHR_Address]; Connector_SetUpPPUDataPins(t); } // Reads
-                if (!Cart.Emu.SeventyTwoPinConnector[55] && Cart.UsingCHRRAM) { Cart.CHRROM[CHR_Address] = input; } // Writes
+                PPU_DataIn = Connector_ReadPPUDataPins(PPU_DataIn);
+                if (!Cart.Emu.SeventyTwoPinConnector[20]) { PPU_DataOut = Cart.CHRROM[CHR_Address]; Connector_SetUpPPUDataPins(PPU_DataOut); } // Reads
+                if (!Cart.Emu.SeventyTwoPinConnector[55] && Cart.UsingCHRRAM) { Cart.CHRROM[CHR_Address] = PPU_DataIn; } // Writes
             }
         }
 
@@ -254,24 +259,23 @@ namespace TriCNES
             if (!Cart.Emu.ConnectorPinFloating[64]) { Cart.Emu.SeventyTwoPinConnector[64] = (Cart.Emu.PPU_AddressBus & 0x2000) != 0; } // PPU A13
             if (!Cart.Emu.ConnectorPinFloating[57]) { Cart.Emu.SeventyTwoPinConnector[57] = (Cart.Emu.PPU_AddressBus & 0x2000) == 0; } // PPU \A13
         }
-        public ushort Connector_ReadPPUAddressPins()
+        public void Connector_ReadPPUAddressPins()
         {
-            ushort Address = 0;
-            if (!Cart.Emu.ConnectorPinFloating[64]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[64] ? 0x2000 : 0); } // PPU A13
-            if (!Cart.Emu.ConnectorPinFloating[63]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[63] ? 0x1000 : 0); } // PPU A12
-            if (!Cart.Emu.ConnectorPinFloating[61]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[61] ? 0x0800 : 0); } // PPU A11
-            if (!Cart.Emu.ConnectorPinFloating[62]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[62] ? 0x0400 : 0); } // PPU A10
-            if (!Cart.Emu.ConnectorPinFloating[60]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[60] ? 0x0200 : 0); } // PPU A9
-            if (!Cart.Emu.ConnectorPinFloating[59]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[59] ? 0x0100 : 0); } // PPU A8
-            if (!Cart.Emu.ConnectorPinFloating[58]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[58] ? 0x0080 : 0); } // PPU A7
-            if (!Cart.Emu.ConnectorPinFloating[22]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[22] ? 0x0040 : 0); } // PPU A6
-            if (!Cart.Emu.ConnectorPinFloating[23]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[23] ? 0x0020 : 0); } // PPU A5
-            if (!Cart.Emu.ConnectorPinFloating[24]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[24] ? 0x0010 : 0); } // PPU A4
-            if (!Cart.Emu.ConnectorPinFloating[25]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[25] ? 0x0008 : 0); } // PPU A3
-            if (!Cart.Emu.ConnectorPinFloating[26]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[26] ? 0x0004 : 0); } // PPU A2
-            if (!Cart.Emu.ConnectorPinFloating[27]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[27] ? 0x0002 : 0); } // PPU A1
-            if (!Cart.Emu.ConnectorPinFloating[28]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[28] ? 0x0001 : 0); } // PPU A0
-            return Address;
+            // This can only be done by the cartridge.
+            if (!Cart.Emu.ConnectorPinFloating[64]) { PPU_AddressIn &= 0x1FFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[64] ? 0x2000 : 0); } // PPU A13
+            if (!Cart.Emu.ConnectorPinFloating[63]) { PPU_AddressIn &= 0x2FFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[63] ? 0x1000 : 0); } // PPU A12
+            if (!Cart.Emu.ConnectorPinFloating[61]) { PPU_AddressIn &= 0x37FF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[61] ? 0x0800 : 0); } // PPU A11
+            if (!Cart.Emu.ConnectorPinFloating[62]) { PPU_AddressIn &= 0x3BFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[62] ? 0x0400 : 0); } // PPU A10
+            if (!Cart.Emu.ConnectorPinFloating[60]) { PPU_AddressIn &= 0x3DFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[60] ? 0x0200 : 0); } // PPU A9
+            if (!Cart.Emu.ConnectorPinFloating[59]) { PPU_AddressIn &= 0x3EFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[59] ? 0x0100 : 0); } // PPU A8
+            if (!Cart.Emu.ConnectorPinFloating[58]) { PPU_AddressIn &= 0x3F7F; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[58] ? 0x0080 : 0); } // PPU A7
+            if (!Cart.Emu.ConnectorPinFloating[22]) { PPU_AddressIn &= 0x3FBF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[22] ? 0x0040 : 0); } // PPU A6
+            if (!Cart.Emu.ConnectorPinFloating[23]) { PPU_AddressIn &= 0x3FDF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[23] ? 0x0020 : 0); } // PPU A5
+            if (!Cart.Emu.ConnectorPinFloating[24]) { PPU_AddressIn &= 0x3FEF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[24] ? 0x0010 : 0); } // PPU A4
+            if (!Cart.Emu.ConnectorPinFloating[25]) { PPU_AddressIn &= 0x3FF7; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[25] ? 0x0008 : 0); } // PPU A3
+            if (!Cart.Emu.ConnectorPinFloating[26]) { PPU_AddressIn &= 0x3FFB; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[26] ? 0x0004 : 0); } // PPU A2
+            if (!Cart.Emu.ConnectorPinFloating[27]) { PPU_AddressIn &= 0x3FFD; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[27] ? 0x0002 : 0); } // PPU A1
+            if (!Cart.Emu.ConnectorPinFloating[28]) { PPU_AddressIn &= 0x3FFE; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[28] ? 0x0001 : 0); } // PPU A0
         }
         public void Connector_SetUpPPUDataPins(byte t)
         {
@@ -284,17 +288,17 @@ namespace TriCNES
             if (!Cart.Emu.ConnectorPinFloating[66]) { Cart.Emu.SeventyTwoPinConnector[66] = (t & 0x40) != 0; } // PPU D6
             if (!Cart.Emu.ConnectorPinFloating[65]) { Cart.Emu.SeventyTwoPinConnector[65] = (t & 0x80) != 0; } // PPU D7
         }
-        public byte Connector_ReadPPUDataPins()
+        public byte Connector_ReadPPUDataPins(byte bus)
         {
-            byte t = 0;
-            if (!Cart.Emu.ConnectorPinFloating[29]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[29] ? 0x01 : 0); } // PPU D0
-            if (!Cart.Emu.ConnectorPinFloating[30]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[30] ? 0x02 : 0); } // PPU D1
-            if (!Cart.Emu.ConnectorPinFloating[31]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[31] ? 0x04 : 0); } // PPU D2
-            if (!Cart.Emu.ConnectorPinFloating[32]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[32] ? 0x08 : 0); } // PPU D3
-            if (!Cart.Emu.ConnectorPinFloating[68]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[68] ? 0x10 : 0); } // PPU D4
-            if (!Cart.Emu.ConnectorPinFloating[67]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[67] ? 0x20 : 0); } // PPU D5
-            if (!Cart.Emu.ConnectorPinFloating[66]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[66] ? 0x40 : 0); } // PPU D6
-            if (!Cart.Emu.ConnectorPinFloating[65]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[65] ? 0x80 : 0); } // PPU D7
+            byte t = bus;
+            if (!Cart.Emu.ConnectorPinFloating[29]) { t &= 0xFE; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[29] ? 0x01 : 0); } // PPU D0
+            if (!Cart.Emu.ConnectorPinFloating[30]) { t &= 0xFD; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[30] ? 0x02 : 0); } // PPU D1
+            if (!Cart.Emu.ConnectorPinFloating[31]) { t &= 0xFB; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[31] ? 0x04 : 0); } // PPU D2
+            if (!Cart.Emu.ConnectorPinFloating[32]) { t &= 0xF7; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[32] ? 0x08 : 0); } // PPU D3
+            if (!Cart.Emu.ConnectorPinFloating[68]) { t &= 0xEF; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[68] ? 0x10 : 0); } // PPU D4
+            if (!Cart.Emu.ConnectorPinFloating[67]) { t &= 0xDF; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[67] ? 0x20 : 0); } // PPU D5
+            if (!Cart.Emu.ConnectorPinFloating[66]) { t &= 0xBF; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[66] ? 0x40 : 0); } // PPU D6
+            if (!Cart.Emu.ConnectorPinFloating[65]) { t &= 0x7F; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[65] ? 0x80 : 0); } // PPU D7
             return t;
         }
 
@@ -2108,13 +2112,13 @@ namespace TriCNES
         byte FetchVideoMemory()
         {
             Cart.MapperChip.Connector_SetUpPPUAddressPins();
+            Cart.MapperChip.Connector_SetUpPPUDataPins((byte)PPU_AddressBus); // If AccessPPU() doesn't update the pins, then we get back the address bus.
             Cart.MapperChip.Connector_CheckCIRAM();
-            byte t = 0;
 
             // Always attempt to read from the cartridge. The data pins would not be updated if reading from the nametable.
             Cart.MapperChip.Connector_PPU_RW(PPU_READ, PPU_WRITE);
             Cart.MapperChip.AccessPPU();
-            t = Cart.MapperChip.Connector_ReadPPUDataPins();
+            byte t = Cart.MapperChip.Connector_ReadPPUDataPins((byte)PPU_AddressBus);
 
             if (PPU_AddressBus >= 0x2000 && Cart.Emu.SeventyTwoPinConnector[56])
             {

@@ -682,7 +682,6 @@ namespace TriCNES
             {
                 cancel.Cancel();
                 EmuClock.Join();
-                EMU.Dispose();
             }
             if (TASPropertiesForm3ct.FromRESET())
             {

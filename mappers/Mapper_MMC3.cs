@@ -252,35 +252,34 @@ namespace TriCNES.mappers
         }
         public override void AccessPPU()
         {
-            ushort Address = Connector_ReadPPUAddressPins();
-            if (Cart.Emu.SeventyTwoPinConnector[57] && Address < 0x2000) // Addresses $2000 through $3FFF do NOT read from the cartrdige.
+            Connector_ReadPPUAddressPins();
+            ushort Address = PPU_AddressIn;
+            if (!Cart.Emu.SeventyTwoPinConnector[64]) // (If PPU A13 is set, we don't do anything on the cartridge)
             {
                 int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
-                byte t = (byte)Address;
-                byte input = Connector_ReadPPUDataPins();
+                PPU_DataIn = Connector_ReadPPUDataPins(PPU_DataIn);
                 if (!Cart.Emu.SeventyTwoPinConnector[20]) // Reads
                 { 
-                    t = Cart.CHRROM[CHR_Address]; 
-                    Connector_SetUpPPUDataPins(t); 
+                    PPU_DataOut = Cart.CHRROM[CHR_Address];
+                    Connector_SetUpPPUDataPins(PPU_DataOut);
                 }
                 if (!Cart.Emu.SeventyTwoPinConnector[55] && Cart.UsingCHRRAM) // Writes
                 {
-                    Cart.CHRROM[CHR_Address] = input; 
+                    Cart.CHRROM[CHR_Address] = PPU_DataIn; 
                 }
             }
-            else if (Cart.AlternativeNametableArrangement && (Address & 0x800) != 0) // Extra Nametable
+            else if (Cart.AlternativeNametableArrangement && Cart.Emu.SeventyTwoPinConnector[61]) // Extra Nametable
             {
                 Address &= 0x7FF;
-                byte t = (byte)Address;
-                byte input = Connector_ReadPPUDataPins();
+                PPU_DataIn = Connector_ReadPPUDataPins(PPU_DataIn);
                 if (!Cart.Emu.SeventyTwoPinConnector[20]) // Reads
                 {
-                    byte b = Cart.PRGVRAM[Address];
-                    Connector_SetUpPPUDataPins(b);
+                    PPU_DataOut = Cart.CHRROM[Address];
+                    Connector_SetUpPPUDataPins(PPU_DataOut);
                 }
                 if (!Cart.Emu.SeventyTwoPinConnector[55]) // Writes
                 {
-                    Cart.PRGVRAM[Address] = input;
+                    Cart.PRGVRAM[Address] = PPU_DataIn;
                 }
             }
         }
