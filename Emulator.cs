@@ -371,26 +371,26 @@ namespace TriCNES
         }
         public void Connector_SetUpCPUDataPins(byte t)
         {
-            if (!Cart.Emu.ConnectorPinFloating[48]) { Cart.Emu.SeventyTwoPinConnector[48] = (t & 0x01) != 0; } // PPU D0
-            if (!Cart.Emu.ConnectorPinFloating[47]) { Cart.Emu.SeventyTwoPinConnector[47] = (t & 0x02) != 0; } // PPU D1
-            if (!Cart.Emu.ConnectorPinFloating[46]) { Cart.Emu.SeventyTwoPinConnector[46] = (t & 0x04) != 0; } // PPU D2
-            if (!Cart.Emu.ConnectorPinFloating[45]) { Cart.Emu.SeventyTwoPinConnector[45] = (t & 0x08) != 0; } // PPU D3
-            if (!Cart.Emu.ConnectorPinFloating[44]) { Cart.Emu.SeventyTwoPinConnector[44] = (t & 0x10) != 0; } // PPU D4
-            if (!Cart.Emu.ConnectorPinFloating[43]) { Cart.Emu.SeventyTwoPinConnector[43] = (t & 0x20) != 0; } // PPU D5
-            if (!Cart.Emu.ConnectorPinFloating[42]) { Cart.Emu.SeventyTwoPinConnector[42] = (t & 0x40) != 0; } // PPU D6
-            if (!Cart.Emu.ConnectorPinFloating[41]) { Cart.Emu.SeventyTwoPinConnector[41] = (t & 0x80) != 0; } // PPU D7
+            if (!Cart.Emu.ConnectorPinFloating[48]) { Cart.Emu.SeventyTwoPinConnector[48] = (t & 0x01) != 0; } // CPU D0
+            if (!Cart.Emu.ConnectorPinFloating[47]) { Cart.Emu.SeventyTwoPinConnector[47] = (t & 0x02) != 0; } // CPU D1
+            if (!Cart.Emu.ConnectorPinFloating[46]) { Cart.Emu.SeventyTwoPinConnector[46] = (t & 0x04) != 0; } // CPU D2
+            if (!Cart.Emu.ConnectorPinFloating[45]) { Cart.Emu.SeventyTwoPinConnector[45] = (t & 0x08) != 0; } // CPU D3
+            if (!Cart.Emu.ConnectorPinFloating[44]) { Cart.Emu.SeventyTwoPinConnector[44] = (t & 0x10) != 0; } // CPU D4
+            if (!Cart.Emu.ConnectorPinFloating[43]) { Cart.Emu.SeventyTwoPinConnector[43] = (t & 0x20) != 0; } // CPU D5
+            if (!Cart.Emu.ConnectorPinFloating[42]) { Cart.Emu.SeventyTwoPinConnector[42] = (t & 0x40) != 0; } // CPU D6
+            if (!Cart.Emu.ConnectorPinFloating[41]) { Cart.Emu.SeventyTwoPinConnector[41] = (t & 0x80) != 0; } // CPU D7
         }
         public byte Connector_ReadCPUDataPins()
         {
             byte t = 0;
-            if (!Cart.Emu.ConnectorPinFloating[48]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[48] ? 0x01 : 0); } // PPU D0
-            if (!Cart.Emu.ConnectorPinFloating[47]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[47] ? 0x02 : 0); } // PPU D1
-            if (!Cart.Emu.ConnectorPinFloating[46]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[46] ? 0x04 : 0); } // PPU D2
-            if (!Cart.Emu.ConnectorPinFloating[45]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[45] ? 0x08 : 0); } // PPU D3
-            if (!Cart.Emu.ConnectorPinFloating[44]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[44] ? 0x10 : 0); } // PPU D4
-            if (!Cart.Emu.ConnectorPinFloating[43]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[43] ? 0x20 : 0); } // PPU D5
-            if (!Cart.Emu.ConnectorPinFloating[42]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[42] ? 0x40 : 0); } // PPU D6
-            if (!Cart.Emu.ConnectorPinFloating[41]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[41] ? 0x80 : 0); } // PPU D7
+            if (!Cart.Emu.ConnectorPinFloating[48]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[48] ? 0x01 : 0); } // CPU D0
+            if (!Cart.Emu.ConnectorPinFloating[47]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[47] ? 0x02 : 0); } // CPU D1
+            if (!Cart.Emu.ConnectorPinFloating[46]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[46] ? 0x04 : 0); } // CPU D2
+            if (!Cart.Emu.ConnectorPinFloating[45]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[45] ? 0x08 : 0); } // CPU D3
+            if (!Cart.Emu.ConnectorPinFloating[44]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[44] ? 0x10 : 0); } // CPU D4
+            if (!Cart.Emu.ConnectorPinFloating[43]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[43] ? 0x20 : 0); } // CPU D5
+            if (!Cart.Emu.ConnectorPinFloating[42]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[42] ? 0x40 : 0); } // CPU D6
+            if (!Cart.Emu.ConnectorPinFloating[41]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[41] ? 0x80 : 0); } // CPU D7
             return t;
         }
         public virtual void Connector_CheckCIRAM()
@@ -1154,7 +1154,7 @@ namespace TriCNES
                 if(ResetMode)
                 {
                     ResetModeCounter++;
-                    if(ResetModeCounter == 1477700) // Approximately how long it takes for the CIC chip to reset the console. Keep in mind, this value lowers as the temperature increases.
+                    if(ResetModeCounter == 1477840) // Approximately how long it takes for the CIC chip to reset the console. Keep in mind, this value lowers as the temperature increases.
                     {
                         ResetModeCounter = 0;
                         Reset(); // Reset via the CIC, not the reset button.
@@ -2196,11 +2196,11 @@ namespace TriCNES
         {
             Cart.MapperChip.Connector_SetUpPPUAddressPins();
             Cart.MapperChip.Connector_CheckCIRAM();
-            if (PPU_AddressBus >= 0x3F00)
+            if ((PPU_AddressBus & 0x3FFF) >= 0x3F00)
             {
                 PaletteRAM[PPU_AddressBus & (((PPU_AddressBus & 0x3) == 0) ? 0x0F : 0x1F)] = input;
             }
-            else if (PPU_AddressBus >= 0x2000 && Cart.Emu.SeventyTwoPinConnector[56])
+            else if (((PPU_AddressBus & 0x3FFF) >= 0x2000) && Cart.Emu.SeventyTwoPinConnector[56])
             {
                 // We're writing to on-console VRAM, not the cartridge.
                 // NOTE: In theory you could trigger bus conflicts with this. I'm currently just assuming the bus is free.
@@ -2372,6 +2372,7 @@ namespace TriCNES
                 else
                 {
                     PPU_v += (ushort)(PPUControlIncrementMode32 ? 32 : 1);
+                    PPU_v &= 0x7FFF;
                 }
             }
 
@@ -4362,6 +4363,7 @@ namespace TriCNES
             {
                 PPU_v++; // increment
             }
+            PPU_v &= 0x7FFF;
         }
 
         void PPU_IncrementScrollY()
@@ -4396,6 +4398,7 @@ namespace TriCNES
                     PPU_v = (ushort)((PPU_v & 0xFC1F) | (y << 5));
                 }
             }
+            PPU_v &= 0x7FFF;
         }
 
         void PPU_ResetXScroll()
