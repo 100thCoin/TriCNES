@@ -6,9 +6,8 @@ namespace TriCNES.mappers
     {
         // There is not a cartridge inserted in the console.
 
-        public override void FetchPRG(ushort Address, bool Observe)
+        public override void FetchCPU()
         {
-            dataPinsAreNotFloating = false;
             // the data pins are always floating. There's no cartridge inserted!
             return;
         }

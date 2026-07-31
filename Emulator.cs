@@ -129,43 +129,54 @@ namespace TriCNES
     public class Mapper
     {
         public Cartridge Cart;
-        public byte dataBus;
-        public byte observedDataBus;
-        public bool dataPinsAreNotFloating;
-        public bool observedDataPinsAreNotFloating;
+
+        public ushort CPU_AddressIn; // internal to the cartridge
+        public byte CPU_DataIn; // internal to the cartridge
+        public byte CPU_DataOut; // internal to the cartridge
 
         public ushort PPU_AddressIn; // internal to the cartridge
         public byte PPU_DataIn; // internal to the cartridge
         public byte PPU_DataOut; // internal to the cartridge
 
         // Default to NROM behavior.
-        public virtual void FetchPRG(ushort Address, bool Observe)
+        public virtual void FetchCPU()
         {
-            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]){ return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            Connector_ReadCPUAddressPins();
 
-            if (!Observe)
+            if (!Cart.Emu.SeventyTwoPinConnector[49]) // CPU /A15 + /M2
             {
-                Address = Connector_ReadCPUAddressPins();
-            }
-            bool notFloating = false;
-            byte data = 0;
-            if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
-            // Observing can happen on a different thread, so we need to ensure that observing doesn't overwrite the data bus or floating pins status.
-
-            if (Address >= 0x8000)
-            {
-                data = Cart.PRGROM[Address & (Cart.PRGROM.Length - 1)]; // Get the address from the ROM file. If the ROM only has $4000 bytes, this will make addresses > $BFFF mirrors of $8000 through $BFFF.
-                notFloating = true;
-            }
-            //open bus
-
-            if (notFloating)
-            {
-                EndFetchPRG(Observe, data);
+                CPU_DataOut = Cart.PRGROM[CPU_AddressIn & (Cart.PRGROM.Length - 1)]; // Get the address from the ROM file. If the ROM only has $4000 bytes, this will make addresses > $BFFF mirrors of $8000 through $BFFF.
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
             return;
         }
-        public virtual void StorePRG(ushort Address, byte Input)
+
+
+        public virtual byte SnoopCPU(ushort Address) // For debug purposes. It's a bit clunky.
+        {
+            if (Address >= 0x8000)
+            {
+                return Cart.PRGROM[Address & (Cart.PRGROM.Length - 1)];
+            }
+            return Cart.Emu.dataBus;
+        }
+        public virtual byte SnoopPPU(ushort Address) // For debug purposes. It's a bit clunky having to set this up for every mapper with a non-NROM CIRAM setup.
+        {
+            if (Address < 0x2000)
+            {
+                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
+                return Cart.CHRROM[CHR_Address];                
+            }
+            else
+            {
+                ushort Addr = (ushort)(Address & 0x3FF);
+                Addr |= (ushort)((Cart.NametableHorizontalMirroring ? ((Address & 0x800) != 0) : ((Address & 0x400) != 0)) ? 0x400 : 0);
+                return Cart.Emu.VRAM[Addr];
+            }
+        }
+
+        public virtual void StoreCPU(ushort Address, byte Input)
         {
         }
         public virtual int FetchPatternAddress(ushort Address)
@@ -176,13 +187,33 @@ namespace TriCNES
         {
             Connector_ReadPPUAddressPins();
             ushort Address = PPU_AddressIn;
-
             if (!Cart.Emu.SeventyTwoPinConnector[64]) // (If PPU A13 is set, we don't do anything on the cartridge)
             {
                 int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
                 PPU_DataIn = Connector_ReadPPUDataPins(PPU_DataIn);
-                if (!Cart.Emu.SeventyTwoPinConnector[20]) { PPU_DataOut = Cart.CHRROM[CHR_Address]; Connector_SetUpPPUDataPins(PPU_DataOut); } // Reads
-                if (!Cart.Emu.SeventyTwoPinConnector[55] && Cart.UsingCHRRAM) { Cart.CHRROM[CHR_Address] = PPU_DataIn; } // Writes
+                if (!Cart.Emu.SeventyTwoPinConnector[20]) // Reads
+                {
+                    PPU_DataOut = Cart.CHRROM[CHR_Address];
+                    Connector_SetUpPPUDataPins(PPU_DataOut);
+                }
+                if (!Cart.Emu.SeventyTwoPinConnector[55] && Cart.UsingCHRRAM) // Writes
+                {
+                    Cart.CHRROM[CHR_Address] = PPU_DataIn;
+                }
+            }
+            else if (Cart.AlternativeNametableArrangement && Cart.Emu.SeventyTwoPinConnector[61]) // Unless we have an extra Nametable
+            {
+                Address &= 0x7FF; // I don't believe there are any carts that have an alternate nametable arrangement that aren't set up this way.
+                PPU_DataIn = Connector_ReadPPUDataPins(PPU_DataIn);
+                if (!Cart.Emu.SeventyTwoPinConnector[20]) // Reads
+                {
+                    PPU_DataOut = Cart.PRGVRAM[Address];
+                    Connector_SetUpPPUDataPins(PPU_DataOut);
+                }
+                if (!Cart.Emu.SeventyTwoPinConnector[55]) // Writes
+                {
+                    Cart.PRGVRAM[Address] = PPU_DataIn;
+                }
             }
         }
 
@@ -228,19 +259,7 @@ namespace TriCNES
         {
             return "";
         }
-        protected void EndFetchPRG(bool Observe, byte data)
-        {
-            if (!Observe)
-            {
-                dataPinsAreNotFloating = true;
-                Connector_SetUpCPUDataPins(data);
-            }
-            else
-            {
-                observedDataPinsAreNotFloating = true;
-                observedDataBus = data;
-            }
-        }
+
         public void Connector_SetUpPPUAddressPins()
         {
             if (!Cart.Emu.ConnectorPinFloating[28]) { Cart.Emu.SeventyTwoPinConnector[28] = (Cart.Emu.PPU_OctalLatch & 0x01) != 0; } // PPU A0
@@ -319,28 +338,27 @@ namespace TriCNES
             if (!Cart.Emu.ConnectorPinFloating[38]) { Cart.Emu.SeventyTwoPinConnector[38] = (Address & 0x1000) != 0; } // CPU A12
             if (!Cart.Emu.ConnectorPinFloating[39]) { Cart.Emu.SeventyTwoPinConnector[39] = (Address & 0x2000) != 0; } // CPU A13
             if (!Cart.Emu.ConnectorPinFloating[40]) { Cart.Emu.SeventyTwoPinConnector[40] = (Address & 0x4000) != 0; } // CPU A14
-            if (!Cart.Emu.ConnectorPinFloating[49]) { Cart.Emu.SeventyTwoPinConnector[49] = (Address & 0x8000) != 0; } // CPU A15
+            if (!Cart.Emu.ConnectorPinFloating[49]) { Cart.Emu.SeventyTwoPinConnector[49] = (Address & 0x8000) == 0; } // CPU /A15
         }
-        public ushort Connector_ReadCPUAddressPins()
+        public void Connector_ReadCPUAddressPins()
         {
-            ushort Address = 0;
-            if (!Cart.Emu.ConnectorPinFloating[49]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[49] ? 0x8000 : 0); } // CPU A0
-            if (!Cart.Emu.ConnectorPinFloating[40]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[40] ? 0x4000 : 0); } // CPU A1
-            if (!Cart.Emu.ConnectorPinFloating[39]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[39] ? 0x2000 : 0); } // CPU A2
-            if (!Cart.Emu.ConnectorPinFloating[38]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[38] ? 0x1000 : 0); } // CPU A3
-            if (!Cart.Emu.ConnectorPinFloating[1]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[1] ? 0x0800 : 0); } // CPU A4
-            if (!Cart.Emu.ConnectorPinFloating[2]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[2] ? 0x0400 : 0); } // CPU A5
-            if (!Cart.Emu.ConnectorPinFloating[3]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[3] ? 0x0200 : 0); } // CPU A6
-            if (!Cart.Emu.ConnectorPinFloating[4]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[4] ? 0x0100 : 0); } // CPU A7
-            if (!Cart.Emu.ConnectorPinFloating[5]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[5] ? 0x0080 : 0); } // CPU A8
-            if (!Cart.Emu.ConnectorPinFloating[6]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[6] ? 0x0040 : 0); } // CPU A9
-            if (!Cart.Emu.ConnectorPinFloating[7]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[7] ? 0x0020 : 0); } // CPU A10
-            if (!Cart.Emu.ConnectorPinFloating[8]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[8] ? 0x0010 : 0); } // CPU A11
-            if (!Cart.Emu.ConnectorPinFloating[9]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[9] ? 0x0008 : 0); } // CPU A12
-            if (!Cart.Emu.ConnectorPinFloating[10]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[10] ? 0x0004 : 0); } // CPU A13
-            if (!Cart.Emu.ConnectorPinFloating[11]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[11] ? 0x0002 : 0); } // CPU A14
-            if (!Cart.Emu.ConnectorPinFloating[12]) { Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[12] ? 0x0001 : 0); } // CPU A15
-            return Address;
+            // This can only be done by the cartridge.
+            if (!Cart.Emu.ConnectorPinFloating[49]) { CPU_AddressIn &= 0x7FFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[49] ? 0 : 0x8000); } // CPU /A15
+            if (!Cart.Emu.ConnectorPinFloating[40]) { CPU_AddressIn &= 0xBFFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[40] ? 0x4000 : 0); } // CPU A14
+            if (!Cart.Emu.ConnectorPinFloating[39]) { CPU_AddressIn &= 0xDFFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[39] ? 0x2000 : 0); } // CPU A13
+            if (!Cart.Emu.ConnectorPinFloating[38]) { CPU_AddressIn &= 0xEFFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[38] ? 0x1000 : 0); } // CPU A12
+            if (!Cart.Emu.ConnectorPinFloating[1]) { CPU_AddressIn &= 0xF7FF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[1] ? 0x0800 : 0); } // CPU A11
+            if (!Cart.Emu.ConnectorPinFloating[2]) { CPU_AddressIn &= 0xFBFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[2] ? 0x0400 : 0); } // CPU A10
+            if (!Cart.Emu.ConnectorPinFloating[3]) { CPU_AddressIn &= 0xFDFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[3] ? 0x0200 : 0); } // CPU A9
+            if (!Cart.Emu.ConnectorPinFloating[4]) { CPU_AddressIn &= 0xFEFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[4] ? 0x0100 : 0); } // CPU A8
+            if (!Cart.Emu.ConnectorPinFloating[5]) { CPU_AddressIn &= 0xFF7F; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[5] ? 0x0080 : 0); } // CPU A7
+            if (!Cart.Emu.ConnectorPinFloating[6]) { CPU_AddressIn &= 0xFFBF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[6] ? 0x0040 : 0); } // CPU A6
+            if (!Cart.Emu.ConnectorPinFloating[7]) { CPU_AddressIn &= 0xFFDF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[7] ? 0x0020 : 0); } // CPU A5
+            if (!Cart.Emu.ConnectorPinFloating[8]) { CPU_AddressIn &= 0xFFEF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[8] ? 0x0010 : 0); } // CPU A4
+            if (!Cart.Emu.ConnectorPinFloating[9]) { CPU_AddressIn &= 0xFFF7; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[9] ? 0x0008 : 0); } // CPU A3
+            if (!Cart.Emu.ConnectorPinFloating[10]) { CPU_AddressIn &= 0xFFFB; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[10] ? 0x0004 : 0); } // CPU A2
+            if (!Cart.Emu.ConnectorPinFloating[11]) { CPU_AddressIn &= 0xFFFD; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[11] ? 0x0002 : 0); } // CPU A1
+            if (!Cart.Emu.ConnectorPinFloating[12]) { CPU_AddressIn &= 0xFFFE; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[12] ? 0x0001 : 0); } // CPU A0
         }
         public void Connector_SetUpCPUDataPins(byte t)
         {
@@ -9362,7 +9380,6 @@ namespace TriCNES
         public bool PPU_EXT_Enable; // I can toggle this boolean, but it is otherwise unimplemented.
 
         //for logging purposes. doesn't update databus.
-        bool DebugObserve = false;
         public byte Observe(ushort Address)
         {
             // Reading from anywhere goes through this function.
@@ -9451,7 +9468,7 @@ namespace TriCNES
             {
                 // Reading from ROM.
                 // Different mappers could rearrange the data from the ROM into different locations on the system bus.
-                MapperFetch(Address, Cart.MemoryMapper);
+                MapperFetchPRG(Address);
                 dataPinsAreNotFloating = true;
             }
             else if (Address < 0x2000)
@@ -9543,7 +9560,7 @@ namespace TriCNES
             else
             {
                 //mapper chip stuff, but also open bus!
-                MapperFetch(Address, Cart.MemoryMapper);
+                MapperFetchPRG(Address);
             }
 
             if (addressBus >= 0x4000 && addressBus <= 0x401F) // If APU registers are active, bus conflicts can occur. Or perhaps you are intentionally reading from the APU registers...
@@ -9606,69 +9623,28 @@ namespace TriCNES
         }
         public byte ObservePPU(ushort Address)
         {
-            // A way to view PPU data for various debugging tools.
-            if (Cart == null)
+            if(Address >= 0x3F00)
             {
-                return 0;
-            }
-            // when reading from the PPU's Video RAM, there's a lot of mapper-specific behavior to consider.
-            Address &= 0x3FFF;
-            if (Address < 0x2000)
-            {
-                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
-                return Cart.CHRROM[Address];
-            }
-            else // if the VRAM address is >= $2000, we need to consider nametable mirroring.
-            {
-                if (Address >= 0x3F00)
+                if((Address & 0x3) == 0)
                 {
-                    // read from palette RAM.
-                    // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
-                    Address &= 0x3F1F;
-                    if ((Address & 3) == 0)
-                    {
-                        Address &= 0x3F0F;
-                    }
-                    return (byte)((PaletteRAM[Address & 0x1F] & 0x3F) | (PPUBus & 0xC0));
+                    return PaletteRAM[Address & 0x0F];
                 }
-                bool PRGVRAM = (Address & 0x800) != 0;
-                Address &= 0x3FF;
-                Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[21] ? 0x400 : 0);
-                if (Cart.AlternativeNametableArrangement)
-                {
-                    if (Cart.MemoryMapper == 4)
-                    {
-                        if (PRGVRAM)
-                        {
-                            // using the extra PRG VRAM.
-                            return Cart.PRGVRAM[Address];
-                        }
-                    }
-                }
-                Address &= 0x7FF;
-                return VRAM[Address];
+                return PaletteRAM[Address & 0x1F];
             }
+            return Cart.MapperChip.SnoopPPU(Address);
         }
 
         byte MapperObserve(ushort Address)
         {
-            Cart.MapperChip.FetchPRG(Address, true);
-            if (Cart.MapperChip.observedDataPinsAreNotFloating)
-            {
-                return Cart.MapperChip.observedDataBus;
-            }
-            return dataBus;
+            return Cart.MapperChip.SnoopCPU(Address);
         }
 
-        void MapperFetch(ushort Address, byte Mapper)
+        void MapperFetchPRG(ushort Address)
         {
             Cart.MapperChip.Connector_SetUpCPUAddressPins(Address);
-            Cart.MapperChip.FetchPRG(Address, false);
-            dataPinsAreNotFloating = Cart.MapperChip.dataPinsAreNotFloating;
-            if (dataPinsAreNotFloating)
-            {                
-                dataBus = Cart.MapperChip.Connector_ReadCPUDataPins();
-            }
+            Cart.MapperChip.Connector_SetUpCPUDataPins(dataBus); // So when we read from the data pins, if nothing changed, we get back this value.
+            Cart.MapperChip.FetchCPU();
+            dataBus = Cart.MapperChip.Connector_ReadCPUDataPins();
             return;
         }
 
@@ -9856,7 +9832,7 @@ namespace TriCNES
             else if (Address >= 0x4020)
             {
                 // mapper chip specific stuff- but also open bus!
-                Cart.MapperChip.StorePRG(Address, Input);
+                Cart.MapperChip.StoreCPU(Address, Input);
 
                 //MapperStore(Input, Address, Cart.MemoryMapper);
 

@@ -83,6 +83,7 @@ namespace TriCNES
                         default:
                         case 0: MapperChip = new Mapper_NROM(); break;
                         case 1: MapperChip = new Mapper_MMC1(); break;
+                        case 71:
                         case 2: MapperChip = new Mapper_UxROM(); break;
                         case 3: MapperChip = new Mapper_CNROM(); break;
                         case 4: MapperChip = new Mapper_MMC3(); break;

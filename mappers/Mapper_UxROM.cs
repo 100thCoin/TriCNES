@@ -7,44 +7,44 @@ namespace TriCNES.mappers
     {
         // ines Mapper 2
         public byte Mapper_2_BankSelect;
-        public override void FetchPRG(ushort Address, bool Observe)
+        public override void FetchCPU()
         {
-            if (!Observe)
-            {
-                Address = Connector_ReadCPUAddressPins();
-            }
-            bool notFloating = false;
-            byte data = 0;
-            if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
-            // Observing can happen on a different thread, so we need to ensure that observing doesn't overwrite the data bus or floating pins status.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            Connector_ReadCPUAddressPins();
 
-            if (Address >= 0x8000)
+            if (CPU_AddressIn >= 0x8000)
             {
-                notFloating = true;
-                if (Address >= 0xC000)
+                if (CPU_AddressIn >= 0xC000)
                 {
-                    ushort tempo = (ushort)(Address & 0x3FFF);
-                    data = Cart.PRGROM[Cart.PRGROM.Length - 0x4000 + tempo];
+                    CPU_DataOut = Cart.PRGROM[Cart.PRGROM.Length - 0x4000 + (CPU_AddressIn & 0x3FFF)];
                 }
                 else
                 {
-                    ushort tempo = (ushort)(Address & 0x3FFF);
-                    data = Cart.PRGROM[0x4000 * (Mapper_2_BankSelect & 0x0F) + tempo];
+                    CPU_DataOut = Cart.PRGROM[0x4000 * (Mapper_2_BankSelect & 0x0F) + (CPU_AddressIn & 0x3FFF)];
                 }
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
 
-            if (notFloating)
-            {
-                EndFetchPRG(Observe, data);
-            }
             return;
         }
-        public override void StorePRG(ushort Address, byte Input)
+        public override void StoreCPU(ushort Address, byte Input)
         {
             if (Address >= 0x8000)
             {
                 Mapper_2_BankSelect = (byte)(Input & 0xF);
             }
+        }
+        public override byte SnoopCPU(ushort Address) // For debug purposes. It's a bit clunky.
+        {
+            if (Address >= 0x8000)
+            {
+                if (CPU_AddressIn >= 0xC000)
+                {
+                    return Cart.PRGROM[Cart.PRGROM.Length - 0x4000 + (Address & 0x3FFF)];
+                }
+                return Cart.PRGROM[0x4000 * (Mapper_2_BankSelect & 0x0F) + (Address & 0x3FFF)];
+            }
+            return Cart.Emu.dataBus;
         }
         public override List<byte> SaveMapperRegisters()
         {

@@ -22,77 +22,71 @@ namespace TriCNES.mappers
         public bool Mapper_4_NametableMirroring; // MMC3 has it's own way of controlling how the nametables are mirrored.
         public byte Mapper_4_PRGRAMProtect;
         public byte Mapper_4_M2Filter;
-        public override void FetchPRG(ushort Address, bool Observe)
+        public override void FetchCPU()
         {
-            if (!Observe)
-            {
-                Address = Connector_ReadCPUAddressPins();
-            }
-            bool notFloating = false;
-            byte data = 0;
-            if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
-            // Observing can happen on a different thread, so we need to ensure that observing doesn't overwrite the data bus or floating pins status.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            Connector_ReadCPUAddressPins();
 
-            if (Address >= 0xE000) // This bank is fixed the the final PRG bank of the ROM
+            if (CPU_AddressIn >= 0xE000) // This bank is fixed the the final PRG bank of the ROM
             {
-                notFloating = true;
-                data = Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x3FFF)];
+                CPU_DataOut = Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (CPU_AddressIn & 0x3FFF)];
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
-            else if (Address >= 0xC000)
+            else if (CPU_AddressIn >= 0xC000)
             {
-                notFloating = true;
                 if ((Mapper_4_8000 & 0x40) == 0x40)
                 {
                     //$C000 swappable
-                    data = Cart.PRGROM[(Mapper_4_Bank8C << 13) | (Address & 0x1FFF)];
+                    CPU_DataOut = Cart.PRGROM[(Mapper_4_Bank8C << 13) | (CPU_AddressIn & 0x1FFF)];
                 }
                 else
                 {
                     //$8000 swappable
-                    data = Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x1FFF)];
+                    CPU_DataOut = Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (CPU_AddressIn & 0x1FFF)];
                 }
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
-            else if (Address >= 0xA000)
+            else if (CPU_AddressIn >= 0xA000)
             {
-                notFloating = true;
                 //$8000 swappable
-                data = Cart.PRGROM[(Mapper_4_BankA << 13) | (Address & 0x1FFF)];
+                CPU_DataOut = Cart.PRGROM[(Mapper_4_BankA << 13) | (CPU_AddressIn & 0x1FFF)];
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
-            else if (Address >= 0x8000)
+            else if (CPU_AddressIn >= 0x8000)
             {
-                notFloating = true;
                 if ((Mapper_4_8000 & 0x40) == 0x40)
                 {
                     //$8000 swappable
-                    data = Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x1FFF)];
+                    CPU_DataOut = Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (CPU_AddressIn & 0x1FFF)];
                 }
                 else
                 {
                     //$C000 swappable
-                    data = Cart.PRGROM[(Mapper_4_Bank8C << 13) | (Address & 0x1FFF)];
+                    CPU_DataOut = Cart.PRGROM[(Mapper_4_Bank8C << 13) | (CPU_AddressIn & 0x1FFF)];
                 }
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
-            else if (Address >= 0x6000)
+            else if (CPU_AddressIn >= 0x6000)
             {
                 if (Cart.SubMapper == 1) // MMC6
                 {
                     if ((Mapper_4_8000 & 0x20) != 0)
                     {
                         // MMC6 differs from MMC3 since there's only 1Kib of PRG RAM
-                        if (Address >= 0x7000 && Address <= 0x71FF)
+                        if (CPU_AddressIn >= 0x7000 && CPU_AddressIn <= 0x71FF)
                         {
                             if ((Mapper_4_PRGRAMProtect & 0x20) != 0)
                             {
-                                notFloating = true;
-                                data = Cart.PRGRAM[Address & 0x3FF];
+                                CPU_DataOut = Cart.PRGRAM[CPU_AddressIn & 0x3FF];
+                                Connector_SetUpCPUDataPins(CPU_DataOut);
                             }
                         }
-                        else if (Address >= 0x7200 && Address <= 0x73FF)
+                        else if (CPU_AddressIn >= 0x7200 && CPU_AddressIn <= 0x73FF)
                         {
                             if ((Mapper_4_PRGRAMProtect & 0x80) != 0)
                             {
-                                notFloating = true;
-                                data = Cart.PRGRAM[Address & 0x3FF];
+                                CPU_DataOut = Cart.PRGRAM[CPU_AddressIn & 0x3FF];
+                                Connector_SetUpCPUDataPins(CPU_DataOut);
                             }
                         }
                     }
@@ -101,20 +95,15 @@ namespace TriCNES.mappers
                 {
                     if ((Mapper_4_PRGRAMProtect & 0x80) != 0)
                     {
-                        notFloating = true;
-                        data = Cart.PRGRAM[Address & 0x1FFF];
+                        CPU_DataOut = Cart.PRGRAM[CPU_AddressIn & 0x1FFF];
+                        Connector_SetUpCPUDataPins(CPU_DataOut);
                     }
                 }
             }
-            //else, open bus
 
-            if (notFloating)
-            {
-                EndFetchPRG(Observe, data);
-            }
             return;
         }
-        public override void StorePRG(ushort Address, byte Input)
+        public override void StoreCPU(ushort Address, byte Input)
         {
             if (Address < 0x8000)
             {   //Battery backed RAM
@@ -208,6 +197,76 @@ namespace TriCNES.mappers
                 }
             }
         }
+        public override byte SnoopCPU(ushort Address) // For debug purposes. It's a bit clunky.
+        {
+            if (Address >= 0xE000) // This bank is fixed the the final PRG bank of the ROM
+            {
+                return Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x3FFF)];
+            }
+            else if (Address >= 0xC000)
+            {
+                if ((Mapper_4_8000 & 0x40) == 0x40)
+                {
+                    //$C000 swappable
+                    return Cart.PRGROM[(Mapper_4_Bank8C << 13) | (Address & 0x1FFF)];
+                }
+                else
+                {
+                    //$8000 swappable
+                    return Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x1FFF)];
+                }
+            }
+            else if (Address >= 0xA000)
+            {
+                //$8000 swappable
+                return Cart.PRGROM[(Mapper_4_BankA << 13) | (Address & 0x1FFF)];
+            }
+            else if (Address >= 0x8000)
+            {
+                if ((Mapper_4_8000 & 0x40) == 0x40)
+                {
+                    //$8000 swappable
+                    return Cart.PRGROM[(Cart.PRG_SizeMinus1 << 14) | (Address & 0x1FFF)];
+                }
+                else
+                {
+                    //$C000 swappable
+                    return Cart.PRGROM[(Mapper_4_Bank8C << 13) | (Address & 0x1FFF)];
+                }
+            }
+            else if (Address >= 0x6000)
+            {
+                if (Cart.SubMapper == 1) // MMC6
+                {
+                    if ((Mapper_4_8000 & 0x20) != 0)
+                    {
+                        // MMC6 differs from MMC3 since there's only 1Kib of PRG RAM
+                        if (Address >= 0x7000 && Address <= 0x71FF)
+                        {
+                            if ((Mapper_4_PRGRAMProtect & 0x20) != 0)
+                            {
+                                return Cart.PRGRAM[Address & 0x3FF];
+                            }
+                        }
+                        else if (Address >= 0x7200 && Address <= 0x73FF)
+                        {
+                            if ((Mapper_4_PRGRAMProtect & 0x80) != 0)
+                            {
+                                return Cart.PRGRAM[Address & 0x3FF];
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if ((Mapper_4_PRGRAMProtect & 0x80) != 0)
+                    {
+                        return Cart.PRGRAM[Address & 0x1FFF];
+                    }
+                }
+            }
+            return Cart.Emu.dataBus;            
+        }
         public override int FetchPatternAddress(ushort Address)
         {
             //Writes to $8000 determine the mode, writes to $8001 determine the banks
@@ -250,37 +309,23 @@ namespace TriCNES.mappers
                 if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
             }
         }
-        public override void AccessPPU()
+        public override byte SnoopPPU(ushort Address) // For debug purposes. It's a bit clunky having to set this up for every mapper with a non-NROM CIRAM setup.
         {
-            Connector_ReadPPUAddressPins();
-            ushort Address = PPU_AddressIn;
-            if (!Cart.Emu.SeventyTwoPinConnector[64]) // (If PPU A13 is set, we don't do anything on the cartridge)
+            if (Address < 0x2000)
             {
                 int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
-                PPU_DataIn = Connector_ReadPPUDataPins(PPU_DataIn);
-                if (!Cart.Emu.SeventyTwoPinConnector[20]) // Reads
-                { 
-                    PPU_DataOut = Cart.CHRROM[CHR_Address];
-                    Connector_SetUpPPUDataPins(PPU_DataOut);
-                }
-                if (!Cart.Emu.SeventyTwoPinConnector[55] && Cart.UsingCHRRAM) // Writes
-                {
-                    Cart.CHRROM[CHR_Address] = PPU_DataIn; 
-                }
+                return Cart.CHRROM[CHR_Address];
             }
-            else if (Cart.AlternativeNametableArrangement && Cart.Emu.SeventyTwoPinConnector[61]) // Extra Nametable
+            else if (Cart.AlternativeNametableArrangement && Address >= 0x2800) // Unless we have an extra Nametable
             {
-                Address &= 0x7FF;
-                PPU_DataIn = Connector_ReadPPUDataPins(PPU_DataIn);
-                if (!Cart.Emu.SeventyTwoPinConnector[20]) // Reads
-                {
-                    PPU_DataOut = Cart.CHRROM[Address];
-                    Connector_SetUpPPUDataPins(PPU_DataOut);
-                }
-                if (!Cart.Emu.SeventyTwoPinConnector[55]) // Writes
-                {
-                    Cart.PRGVRAM[Address] = PPU_DataIn;
-                }
+                Address &= 0x7FF; // I don't believe there are any carts that have an alternate nametable arrangement that aren't set up this way.
+                return Cart.PRGVRAM[Address];
+            }
+            else
+            {
+                ushort Addr = (ushort)(Address & 0x3FF);
+                Addr |= (ushort)((Mapper_4_NametableMirroring ? ((Address & 0x800) != 0) : ((Address & 0x400) != 0)) ? 0x400 : 0);
+                return Cart.Emu.VRAM[Addr];
             }
         }
 

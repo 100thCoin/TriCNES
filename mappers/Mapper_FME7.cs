@@ -25,69 +25,59 @@ namespace TriCNES.mappers
         public bool Mapper_69_EnableIRQ;
         public bool Mapper_69_EnableIRQCounterDecrement;
         public ushort Mapper_69_IRQCounter; // When enabled the 16-bit IRQ counter is decremented once per CPU cycle. When the IRQ counter is decremented from $0000 to $FFFF an IRQ is generated.
-        public override void FetchPRG(ushort Address, bool Observe)
+        public override void FetchCPU()
         {
-            if (!Observe)
-            {
-                Address = Connector_ReadCPUAddressPins();
-            }
-            bool notFloating = false;
-            byte data = 0;
-            if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
-            // Observing can happen on a different thread, so we need to ensure that observing doesn't overwrite the data bus or floating pins status.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            Connector_ReadCPUAddressPins();
 
-            if (Address >= 0x6000)
+            if (CPU_AddressIn >= 0x6000)
             {
-                ushort tempo = (ushort)(Address % 0x2000);
-                if (Address >= 0x6000)
+                ushort tempo = (ushort)(CPU_AddressIn % 0x2000);
+                if (CPU_AddressIn >= 0x6000)
                 {
                     //actions
-                    if (Address < 0x8000)
+                    if (CPU_AddressIn < 0x8000)
                     {
                         if (Mapper_69_Bank_6_isRAM)
                         {
                             if (Mapper_69_Bank_6_isRAMEnabled)
                             {
-                                notFloating = true;
-                                data = Cart.PRGRAM[Address & 0x1FFF];
+                                CPU_DataOut = Cart.PRGRAM[CPU_AddressIn & 0x1FFF];
+    
                             }
                         }
                         else
                         {   //read from ROM
-                            notFloating = true;
-                            data = Cart.PRGROM[(Mapper_69_Bank_6 * 0x2000 + tempo) % Cart.PRGROM.Length];
+                            CPU_DataOut = Cart.PRGROM[(Mapper_69_Bank_6 * 0x2000 + tempo) % Cart.PRGROM.Length];
+
                         }
                     }
-                    else if (Address < 0xA000)
+                    else if (CPU_AddressIn < 0xA000)
                     {
-                        notFloating = true;
-                        data = Cart.PRGROM[(Mapper_69_Bank_8 * 0x2000 + tempo) % Cart.PRGROM.Length];
+                        CPU_DataOut = Cart.PRGROM[(Mapper_69_Bank_8 * 0x2000 + tempo) % Cart.PRGROM.Length];
+                        Connector_SetUpCPUDataPins(CPU_DataOut);
                     }
-                    else if (Address < 0xC000)
+                    else if (CPU_AddressIn < 0xC000)
                     {
-                        notFloating = true;
-                        data = Cart.PRGROM[(Mapper_69_Bank_A * 0x2000 + tempo) % Cart.PRGROM.Length];
+                        CPU_DataOut = Cart.PRGROM[(Mapper_69_Bank_A * 0x2000 + tempo) % Cart.PRGROM.Length];
+                        Connector_SetUpCPUDataPins(CPU_DataOut);
                     }
-                    else if (Address < 0xE000)
+                    else if (CPU_AddressIn < 0xE000)
                     {
-                        notFloating = true;
-                        data = Cart.PRGROM[(Mapper_69_Bank_C * 0x2000 + tempo) % Cart.PRGROM.Length];
+                        CPU_DataOut = Cart.PRGROM[(Mapper_69_Bank_C * 0x2000 + tempo) % Cart.PRGROM.Length];
+                        Connector_SetUpCPUDataPins(CPU_DataOut);
                     }
                     else
                     {
-                        notFloating = true;
-                        data = Cart.PRGROM[Cart.PRGROM.Length - 0x2000 + tempo];
+                        CPU_DataOut = Cart.PRGROM[Cart.PRGROM.Length - 0x2000 + tempo];
+                        Connector_SetUpCPUDataPins(CPU_DataOut);
                     }
                 }
             }
 
-            if (notFloating)
-            {
-                EndFetchPRG(Observe, data);
-            }
             return;
         }
-        public override void StorePRG(ushort Address, byte Input)
+        public override void StoreCPU(ushort Address, byte Input)
         {
             if (Address >= 0x6000)
             {
@@ -131,6 +121,48 @@ namespace TriCNES.mappers
                 } // else do nothing
             }
         }
+        public override byte SnoopCPU(ushort Address) // For debug purposes. It's a bit clunky.
+        {
+            if (Address >= 0x6000)
+            {
+                ushort tempo = (ushort)(Address % 0x2000);
+                if (Address >= 0x6000)
+                {
+                    //actions
+                    if (Address < 0x8000)
+                    {
+                        if (Mapper_69_Bank_6_isRAM)
+                        {
+                            if (Mapper_69_Bank_6_isRAMEnabled)
+                            {
+                                return Cart.PRGRAM[Address & 0x1FFF];    
+                            }
+                        }
+                        else
+                        {   //read from ROM
+                            return Cart.PRGROM[(Mapper_69_Bank_6 * 0x2000 + tempo) % Cart.PRGROM.Length];
+                        }
+                    }
+                    else if (Address < 0xA000)
+                    {
+                        return Cart.PRGROM[(Mapper_69_Bank_8 * 0x2000 + tempo) % Cart.PRGROM.Length];
+                    }
+                    else if (Address < 0xC000)
+                    {
+                        return Cart.PRGROM[(Mapper_69_Bank_A * 0x2000 + tempo) % Cart.PRGROM.Length];
+                    }
+                    else if (Address < 0xE000)
+                    {
+                        return Cart.PRGROM[(Mapper_69_Bank_C * 0x2000 + tempo) % Cart.PRGROM.Length];
+                    }
+                    else
+                    {
+                        return Cart.PRGROM[Cart.PRGROM.Length - 0x2000 + tempo];
+                    }
+                }
+            }
+            return Cart.Emu.dataBus;
+        }
         public override int FetchPatternAddress(ushort Address)
         {
             if (Address < 0x400) { return (Mapper_69_CHR_1K0 * 0x400 + Address) & (Cart.CHRROM.Length - 1); }
@@ -159,6 +191,33 @@ namespace TriCNES.mappers
                 case 3: //one-screen B
                     if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = true; }
                     break;
+            }
+        }
+        public override byte SnoopPPU(ushort Address) // For debug purposes. It's a bit clunky having to set this up for every mapper with a non-NROM CIRAM setup.
+        {
+            if (Address < 0x2000)
+            {
+                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
+                return Cart.CHRROM[CHR_Address];
+            }
+            else
+            {
+                ushort Addr = (ushort)(Address & 0x3FF);
+                switch (Mapper_69_NametableMirroring)
+                {
+                    case 0: //vertical
+                        Addr |= (ushort)(((Address & 0x400) != 0) ? 0x400 : 0);
+                        break;
+                    case 1: //horizontal
+                        Addr |= (ushort)(((Address & 0x800) != 0) ? 0x400 : 0);
+                        break;
+                    case 2: //one-screen A
+                        break;
+                    case 3: //one-screen B
+                        Addr |= 0x400;
+                        break;
+                }
+                return Cart.Emu.VRAM[Addr];
             }
         }
 

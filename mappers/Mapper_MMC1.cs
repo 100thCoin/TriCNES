@@ -12,20 +12,13 @@ namespace TriCNES.mappers
         public byte Mapper_1_CHR1;              //0xC000
         public byte Mapper_1_PRG;               //0xE000
         public bool Mapper_1_PB;
-        public override void FetchPRG(ushort Address, bool Observe)
+        public override void FetchCPU()
         {
-            if (!Observe)
-            {
-                Address = Connector_ReadCPUAddressPins();
-            }
-            bool notFloating = false;
-            byte data = 0;
-            if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
-            // Observing can happen on a different thread, so we need to ensure that observing doesn't overwrite the data bus or floating pins status.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            Connector_ReadCPUAddressPins();
 
-            if (Address >= 0x8000)
+            if (CPU_AddressIn >= 0x8000)
             {
-                notFloating = true;
                 // The bank mode for MMC1:
                 byte MMC1PRGROMBankMode = (byte)((Mapper_1_Control & 0b01100) >> 2);
                 switch (MMC1PRGROMBankMode)
@@ -34,56 +27,52 @@ namespace TriCNES.mappers
                     case 1:
                         {
                             // switch 32 KB at $8000, ignoring low bit of bank number
-                            ushort tempo = (ushort)(Address & 0x7FFF);
-                            data = Cart.PRGROM[(0x8000 * (Mapper_1_PRG & 0x0E) + tempo) % Cart.PRGROM.Length];
+                            ushort tempo = (ushort)(CPU_AddressIn & 0x7FFF);
+                            CPU_DataOut = Cart.PRGROM[(0x8000 * (Mapper_1_PRG & 0x0E) + tempo) % Cart.PRGROM.Length];
                         }
                         break;
                     case 2:
                         // fix first bank at $8000 and switch 16 KB bank at $C000
-                        if (Address >= 0xC000)
+                        if (CPU_AddressIn >= 0xC000)
                         {
-                            ushort tempo = (ushort)(Address & 0x3FFF);
-                            data = Cart.PRGROM[0x4000 * (Mapper_1_PRG) + tempo];
+                            ushort tempo = (ushort)(CPU_AddressIn & 0x3FFF);
+                            CPU_DataOut = Cart.PRGROM[0x4000 * (Mapper_1_PRG) + tempo];
                         }
                         else
                         {
-                            ushort tempo = (ushort)(Address & 0x3FFF);
-                            data = Cart.PRGROM[tempo];
+                            ushort tempo = (ushort)(CPU_AddressIn & 0x3FFF);
+                            CPU_DataOut = Cart.PRGROM[tempo];
                         }
                         break;
                     case 3:
                         // fix last bank at $C000 and switch 16 KB bank at $8000
-                        if (Address >= 0xC000)
+                        if (CPU_AddressIn >= 0xC000)
                         {
-                            ushort tempo = (ushort)(Address & 0x3FFF);
-                            data = Cart.PRGROM[Cart.PRGROM.Length - 0x4000 + tempo];
+                            ushort tempo = (ushort)(CPU_AddressIn & 0x3FFF);
+                            CPU_DataOut = Cart.PRGROM[Cart.PRGROM.Length - 0x4000 + tempo];
                         }
                         else
                         {
-                            ushort tempo = (ushort)(Address & 0x3FFF);
-                            data = Cart.PRGROM[(0x4000 * (Mapper_1_PRG & 0x0F) + tempo) & (Cart.PRGROM.Length - 1)];
+                            ushort tempo = (ushort)(CPU_AddressIn & 0x3FFF);
+                            CPU_DataOut = Cart.PRGROM[(0x4000 * (Mapper_1_PRG & 0x0F) + tempo) & (Cart.PRGROM.Length - 1)];
                         }
                         break;
                 }
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
             else // if the address is < $8000
             {
-                if (((Mapper_1_PRG & 0x10) == 0) && Address >= 0x6000) // if Work RAM is enabled
+                if (((Mapper_1_PRG & 0x10) == 0) && CPU_AddressIn >= 0x6000) // if Work RAM is enabled
                 {
-                    data = Cart.PRGRAM[Address & 0x1FFF];
-                    notFloating = true;
+                    CPU_DataOut = Cart.PRGRAM[CPU_AddressIn & 0x1FFF];
+                    Connector_SetUpCPUDataPins(CPU_DataOut);
                 }
                 // else, open bus.
             }
-            //open bus
 
-            if (notFloating)
-            {
-                EndFetchPRG(Observe, data);
-            }
             return;
         }
-        public override void StorePRG(ushort Address, byte Input)
+        public override void StoreCPU(ushort Address, byte Input)
         {
             if (Address < 0x8000) //WRAM not available on MMC1A
             {
@@ -130,6 +119,60 @@ namespace TriCNES.mappers
                 Mapper_1_Control |= 0b01100;
             }
         }
+        public override byte SnoopCPU(ushort Address) // For debug purposes. It's a bit clunky.
+        {
+            if (Address >= 0x8000)
+            {
+                // The bank mode for MMC1:
+                byte MMC1PRGROMBankMode = (byte)((Mapper_1_Control & 0b01100) >> 2);
+                switch (MMC1PRGROMBankMode)
+                {
+                    case 0:
+                    case 1:
+                        {
+                            // switch 32 KB at $8000, ignoring low bit of bank number
+                            ushort tempo = (ushort)(Address & 0x7FFF);
+                            return Cart.PRGROM[(0x8000 * (Mapper_1_PRG & 0x0E) + tempo) % Cart.PRGROM.Length];
+                        }
+                        break;
+                    case 2:
+                        // fix first bank at $8000 and switch 16 KB bank at $C000
+                        if (Address >= 0xC000)
+                        {
+                            ushort tempo = (ushort)(Address & 0x3FFF);
+                            return Cart.PRGROM[0x4000 * (Mapper_1_PRG) + tempo];
+                        }
+                        else
+                        {
+                            ushort tempo = (ushort)(Address & 0x3FFF);
+                            return Cart.PRGROM[tempo];
+                        }
+                        break;
+                    case 3:
+                        // fix last bank at $C000 and switch 16 KB bank at $8000
+                        if (Address >= 0xC000)
+                        {
+                            ushort tempo = (ushort)(Address & 0x3FFF);
+                            return Cart.PRGROM[Cart.PRGROM.Length - 0x4000 + tempo];
+                        }
+                        else
+                        {
+                            ushort tempo = (ushort)(Address & 0x3FFF);
+                            return Cart.PRGROM[(0x4000 * (Mapper_1_PRG & 0x0F) + tempo) & (Cart.PRGROM.Length - 1)];
+                        }
+                        break;
+                }
+            }
+            else // if the address is < $8000
+            {
+                if (((Mapper_1_PRG & 0x10) == 0) && Address >= 0x6000) // if Work RAM is enabled
+                {
+                    return Cart.PRGRAM[Address & 0x1FFF];
+                }
+                // else, open bus.
+            }
+            return Cart.Emu.dataBus;
+        }
         public override int FetchPatternAddress(ushort Address)
         {
             // bit 4 of Mapper_1_Control controls how the pattern tables are swapped. if set, 2 banks of 4Kib. Otherwise, 1 8Kib bank
@@ -165,6 +208,33 @@ namespace TriCNES.mappers
                 case 3: //horizontal
                     if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61]; }
                     break;
+            }
+        }
+        public override byte SnoopPPU(ushort Address) // For debug purposes. It's a bit clunky having to set this up for every mapper with a non-NROM CIRAM setup.
+        {
+            if (Address < 0x2000)
+            {
+                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
+                return Cart.CHRROM[CHR_Address];
+            }
+            else
+            {
+                ushort Addr = (ushort)(Address & 0x3FF);
+                switch (Mapper_1_Control & 3)
+                {
+                    case 0: //one screen, low
+                        break;
+                    case 1: //one screen, high
+                        Addr |= 0x400;
+                        break;
+                    case 2: //vertical
+                        Addr |= (ushort)(((Address & 0x400) != 0) ? 0x400 : 0);
+                        break;
+                    case 3: //horizontal
+                        Addr |= (ushort)(((Address & 0x800) != 0) ? 0x400 : 0);
+                        break;
+                }
+                return Cart.Emu.VRAM[Addr];
             }
         }
 

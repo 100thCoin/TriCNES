@@ -14,35 +14,25 @@ namespace TriCNES.mappers
         public bool Mapper_9_NametableMirroring;
         public bool Mapper_9_Latch0_FE;
         public bool Mapper_9_Latch1_FE; 
-        public override void FetchPRG(ushort Address, bool Observe)
+        public override void FetchCPU()
         {
-            if (!Observe)
-            {
-                Address = Connector_ReadCPUAddressPins();
-            }
-            bool notFloating = false;
-            byte data = 0;
-            if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
-            // Observing can happen on a different thread, so we need to ensure that observing doesn't overwrite the data bus or floating pins status.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            Connector_ReadCPUAddressPins();
 
-            if (Address >= 0xA000)
+            if (CPU_AddressIn >= 0xA000)
             {
-                notFloating = true;
-                data = Cart.PRGROM[((Cart.PRG_Size - 2) << 14) | (Address & 0x7FFF)];
+                CPU_DataOut = Cart.PRGROM[((Cart.PRG_Size - 2) << 14) | (CPU_AddressIn & 0x7FFF)];
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
-            else if(Address >= 0x8000)
+            else if(CPU_AddressIn >= 0x8000)
             {
-                notFloating = true;
-                data = Cart.PRGROM[(Mapper_9_BankSelect << 13) | (Address & 0x1FFF)];
+                CPU_DataOut = Cart.PRGROM[(Mapper_9_BankSelect << 13) | (CPU_AddressIn & 0x1FFF)];
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
 
-            if (notFloating)
-            {
-                EndFetchPRG(Observe, data);
-            }
             return;
         }
-        public override void StorePRG(ushort Address, byte Input)
+        public override void StoreCPU(ushort Address, byte Input)
         {
             if (Address < 0xA000)
             {
@@ -73,7 +63,18 @@ namespace TriCNES.mappers
                 Mapper_9_NametableMirroring = (Input & 0x1) == 1;
             }
         }
-
+        public override byte SnoopCPU(ushort Address) // For debug purposes. It's a bit clunky.
+        {
+            if (Address >= 0xA000)
+            {
+                return Cart.PRGROM[((Cart.PRG_Size - 2) << 14) | (Address & 0x7FFF)];
+            }
+            else if (Address >= 0x8000)
+            {
+                return Cart.PRGROM[(Mapper_9_BankSelect << 13) | (Address & 0x1FFF)];
+            }
+            return Cart.Emu.dataBus;
+        }
         public override void AccessPPU()
         {
             Connector_ReadPPUAddressPins();
@@ -125,6 +126,21 @@ namespace TriCNES.mappers
                 if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
             }
         }
+        public override byte SnoopPPU(ushort Address) // For debug purposes. It's a bit clunky having to set this up for every mapper with a non-NROM CIRAM setup.
+        {
+            if (Address < 0x2000)
+            {
+                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
+                return Cart.CHRROM[CHR_Address];
+            }
+            else
+            {
+                ushort Addr = (ushort)(Address & 0x3FF);
+                Addr |= (ushort)((Mapper_9_NametableMirroring ? ((Address & 0x800) != 0) : ((Address & 0x400) != 0)) ? 0x400 : 0);
+                return Cart.Emu.VRAM[Addr];
+            }
+        }
+
         public override List<byte> SaveMapperRegisters()
         {
             List<byte> State = new List<byte>();

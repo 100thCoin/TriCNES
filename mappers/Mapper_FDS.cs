@@ -16,28 +16,23 @@ namespace TriCNES.mappers
             FDS_BIOS = fds_bios;
         }
 
-        public override void FetchPRG(ushort Address, bool Observe)
+        public override void FetchCPU()
         {
-            if (!Observe)
-            {
-                Address = Connector_ReadCPUAddressPins();
-            }
-            bool notFloating = false;
-            byte data = 0;
-            if (!Observe) { dataPinsAreNotFloating = false; } else { observedDataPinsAreNotFloating = false; }
-            // Observing can happen on a different thread, so we need to ensure that observing doesn't overwrite the data bus or floating pins status.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            Connector_ReadCPUAddressPins();
+            ushort Address = CPU_AddressIn;
 
-            if (Address >= 0xE000)
+            if (CPU_AddressIn >= 0xE000)
             {
                 // read from the FDS BIOS
-                notFloating = true;
-                data = FDS_BIOS[Address & 0x1FFF];
+                CPU_DataOut = FDS_BIOS[Address & 0x1FFF];
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
             else if (Address >= 0x6000)
             {
                 // read from the FDS PRG RAM
-                notFloating = true;
-                data = Cart.PRGRAM[Address-0x6000];
+                CPU_DataOut = Cart.PRGRAM[Address-0x6000];
+                Connector_SetUpCPUDataPins(CPU_DataOut);
             }
             else if (Address >= 4030 && Address <= 0x403F)
             {
@@ -49,24 +44,18 @@ namespace TriCNES.mappers
                     case 0:
                         {
                             // FDS Status ($4030)
-                            notFloating = true;
-                            data = 0;
-
-                            data |= (byte)((FDS_4025_Control >> 3) & 1); // 4030.3 = 4025.3
-
-                            data |= (byte)((Cart.FDS.DiskAddress >= Cart.FDS.Disk.Length) ? 0x40 : 0); // 4030.6 = End of Disk
-
-
-                            data |= (byte)(Cart.FDS.Status_ByteTransferFlag ? 0x80 : 0); // 4030.7 = Byte Transfer Flag
-
-
+                            CPU_DataOut = 0;
+                            CPU_DataOut |= (byte)((FDS_4025_Control >> 3) & 1); // 4030.3 = 4025.3
+                            CPU_DataOut |= (byte)((Cart.FDS.DiskAddress >= Cart.FDS.Disk.Length) ? 0x40 : 0); // 4030.6 = End of Disk
+                            CPU_DataOut |= (byte)(Cart.FDS.Status_ByteTransferFlag ? 0x80 : 0); // 4030.7 = Byte Transfer Flag
+                            Connector_SetUpCPUDataPins(CPU_DataOut);
                         }
                         break;
                     case 1:
                         {
                             // Disk Data Input ($4031)
-                            notFloating = true;
-                            data = Cart.FDS.ShiftRegisterLatch;
+                            CPU_DataOut = Cart.FDS.ShiftRegisterLatch;
+                            Connector_SetUpCPUDataPins(CPU_DataOut);
                             Cart.FDS.Status_ByteTransferFlag = false;
                             Connector_IRQPin(false); //acknowledge the IRQ
                         }
@@ -74,32 +63,28 @@ namespace TriCNES.mappers
                     case 2:
                         {
                             // Disk Drive Status ($4032)
-                            notFloating = true;
-                            data = 0;
+                            CPU_DataOut = 0;
                             if(Cart.FDS.CurrentState == DiskDrive.RamAdapterState.INSERTING)
                             {
-                                data |= 1;
+                                CPU_DataOut |= 1;
                             }
                             if (!(((FDS_4025_Control & 2) == 0) && (Cart.FDS.CurrentState == DiskDrive.RamAdapterState.RUNNING || Cart.FDS.CurrentState == DiskDrive.RamAdapterState.IDLE)))
                             {
-                                data |= 2;
+                                CPU_DataOut |= 2;
                             }
+                            Connector_SetUpCPUDataPins(CPU_DataOut);
                         }
                         break;
                     case 3:
                         {
                             // External Connector Input ($4033)
-                            notFloating = true;
-                            data = 0x80; // The battery is good.
+                            CPU_DataOut = 0x80; // The battery is good.
+                            Connector_SetUpCPUDataPins(CPU_DataOut);
                         }
                         break;
                 }
             }
 
-            if (notFloating)
-            {
-                EndFetchPRG(Observe, data);
-            }
             return;
         }
         public override int FetchPatternAddress(ushort Address)
@@ -107,7 +92,7 @@ namespace TriCNES.mappers
             return Address;
         }
 
-        public override void StorePRG(ushort Address, byte Input)
+        public override void StoreCPU(ushort Address, byte Input)
         {
             if (Address >= 0x6000 && Address < 0xE000)
             {
@@ -157,6 +142,68 @@ namespace TriCNES.mappers
                 }
             }
         }
+
+        public override byte SnoopCPU(ushort Address) // For debug purposes. It's a bit clunky.
+        {
+            if (Address >= 0xE000)
+            {
+                // read from the FDS BIOS
+                return FDS_BIOS[Address & 0x1FFF];
+            }
+            else if (Address >= 0x6000)
+            {
+                // read from the FDS PRG RAM
+                return Cart.PRGRAM[Address - 0x6000];
+            }
+            else if (Address >= 4030 && Address <= 0x403F)
+            {
+                // Read from the FDS Registers
+                Address &= 0xF;
+                switch (Address)
+                {
+                    default: break;
+                    case 0:
+                        {
+                            // FDS Status ($4030)
+                            byte t = 0;
+                            t |= (byte)((FDS_4025_Control >> 3) & 1); // 4030.3 = 4025.3
+                            t |= (byte)((Cart.FDS.DiskAddress >= Cart.FDS.Disk.Length) ? 0x40 : 0); // 4030.6 = End of Disk
+                            t |= (byte)(Cart.FDS.Status_ByteTransferFlag ? 0x80 : 0); // 4030.7 = Byte Transfer Flag
+                            return t;
+                        }
+                        break;
+                    case 1:
+                        {
+                            // Disk Data Input ($4031)
+                            return Cart.FDS.ShiftRegisterLatch;
+                        }
+                        break;
+                    case 2:
+                        {
+                            // Disk Drive Status ($4032)
+                            byte t = 0;
+                            if (Cart.FDS.CurrentState == DiskDrive.RamAdapterState.INSERTING)
+                            {
+                                t |= 1;
+                            }
+                            if (!(((FDS_4025_Control & 2) == 0) && (Cart.FDS.CurrentState == DiskDrive.RamAdapterState.RUNNING || Cart.FDS.CurrentState == DiskDrive.RamAdapterState.IDLE)))
+                            {
+                                t |= 2;
+                            }
+                            return t;
+                        }
+                        break;
+                    case 3:
+                        {
+                            // External Connector Input ($4033)
+                            return 0x80; // The battery is good.
+                        }
+                        break;
+                }
+            }
+            return Cart.Emu.dataBus;
+        }
+
         public override void Connector_CheckCIRAM()
         {
             if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57]; }
@@ -167,6 +214,20 @@ namespace TriCNES.mappers
             else //vertical
             {
                 if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
+            }
+        }
+        public override byte SnoopPPU(ushort Address) // For debug purposes. It's a bit clunky having to set this up for every mapper with a non-NROM CIRAM setup.
+        {
+            if (Address < 0x2000)
+            {
+                int CHR_Address = Cart.MapperChip.FetchPatternAddress(Address);
+                return Cart.CHRROM[CHR_Address];
+            }
+            else
+            {
+                ushort Addr = (ushort)(Address & 0x3FF);
+                Addr |= (ushort)(((((FDS_4025_Control >> 3) & 1) == 1) ? ((Address & 0x800) != 0) : ((Address & 0x400) != 0)) ? 0x400 : 0);
+                return Cart.Emu.VRAM[Addr];
             }
         }
 
