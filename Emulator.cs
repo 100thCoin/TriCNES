@@ -260,6 +260,15 @@ namespace TriCNES
             return "";
         }
 
+        public virtual bool CheckCIC()
+        {
+            // I'm not actually emulating the CIC internals. (... yet.)
+            // Instead, I'll simply return true so long as the cartridge has power.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return false; } // If the cartridge is disconnected from power or ground, it cannot do anything, so the CIC check fails.
+            if ( Cart.Emu.ConnectorPinFloating[33] || Cart.Emu.ConnectorPinFloating[34] || Cart.Emu.ConnectorPinFloating[70]) { return false; } // If these pins for the CIC chip get disconnected, the CIC chip cannot match the console's CIC.
+            return true;
+        }
+
         public void Connector_SetUpPPUAddressPins()
         {
             if (!Cart.Emu.ConnectorPinFloating[28]) { Cart.Emu.SeventyTwoPinConnector[28] = (Cart.Emu.PPU_OctalLatch & 0x01) != 0; } // PPU A0
@@ -624,6 +633,9 @@ namespace TriCNES
         public byte CPUClock;    // Counts down from 12. When it's 0, a CPU cycle occurs.
         public byte MasterClock; // Counts up every master clock cycle. Resets at 24.
 
+        public byte CICClock; // Seperate from the Master clock, we have the clock of the CIC chip.
+        public bool ResetMode; // If the CIC chip was tripped, the console will reset approximately every second.
+        public int ResetModeCounter; // Counter to reset teh console after the correct amount of time has passed.
 
         public bool[] SeventyTwoPinConnector; // The 72 pin connector.
         public bool[] ConnectorPinFloating;   // Toggle which pins are disconnected.
@@ -971,6 +983,13 @@ namespace TriCNES
 
         public bool PPU_RESET;
 
+        public void ResetButton()
+        {
+            ResetMode = false; // Clear the CIC reset mode.
+            ResetModeCounter = 0;
+            Reset();
+        }
+
         // when pressing the reset button, this function runs
         public void Reset()
         {
@@ -1132,6 +1151,16 @@ namespace TriCNES
             {
                 CPUClock = 0; // there is 1 CPU cycle for every 12 master clock cycles
 
+                if(ResetMode)
+                {
+                    ResetModeCounter++;
+                    if(ResetModeCounter == 1477700) // Approximately how long it takes for the CIC chip to reset the console. Keep in mind, this value lowers as the temperature increases.
+                    {
+                        ResetModeCounter = 0;
+                        Reset(); // Reset via the CIC, not the reset button.
+                    }
+                }
+
                 _6502(); // This is where I run the CPU
                 totalCycles++;         // for debugging mostly
                 Cart.MapperChip.CPUClock(); // If the mapper chip does every cpu cycle... (see FME-7)
@@ -1180,11 +1209,20 @@ namespace TriCNES
                 // If the timing needs to be exactly n and a half APU cycles, then I'll just multiply the numbers by 2 and clock this twice as fast.
             }
 
-            // Decrement the clocks.
+            if(CICClock == 5) // The CIC clock is NOT tied to the master clock. It would actually clock approximately every 5.369318 master clock cycles, but I'm not going to worry about that for now.
+            {
+                CICClock = 0;
+                if (!Cart.MapperChip.CheckCIC())
+                {
+                    ResetMode = true;
+                }
+            }
+
+            // Increment the clocks.
             PPUClock++;
             CPUClock++;
-
-            if(Cart.FDS != null)
+            CICClock++;
+            if (Cart.FDS != null)
             {
                 Cart.FDS.Clock();
             }
@@ -1364,7 +1402,7 @@ namespace TriCNES
                             {
                                 if (TAS_InputSequenceIndex > 0 && TAS_InputSequenceIndex < TAS_ResetLog.Length && TAS_ResetLog[TAS_InputSequenceIndex])
                                 {
-                                    Reset();
+                                    ResetButton();
                                 }
                                 TAS_InputSequenceIndex++; // Instead of using 1 input per frame, this just advances to the next input
                             }
@@ -1835,7 +1873,7 @@ namespace TriCNES
                     {
                         if (TAS_ReadingTAS && TAS_InputSequenceIndex > 0 && TAS_InputSequenceIndex < TAS_ResetLog.Length && TAS_ResetLog[TAS_InputSequenceIndex])
                         {
-                            Reset();
+                            ResetButton();
                         }
                         // If this was using "SubFrame", TAS_InputSequenceIndex is incremented whenever the controller is strobed.
                         // Instead, I increment the index here at the start of vblank.

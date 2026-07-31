@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Input;
+using TriCNES.mappers;
 
 namespace TriCNES
 {
@@ -105,6 +106,12 @@ namespace TriCNES
             {
                 PendingLoadState = false;
                 EMU.LoadState(Savestate);
+            }
+            if(Pending_EjectCartridge)
+            {
+                Pending_EjectCartridge = false;
+                EMU.Cart.MapperChip = new Mapper_NULL();
+                EMU.Cart.MapperChip.Cart = EMU.Cart;
             }
             if (TraceLogger != null)
             {
@@ -690,7 +697,7 @@ namespace TriCNES
                     MessageBox.Show("The emulator needs to be powered on before running from RESET.");
                     return;
                 }
-                EMU.Reset();
+                EMU.ResetButton();
             }
             else
             {
@@ -750,7 +757,7 @@ namespace TriCNES
         {
             if (EMU != null)
             {
-                EMU.Reset();
+                EMU.ResetButton();
             }
         }
 
@@ -766,6 +773,8 @@ namespace TriCNES
                 Emu2.Cart = EMU.Cart;
                 Emu2.Cart.Emu = Emu2;
                 EMU = Emu2;
+                if (!LoadROM(filePath)) { return; }
+                EMU.ResetButton();
             }
         }
 
@@ -1872,7 +1881,7 @@ namespace TriCNES
                     RunPostFramePhase();
                     if (TasTimeline.frameIndex < TriCTASTimeline.Resets.Count && TriCTASTimeline.Resets[TasTimeline.frameIndex])
                     {
-                        EMU.Reset();
+                        EMU.ResetButton();
                     }
 
                     if (!EMU.TASTimelineClockFiltering || !EMU.LagFrame)
@@ -1911,7 +1920,14 @@ namespace TriCNES
             }
             return joystickButtons;
         }
+        bool Pending_EjectCartridge;
 
+        private void ejectCartridgeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            // I highly doubt anybody will intentionally press this button other than myself right now as I test this.
+            // It might be a good idea to remove this feature at some point, heh.
+            Pending_EjectCartridge = true;
+        }
     }
 
     /// <summary>
