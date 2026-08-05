@@ -14,7 +14,7 @@ namespace TriCNES.mappers
         public bool Mapper_1_PB;
         public override void FetchCPU()
         {
-            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[71]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
             Connector_ReadCPUAddressPins();
 
             if (CPU_AddressIn >= 0x8000)
@@ -193,7 +193,7 @@ namespace TriCNES.mappers
         }
         public override void Connector_CheckCIRAM()
         {
-            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57]; }
+            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
             switch (Mapper_1_Control & 3)
             {
                 case 0: //one screen, low

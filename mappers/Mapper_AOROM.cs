@@ -9,7 +9,7 @@ namespace TriCNES.mappers
         public byte Mapper_7_BankSelect;
         public override void FetchCPU()
         {
-            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[71]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
             Connector_ReadCPUAddressPins();
 
             if (!Cart.Emu.SeventyTwoPinConnector[49]) // CPU /A15 + /M2
@@ -37,7 +37,7 @@ namespace TriCNES.mappers
         }
         public override void Connector_CheckCIRAM()
         {
-            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57]; }
+            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
             if ((Mapper_7_BankSelect & 0x10) == 0) // show nametable 0
             {
                 if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = false; }

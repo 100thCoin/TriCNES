@@ -74,6 +74,12 @@
     <Compile Include="forms\TASProperties3ct.Designer.cs">
       <DependentUpon>TASProperties3ct.cs</DependentUpon>
     </Compile>
+    <Compile Include="forms\TriC72PinConnector.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="forms\TriC72PinConnector.Designer.cs">
+      <DependentUpon>TriC72PinConnector.cs</DependentUpon>
+    </Compile>
     <Compile Include="forms\TriCHexEditor.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -121,6 +127,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="forms\TASProperties3ct.resx">
       <DependentUpon>TASProperties3ct.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="forms\TriC72PinConnector.resx">
+      <DependentUpon>TriC72PinConnector.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="forms\TriCHexEditor.resx">
       <DependentUpon>TriCHexEditor.cs</DependentUpon>

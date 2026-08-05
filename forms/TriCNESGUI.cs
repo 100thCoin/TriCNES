@@ -56,6 +56,7 @@ namespace TriCNES
         public TriCNTViewer? NametableViewer;
         public TriCTASTimeline? TasTimeline;
         public TriCHexEditor? HexEditor;
+        public TriC72PinConnector? CartConnector;
 
         void RunUpkeep()
         {
@@ -133,6 +134,10 @@ namespace TriCNES
             if(HexEditor != null)
             {
                 HexEditor.Update();
+            }
+            if (CartConnector != null)
+            {
+                CartConnector.Update72PinConnector();
             }
         }
 
@@ -866,6 +871,10 @@ namespace TriCNES
             if (HexEditor != null)
             {
                 HexEditor.Dispose();
+            }
+            if (CartConnector != null)
+            {
+                CartConnector.Dispose();
             }
             Application.Exit();
         }
@@ -1927,6 +1936,19 @@ namespace TriCNES
             // I highly doubt anybody will intentionally press this button other than myself right now as I test this.
             // It might be a good idea to remove this feature at some point, heh.
             Pending_EjectCartridge = true;
+        }
+
+        private void cartridgeConnectorToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (CartConnector != null)
+            {
+                CartConnector.Focus();
+                return;
+            }
+            CartConnector = new TriC72PinConnector();
+            CartConnector.MainGUI = this;
+            CartConnector.Show();
+            CartConnector.Location = Location;
         }
     }
 

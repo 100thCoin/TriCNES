@@ -141,7 +141,7 @@ namespace TriCNES
         // Default to NROM behavior.
         public virtual void FetchCPU()
         {
-            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[71]) || Cart.Emu.ConnectorPinFloating[35]) { return; } // If the cartridge is disconnected from power or ground, it cannot do anything.
             Connector_ReadCPUAddressPins();
 
             if (!Cart.Emu.SeventyTwoPinConnector[49]) // CPU /A15 + /M2
@@ -264,7 +264,7 @@ namespace TriCNES
         {
             // I'm not actually emulating the CIC internals. (... yet.)
             // Instead, I'll simply return true so long as the cartridge has power.
-            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[75]) || Cart.Emu.ConnectorPinFloating[35]) { return false; } // If the cartridge is disconnected from power or ground, it cannot do anything, so the CIC check fails.
+            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[71]) || Cart.Emu.ConnectorPinFloating[35]) { return false; } // If the cartridge is disconnected from power or ground, it cannot do anything, so the CIC check fails.
             if ( Cart.Emu.ConnectorPinFloating[33] || Cart.Emu.ConnectorPinFloating[34] || Cart.Emu.ConnectorPinFloating[70]) { return false; } // If these pins for the CIC chip get disconnected, the CIC chip cannot match the console's CIC.
             return true;
         }
@@ -318,16 +318,15 @@ namespace TriCNES
         }
         public byte Connector_ReadPPUDataPins(byte bus)
         {
-            byte t = bus;
-            if (!Cart.Emu.ConnectorPinFloating[29]) { t &= 0xFE; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[29] ? 0x01 : 0); } // PPU D0
-            if (!Cart.Emu.ConnectorPinFloating[30]) { t &= 0xFD; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[30] ? 0x02 : 0); } // PPU D1
-            if (!Cart.Emu.ConnectorPinFloating[31]) { t &= 0xFB; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[31] ? 0x04 : 0); } // PPU D2
-            if (!Cart.Emu.ConnectorPinFloating[32]) { t &= 0xF7; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[32] ? 0x08 : 0); } // PPU D3
-            if (!Cart.Emu.ConnectorPinFloating[68]) { t &= 0xEF; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[68] ? 0x10 : 0); } // PPU D4
-            if (!Cart.Emu.ConnectorPinFloating[67]) { t &= 0xDF; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[67] ? 0x20 : 0); } // PPU D5
-            if (!Cart.Emu.ConnectorPinFloating[66]) { t &= 0xBF; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[66] ? 0x40 : 0); } // PPU D6
-            if (!Cart.Emu.ConnectorPinFloating[65]) { t &= 0x7F; t |= (byte)(Cart.Emu.SeventyTwoPinConnector[65] ? 0x80 : 0); } // PPU D7
-            return t;
+            if (!Cart.Emu.ConnectorPinFloating[29]) { bus &= 0xFE; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[29] ? 0x01 : 0); } // PPU D0
+            if (!Cart.Emu.ConnectorPinFloating[30]) { bus &= 0xFD; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[30] ? 0x02 : 0); } // PPU D1
+            if (!Cart.Emu.ConnectorPinFloating[31]) { bus &= 0xFB; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[31] ? 0x04 : 0); } // PPU D2
+            if (!Cart.Emu.ConnectorPinFloating[32]) { bus &= 0xF7; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[32] ? 0x08 : 0); } // PPU D3
+            if (!Cart.Emu.ConnectorPinFloating[68]) { bus &= 0xEF; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[68] ? 0x10 : 0); } // PPU D4
+            if (!Cart.Emu.ConnectorPinFloating[67]) { bus &= 0xDF; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[67] ? 0x20 : 0); } // PPU D5
+            if (!Cart.Emu.ConnectorPinFloating[66]) { bus &= 0xBF; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[66] ? 0x40 : 0); } // PPU D6
+            if (!Cart.Emu.ConnectorPinFloating[65]) { bus &= 0x7F; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[65] ? 0x80 : 0); } // PPU D7
+            return bus;
         }
 
         public void Connector_SetUpCPUAddressPins(ushort Address) // the 2A03 bus, not the 6502 bus.
@@ -395,7 +394,7 @@ namespace TriCNES
         }
         public virtual void Connector_CheckCIRAM()
         {
-            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = !Cart.Emu.SeventyTwoPinConnector[57]; }
+            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
             if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.NametableHorizontalMirroring ? Cart.Emu.SeventyTwoPinConnector[61] : Cart.Emu.SeventyTwoPinConnector[62]; }
         }
         public virtual void Connector_IRQPin(bool t)
@@ -938,7 +937,7 @@ namespace TriCNES
 
             programCounter = 0xFFFF; // Technically, this value is nondeterministic. It also doesn't matter where it is, as it will be initialized in the RESET instruction.
             PPU_Scanline = 0;        // The PPU begins on dot 0 of scanline 0
-            PPU_Dot = 7;       // Shouldn't this be 0? I don't know why, but this passes all the tests if this is 7, so...?
+            PPU_Dot = 0;
 
             PPU_OddFrame = true;    // And this is technically considered an "odd" frame when it comes to even/odd frame timing.
 
@@ -1758,8 +1757,6 @@ namespace TriCNES
 
         bool PPU_CanDetectSpriteZeroHit; // Only 1 sprite zero hit is allowed per frame. This gets set if a sprite zero hit occurs, and cleared at the end of vblank.
 
-        public bool PPU_A12_Prev; // The MMC3 chip's IRQ counter is changed whenever bit 12 of the PPU Address is changing from a 0 to a 1. This is recorded at the start of a PPU cycle, and checked at the end.
-
         public bool PPU_OddFrame; // Every other frame is 1 ppu cycle shorter.
 
         public byte DotColor; // The pixel output is delayed by 2 dots.
@@ -1931,7 +1928,6 @@ namespace TriCNES
             PPUStatus_SpriteOverflow_Delayed = PPUStatus_SpriteOverflow;
 
             Cart.MapperChip.PPUClock(); // If the mapper chip does something every ppu clock... (See MMC3)
-            PPU_A12_Prev = (PPU_AddressBus & 0b0001000000000000) != 0; // Record the value of the A12. This is needed for MMC3.
 
             if (PPU_OddFrame && (PPU_Mask_ShowBackground || PPU_Mask_ShowSprites))
             {
@@ -2170,20 +2166,20 @@ namespace TriCNES
             Cart.MapperChip.Connector_SetUpPPUAddressPins();
             Cart.MapperChip.Connector_SetUpPPUDataPins((byte)PPU_AddressBus); // If AccessPPU() doesn't update the pins, then we get back the address bus.
             Cart.MapperChip.Connector_CheckCIRAM();
+            bool CE = !SeventyTwoPinConnector[56] && !ConnectorPinFloating[56] && !ConnectorPinFloating[57];
 
             // Always attempt to read from the cartridge. The data pins would not be updated if reading from the nametable.
             Cart.MapperChip.Connector_PPU_RW(PPU_READ, PPU_WRITE);
             Cart.MapperChip.AccessPPU();
             byte t = Cart.MapperChip.Connector_ReadPPUDataPins((byte)PPU_AddressBus);
 
-            if (PPU_AddressBus >= 0x2000 && Cart.Emu.SeventyTwoPinConnector[56])
+            if (CE)
             {
                 // We're reading from on-console VRAM, not the cartridge.
                 // NOTE: In theory you could trigger bus conflicts with this. I'm currently just assuming the bus is free.
-                ushort Address = (ushort)((Cart.Emu.PPU_AddressBus & 0x3F00) | Cart.Emu.PPU_OctalLatch);
-                Address &= 0x3FF;
-                Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[21] ? 0x400 : 0);
-                t = Cart.Emu.VRAM[Address];
+                ushort Address = (ushort)((PPU_AddressBus & 0x300) | PPU_OctalLatch);
+                Address |= (ushort)(SeventyTwoPinConnector[21] ? 0x400 : 0);
+                t = VRAM[Address];
             }
 
             PPU_AddressBus &= 0xFF00;
@@ -2196,18 +2192,19 @@ namespace TriCNES
         {
             Cart.MapperChip.Connector_SetUpPPUAddressPins();
             Cart.MapperChip.Connector_CheckCIRAM();
+            bool CE = !SeventyTwoPinConnector[56] && !ConnectorPinFloating[56] && !ConnectorPinFloating[57];
+
             if ((PPU_AddressBus & 0x3FFF) >= 0x3F00)
             {
                 PaletteRAM[PPU_AddressBus & (((PPU_AddressBus & 0x3) == 0) ? 0x0F : 0x1F)] = input;
             }
-            else if (((PPU_AddressBus & 0x3FFF) >= 0x2000) && Cart.Emu.SeventyTwoPinConnector[56])
+            else if (CE)
             {
                 // We're writing to on-console VRAM, not the cartridge.
                 // NOTE: In theory you could trigger bus conflicts with this. I'm currently just assuming the bus is free.
-                ushort Address = (ushort)((Cart.Emu.PPU_AddressBus & 0x3F00) | Cart.Emu.PPU_OctalLatch);
-                Address &= 0x3FF;
-                Address |= (ushort)(Cart.Emu.SeventyTwoPinConnector[21] ? 0x400 : 0);
-                Cart.Emu.VRAM[Address] = input;
+                ushort Address = (ushort)((PPU_AddressBus & 0x300) | PPU_OctalLatch);
+                Address |= (ushort)(SeventyTwoPinConnector[21] ? 0x400 : 0);
+                VRAM[Address] = input;
             }
             else
             {
@@ -11141,7 +11138,6 @@ namespace TriCNES
             State.Add(PPU_HighBitPlane);
             State.Add(PPU_Attribute);
             State.Add((byte)(PPU_CanDetectSpriteZeroHit ? 1 : 0));
-            State.Add((byte)(PPU_A12_Prev ? 1 : 0));
             State.Add((byte)(PPU_OddFrame ? 1 : 0));
             State.Add(PaletteRAMAddress);
             State.Add((byte)(ThisDotReadFromPaletteRAM ? 1 : 0));
@@ -11446,7 +11442,6 @@ namespace TriCNES
             PPU_HighBitPlane = State[p++];
             PPU_Attribute = State[p++];
             PPU_CanDetectSpriteZeroHit = (State[p++] & 1) == 1;
-            PPU_A12_Prev = (State[p++] & 1) == 1;
             PPU_OddFrame = (State[p++] & 1) == 1;
             PaletteRAMAddress = State[p++];
             ThisDotReadFromPaletteRAM = (State[p++] & 1) == 1;
