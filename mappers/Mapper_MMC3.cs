@@ -116,7 +116,7 @@ namespace TriCNES.mappers
                     {
                         if (Address >= 0x7000 && Address <= 0x71FF)
                         {
-                            if ((Mapper_4_PRGRAMProtect & 0x10) == 0)
+                            if ((Mapper_4_PRGRAMProtect & 0x10) != 0)
                             {
                                 Cart.PRGRAM[Address & 0x3FF] = Input;
 
@@ -124,7 +124,7 @@ namespace TriCNES.mappers
                         }
                         else if (Address >= 0x7200 && Address <= 0x73FF)
                         {
-                            if ((Mapper_4_PRGRAMProtect & 0x40) == 0)
+                            if ((Mapper_4_PRGRAMProtect & 0x40) != 0)
                             {
                                 Cart.PRGRAM[Address & 0x3FF] = Input;
                             }
@@ -292,22 +292,39 @@ namespace TriCNES.mappers
         }
         public override void Connector_CheckCIRAM()
         {
-            if (Cart.AlternativeNametableArrangement)
+            if (TiltingCart)
             {
-                if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57] || Cart.Emu.SeventyTwoPinConnector[61]; }
+                if (Cart.AlternativeNametableArrangement)
+                {
+                    if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57] || Cart.Emu.SeventyTwoPinConnector[61]; }
+                }
+                else
+                {
+                    if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
+                }
+
+                if (Mapper_4_NametableMirroring) //horizontal
+                {
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61]; }
+                }
+                else //vertical
+                {
+                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
+                }
             }
             else
             {
-                if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
-            }
+                if (Cart.AlternativeNametableArrangement)
+                {
+                    Cart.Emu.SeventyTwoPinConnector[61] = (Cart.Emu.PPU_AddressBus & 0x0800) != 0;
+                    Cart.Emu.SeventyTwoPinConnector[56] = (Cart.Emu.PPU_AddressBus & 0x2000) == 0 || Cart.Emu.SeventyTwoPinConnector[61];
+                }
+                else
+                {
+                    Cart.Emu.SeventyTwoPinConnector[56] = (Cart.Emu.PPU_AddressBus & 0x2000) == 0;
+                }
+                Cart.Emu.SeventyTwoPinConnector[21] = Mapper_4_NametableMirroring ? ((Cart.Emu.PPU_AddressBus & 0x800) != 0) : ((Cart.Emu.PPU_AddressBus & 0x400) != 0);
 
-            if (Mapper_4_NametableMirroring) //horizontal
-            {
-                if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61]; }
-            }
-            else //vertical
-            {
-                if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
             }
         }
         public override byte SnoopPPU(ushort Address) // For debug purposes. It's a bit clunky having to set this up for every mapper with a non-NROM CIRAM setup.
@@ -395,7 +412,14 @@ namespace TriCNES.mappers
 
         public override void PPUClock()
         {
-            Connector_SetUpPPUAddressPins();
+            if (!TiltingCart)
+            {
+                Cart.Emu.SeventyTwoPinConnector[63] = (Cart.Emu.PPU_AddressBus & 0x1000) != 0;
+            }
+            else
+            {
+                Connector_SetUpPPUAddressPins();
+            }
             // if bit 12 of the ppu address bus (A12) changes:
             if (!Mapper_4_PPUA12 && Cart.Emu.SeventyTwoPinConnector[63] && Mapper_4_M2Filter == 3)
             {

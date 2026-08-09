@@ -37,14 +37,18 @@ namespace TriCNES.mappers
         }
         public override void Connector_CheckCIRAM()
         {
-            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
-            if ((Mapper_7_BankSelect & 0x10) == 0) // show nametable 0
+            if (TiltingCart)
             {
-                if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = false; }
+                if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
+                if (!Cart.Emu.ConnectorPinFloating[21])
+                {
+                    Cart.Emu.SeventyTwoPinConnector[21] = (Mapper_7_BankSelect & 0x10) != 0;
+                }
             }
-            else // show nametable 1
+            else
             {
-                if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = true; }
+                Cart.Emu.SeventyTwoPinConnector[56] = (Cart.Emu.PPU_AddressBus & 0x2000) == 0;
+                Cart.Emu.SeventyTwoPinConnector[21] = (Mapper_7_BankSelect & 0x10) != 0;
             }
         }
         public override byte SnoopPPU(ushort Address) // For debug purposes. It's a bit clunky having to set this up for every mapper with a non-NROM CIRAM setup.

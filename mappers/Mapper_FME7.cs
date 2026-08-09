@@ -176,21 +176,43 @@ namespace TriCNES.mappers
         }
         public override void Connector_CheckCIRAM()
         {
-            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
-            switch (Mapper_69_NametableMirroring)
+            if (TiltingCart)
             {
-                case 0: //vertical
-                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
-                    break;
-                case 1: //horizontal
-                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61]; }
-                    break;
-                case 2: //one-screen A
-                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = false; }
-                    break;
-                case 3: //one-screen B
-                    if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = true; }
-                    break;
+                if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
+                switch (Mapper_69_NametableMirroring)
+                {
+                    case 0: //vertical
+                        if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[62]; }
+                        break;
+                    case 1: //horizontal
+                        if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.Emu.SeventyTwoPinConnector[61]; }
+                        break;
+                    case 2: //one-screen A
+                        if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = false; }
+                        break;
+                    case 3: //one-screen B
+                        if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = true; }
+                        break;
+                }
+            }
+            else
+            {
+                Cart.Emu.SeventyTwoPinConnector[56] = (Cart.Emu.PPU_AddressBus & 0x2000) == 0;
+                switch (Mapper_69_NametableMirroring)
+                {
+                    case 0: //vertical
+                        Cart.Emu.SeventyTwoPinConnector[21] = (Cart.Emu.PPU_AddressBus & 0x400) != 0;
+                        break;
+                    case 1: //horizontal
+                        Cart.Emu.SeventyTwoPinConnector[21] = (Cart.Emu.PPU_AddressBus & 0x800) != 0;
+                        break;
+                    case 2: //one-screen A
+                        Cart.Emu.SeventyTwoPinConnector[21] = false;
+                        break;
+                    case 3: //one-screen B
+                        Cart.Emu.SeventyTwoPinConnector[21] = true;
+                        break;
+                }
             }
         }
         public override byte SnoopPPU(ushort Address) // For debug purposes. It's a bit clunky having to set this up for every mapper with a non-NROM CIRAM setup.

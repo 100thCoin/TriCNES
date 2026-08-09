@@ -130,13 +130,17 @@ namespace TriCNES
     {
         public Cartridge Cart;
 
+        public bool TiltingCart; // If you are using the GUI to mess with pins on the 72-pin connector. When false, we can optimize things a little.
+
         public ushort CPU_AddressIn; // internal to the cartridge
         public byte CPU_DataIn; // internal to the cartridge
         public byte CPU_DataOut; // internal to the cartridge
+        public byte CPU_NonTiltData; //If you are not using the GUI to mess with pins on the 72-pin connector, we can optimize a little bit.
 
         public ushort PPU_AddressIn; // internal to the cartridge
         public byte PPU_DataIn; // internal to the cartridge
         public byte PPU_DataOut; // internal to the cartridge
+        public byte PPU_NonTiltData; //If you are not using the GUI to mess with pins on the 72-pin connector, we can optimize a little bit.
 
         // Default to NROM behavior.
         public virtual void FetchCPU()
@@ -264,138 +268,200 @@ namespace TriCNES
         {
             // I'm not actually emulating the CIC internals. (... yet.)
             // Instead, I'll simply return true so long as the cartridge has power.
-            if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[71]) || Cart.Emu.ConnectorPinFloating[35]) { return false; } // If the cartridge is disconnected from power or ground, it cannot do anything, so the CIC check fails.
-            if ( Cart.Emu.ConnectorPinFloating[33] || Cart.Emu.ConnectorPinFloating[34] || Cart.Emu.ConnectorPinFloating[70]) { return false; } // If these pins for the CIC chip get disconnected, the CIC chip cannot match the console's CIC.
+            if (TiltingCart)
+            {
+                if ((Cart.Emu.ConnectorPinFloating[0] && Cart.Emu.ConnectorPinFloating[71]) || Cart.Emu.ConnectorPinFloating[35]) { return false; } // If the cartridge is disconnected from power or ground, it cannot do anything, so the CIC check fails.
+                if (Cart.Emu.ConnectorPinFloating[33] || Cart.Emu.ConnectorPinFloating[34] || Cart.Emu.ConnectorPinFloating[70]) { return false; } // If these pins for the CIC chip get disconnected, the CIC chip cannot match the console's CIC.
+            }
             return true;
         }
 
         public void Connector_SetUpPPUAddressPins()
         {
-            if (!Cart.Emu.ConnectorPinFloating[28]) { Cart.Emu.SeventyTwoPinConnector[28] = (Cart.Emu.PPU_OctalLatch & 0x01) != 0; } // PPU A0
-            if (!Cart.Emu.ConnectorPinFloating[27]) { Cart.Emu.SeventyTwoPinConnector[27] = (Cart.Emu.PPU_OctalLatch & 0x02) != 0; } // PPU A1
-            if (!Cart.Emu.ConnectorPinFloating[26]) { Cart.Emu.SeventyTwoPinConnector[26] = (Cart.Emu.PPU_OctalLatch & 0x04) != 0; } // PPU A2
-            if (!Cart.Emu.ConnectorPinFloating[25]) { Cart.Emu.SeventyTwoPinConnector[25] = (Cart.Emu.PPU_OctalLatch & 0x08) != 0; } // PPU A3
-            if (!Cart.Emu.ConnectorPinFloating[24]) { Cart.Emu.SeventyTwoPinConnector[24] = (Cart.Emu.PPU_OctalLatch & 0x10) != 0; } // PPU A4
-            if (!Cart.Emu.ConnectorPinFloating[23]) { Cart.Emu.SeventyTwoPinConnector[23] = (Cart.Emu.PPU_OctalLatch & 0x20) != 0; } // PPU A5
-            if (!Cart.Emu.ConnectorPinFloating[22]) { Cart.Emu.SeventyTwoPinConnector[22] = (Cart.Emu.PPU_OctalLatch & 0x40) != 0; } // PPU A6
-            if (!Cart.Emu.ConnectorPinFloating[58]) { Cart.Emu.SeventyTwoPinConnector[58] = (Cart.Emu.PPU_OctalLatch & 0x80) != 0; } // PPU A7
-            if (!Cart.Emu.ConnectorPinFloating[59]) { Cart.Emu.SeventyTwoPinConnector[59] = (Cart.Emu.PPU_AddressBus & 0x0100) != 0; } // PPU A8
-            if (!Cart.Emu.ConnectorPinFloating[60]) { Cart.Emu.SeventyTwoPinConnector[60] = (Cart.Emu.PPU_AddressBus & 0x0200) != 0; } // PPU A9
-            if (!Cart.Emu.ConnectorPinFloating[62]) { Cart.Emu.SeventyTwoPinConnector[62] = (Cart.Emu.PPU_AddressBus & 0x0400) != 0; } // PPU A10
-            if (!Cart.Emu.ConnectorPinFloating[61]) { Cart.Emu.SeventyTwoPinConnector[61] = (Cart.Emu.PPU_AddressBus & 0x0800) != 0; } // PPU A11
-            if (!Cart.Emu.ConnectorPinFloating[63]) { Cart.Emu.SeventyTwoPinConnector[63] = (Cart.Emu.PPU_AddressBus & 0x1000) != 0; } // PPU A12
-            if (!Cart.Emu.ConnectorPinFloating[64]) { Cart.Emu.SeventyTwoPinConnector[64] = (Cart.Emu.PPU_AddressBus & 0x2000) != 0; } // PPU A13
-            if (!Cart.Emu.ConnectorPinFloating[57]) { Cart.Emu.SeventyTwoPinConnector[57] = (Cart.Emu.PPU_AddressBus & 0x2000) == 0; } // PPU \A13
+            if(TiltingCart)
+            {
+                if (!Cart.Emu.ConnectorPinFloating[28]) { Cart.Emu.SeventyTwoPinConnector[28] = (Cart.Emu.PPU_OctalLatch & 0x01) != 0; } // PPU A0
+                if (!Cart.Emu.ConnectorPinFloating[27]) { Cart.Emu.SeventyTwoPinConnector[27] = (Cart.Emu.PPU_OctalLatch & 0x02) != 0; } // PPU A1
+                if (!Cart.Emu.ConnectorPinFloating[26]) { Cart.Emu.SeventyTwoPinConnector[26] = (Cart.Emu.PPU_OctalLatch & 0x04) != 0; } // PPU A2
+                if (!Cart.Emu.ConnectorPinFloating[25]) { Cart.Emu.SeventyTwoPinConnector[25] = (Cart.Emu.PPU_OctalLatch & 0x08) != 0; } // PPU A3
+                if (!Cart.Emu.ConnectorPinFloating[24]) { Cart.Emu.SeventyTwoPinConnector[24] = (Cart.Emu.PPU_OctalLatch & 0x10) != 0; } // PPU A4
+                if (!Cart.Emu.ConnectorPinFloating[23]) { Cart.Emu.SeventyTwoPinConnector[23] = (Cart.Emu.PPU_OctalLatch & 0x20) != 0; } // PPU A5
+                if (!Cart.Emu.ConnectorPinFloating[22]) { Cart.Emu.SeventyTwoPinConnector[22] = (Cart.Emu.PPU_OctalLatch & 0x40) != 0; } // PPU A6
+                if (!Cart.Emu.ConnectorPinFloating[58]) { Cart.Emu.SeventyTwoPinConnector[58] = (Cart.Emu.PPU_OctalLatch & 0x80) != 0; } // PPU A7
+                if (!Cart.Emu.ConnectorPinFloating[59]) { Cart.Emu.SeventyTwoPinConnector[59] = (Cart.Emu.PPU_AddressBus & 0x0100) != 0; } // PPU A8
+                if (!Cart.Emu.ConnectorPinFloating[60]) { Cart.Emu.SeventyTwoPinConnector[60] = (Cart.Emu.PPU_AddressBus & 0x0200) != 0; } // PPU A9
+                if (!Cart.Emu.ConnectorPinFloating[62]) { Cart.Emu.SeventyTwoPinConnector[62] = (Cart.Emu.PPU_AddressBus & 0x0400) != 0; } // PPU A10
+                if (!Cart.Emu.ConnectorPinFloating[61]) { Cart.Emu.SeventyTwoPinConnector[61] = (Cart.Emu.PPU_AddressBus & 0x0800) != 0; } // PPU A11
+                if (!Cart.Emu.ConnectorPinFloating[63]) { Cart.Emu.SeventyTwoPinConnector[63] = (Cart.Emu.PPU_AddressBus & 0x1000) != 0; } // PPU A12
+                if (!Cart.Emu.ConnectorPinFloating[64]) { Cart.Emu.SeventyTwoPinConnector[64] = (Cart.Emu.PPU_AddressBus & 0x2000) != 0; } // PPU A13
+                if (!Cart.Emu.ConnectorPinFloating[57]) { Cart.Emu.SeventyTwoPinConnector[57] = (Cart.Emu.PPU_AddressBus & 0x2000) == 0; } // PPU \A13
+            }
+            else
+            {
+                // Okay, real talk. If we're not messing with the 72 pin connector, we don't need to do any of that, and we can optimize that down to this...
+                PPU_AddressIn = (ushort)((Cart.Emu.PPU_AddressBus & 0x3F00) | Cart.Emu.PPU_OctalLatch);
+                Cart.Emu.SeventyTwoPinConnector[64] = (Cart.Emu.PPU_AddressBus & 0x2000) != 0; // And make sure this pin is set up. We still use this for other purposes.
+            }
         }
         public void Connector_ReadPPUAddressPins()
         {
             // This can only be done by the cartridge.
-            if (!Cart.Emu.ConnectorPinFloating[64]) { PPU_AddressIn &= 0x1FFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[64] ? 0x2000 : 0); } // PPU A13
-            if (!Cart.Emu.ConnectorPinFloating[63]) { PPU_AddressIn &= 0x2FFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[63] ? 0x1000 : 0); } // PPU A12
-            if (!Cart.Emu.ConnectorPinFloating[61]) { PPU_AddressIn &= 0x37FF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[61] ? 0x0800 : 0); } // PPU A11
-            if (!Cart.Emu.ConnectorPinFloating[62]) { PPU_AddressIn &= 0x3BFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[62] ? 0x0400 : 0); } // PPU A10
-            if (!Cart.Emu.ConnectorPinFloating[60]) { PPU_AddressIn &= 0x3DFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[60] ? 0x0200 : 0); } // PPU A9
-            if (!Cart.Emu.ConnectorPinFloating[59]) { PPU_AddressIn &= 0x3EFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[59] ? 0x0100 : 0); } // PPU A8
-            if (!Cart.Emu.ConnectorPinFloating[58]) { PPU_AddressIn &= 0x3F7F; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[58] ? 0x0080 : 0); } // PPU A7
-            if (!Cart.Emu.ConnectorPinFloating[22]) { PPU_AddressIn &= 0x3FBF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[22] ? 0x0040 : 0); } // PPU A6
-            if (!Cart.Emu.ConnectorPinFloating[23]) { PPU_AddressIn &= 0x3FDF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[23] ? 0x0020 : 0); } // PPU A5
-            if (!Cart.Emu.ConnectorPinFloating[24]) { PPU_AddressIn &= 0x3FEF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[24] ? 0x0010 : 0); } // PPU A4
-            if (!Cart.Emu.ConnectorPinFloating[25]) { PPU_AddressIn &= 0x3FF7; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[25] ? 0x0008 : 0); } // PPU A3
-            if (!Cart.Emu.ConnectorPinFloating[26]) { PPU_AddressIn &= 0x3FFB; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[26] ? 0x0004 : 0); } // PPU A2
-            if (!Cart.Emu.ConnectorPinFloating[27]) { PPU_AddressIn &= 0x3FFD; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[27] ? 0x0002 : 0); } // PPU A1
-            if (!Cart.Emu.ConnectorPinFloating[28]) { PPU_AddressIn &= 0x3FFE; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[28] ? 0x0001 : 0); } // PPU A0
+            if (TiltingCart)
+            {
+                if (!Cart.Emu.ConnectorPinFloating[64]) { PPU_AddressIn &= 0x1FFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[64] ? 0x2000 : 0); } // PPU A13
+                if (!Cart.Emu.ConnectorPinFloating[63]) { PPU_AddressIn &= 0x2FFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[63] ? 0x1000 : 0); } // PPU A12
+                if (!Cart.Emu.ConnectorPinFloating[61]) { PPU_AddressIn &= 0x37FF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[61] ? 0x0800 : 0); } // PPU A11
+                if (!Cart.Emu.ConnectorPinFloating[62]) { PPU_AddressIn &= 0x3BFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[62] ? 0x0400 : 0); } // PPU A10
+                if (!Cart.Emu.ConnectorPinFloating[60]) { PPU_AddressIn &= 0x3DFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[60] ? 0x0200 : 0); } // PPU A9
+                if (!Cart.Emu.ConnectorPinFloating[59]) { PPU_AddressIn &= 0x3EFF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[59] ? 0x0100 : 0); } // PPU A8
+                if (!Cart.Emu.ConnectorPinFloating[58]) { PPU_AddressIn &= 0x3F7F; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[58] ? 0x0080 : 0); } // PPU A7
+                if (!Cart.Emu.ConnectorPinFloating[22]) { PPU_AddressIn &= 0x3FBF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[22] ? 0x0040 : 0); } // PPU A6
+                if (!Cart.Emu.ConnectorPinFloating[23]) { PPU_AddressIn &= 0x3FDF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[23] ? 0x0020 : 0); } // PPU A5
+                if (!Cart.Emu.ConnectorPinFloating[24]) { PPU_AddressIn &= 0x3FEF; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[24] ? 0x0010 : 0); } // PPU A4
+                if (!Cart.Emu.ConnectorPinFloating[25]) { PPU_AddressIn &= 0x3FF7; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[25] ? 0x0008 : 0); } // PPU A3
+                if (!Cart.Emu.ConnectorPinFloating[26]) { PPU_AddressIn &= 0x3FFB; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[26] ? 0x0004 : 0); } // PPU A2
+                if (!Cart.Emu.ConnectorPinFloating[27]) { PPU_AddressIn &= 0x3FFD; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[27] ? 0x0002 : 0); } // PPU A1
+                if (!Cart.Emu.ConnectorPinFloating[28]) { PPU_AddressIn &= 0x3FFE; PPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[28] ? 0x0001 : 0); } // PPU A0
+            }
         }
         public void Connector_SetUpPPUDataPins(byte t)
         {
-            if (!Cart.Emu.ConnectorPinFloating[29]) { Cart.Emu.SeventyTwoPinConnector[29] = (t & 0x01) != 0; } // PPU D0
-            if (!Cart.Emu.ConnectorPinFloating[30]) { Cart.Emu.SeventyTwoPinConnector[30] = (t & 0x02) != 0; } // PPU D1
-            if (!Cart.Emu.ConnectorPinFloating[31]) { Cart.Emu.SeventyTwoPinConnector[31] = (t & 0x04) != 0; } // PPU D2
-            if (!Cart.Emu.ConnectorPinFloating[32]) { Cart.Emu.SeventyTwoPinConnector[32] = (t & 0x08) != 0; } // PPU D3
-            if (!Cart.Emu.ConnectorPinFloating[68]) { Cart.Emu.SeventyTwoPinConnector[68] = (t & 0x10) != 0; } // PPU D4
-            if (!Cart.Emu.ConnectorPinFloating[67]) { Cart.Emu.SeventyTwoPinConnector[67] = (t & 0x20) != 0; } // PPU D5
-            if (!Cart.Emu.ConnectorPinFloating[66]) { Cart.Emu.SeventyTwoPinConnector[66] = (t & 0x40) != 0; } // PPU D6
-            if (!Cart.Emu.ConnectorPinFloating[65]) { Cart.Emu.SeventyTwoPinConnector[65] = (t & 0x80) != 0; } // PPU D7
+            if (TiltingCart)
+            {
+                if (!Cart.Emu.ConnectorPinFloating[29]) { Cart.Emu.SeventyTwoPinConnector[29] = (t & 0x01) != 0; } // PPU D0
+                if (!Cart.Emu.ConnectorPinFloating[30]) { Cart.Emu.SeventyTwoPinConnector[30] = (t & 0x02) != 0; } // PPU D1
+                if (!Cart.Emu.ConnectorPinFloating[31]) { Cart.Emu.SeventyTwoPinConnector[31] = (t & 0x04) != 0; } // PPU D2
+                if (!Cart.Emu.ConnectorPinFloating[32]) { Cart.Emu.SeventyTwoPinConnector[32] = (t & 0x08) != 0; } // PPU D3
+                if (!Cart.Emu.ConnectorPinFloating[68]) { Cart.Emu.SeventyTwoPinConnector[68] = (t & 0x10) != 0; } // PPU D4
+                if (!Cart.Emu.ConnectorPinFloating[67]) { Cart.Emu.SeventyTwoPinConnector[67] = (t & 0x20) != 0; } // PPU D5
+                if (!Cart.Emu.ConnectorPinFloating[66]) { Cart.Emu.SeventyTwoPinConnector[66] = (t & 0x40) != 0; } // PPU D6
+                if (!Cart.Emu.ConnectorPinFloating[65]) { Cart.Emu.SeventyTwoPinConnector[65] = (t & 0x80) != 0; } // PPU D7
+            }
+            else
+            {
+                PPU_NonTiltData = t;
+            }
         }
         public byte Connector_ReadPPUDataPins(byte bus)
         {
-            if (!Cart.Emu.ConnectorPinFloating[29]) { bus &= 0xFE; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[29] ? 0x01 : 0); } // PPU D0
-            if (!Cart.Emu.ConnectorPinFloating[30]) { bus &= 0xFD; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[30] ? 0x02 : 0); } // PPU D1
-            if (!Cart.Emu.ConnectorPinFloating[31]) { bus &= 0xFB; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[31] ? 0x04 : 0); } // PPU D2
-            if (!Cart.Emu.ConnectorPinFloating[32]) { bus &= 0xF7; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[32] ? 0x08 : 0); } // PPU D3
-            if (!Cart.Emu.ConnectorPinFloating[68]) { bus &= 0xEF; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[68] ? 0x10 : 0); } // PPU D4
-            if (!Cart.Emu.ConnectorPinFloating[67]) { bus &= 0xDF; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[67] ? 0x20 : 0); } // PPU D5
-            if (!Cart.Emu.ConnectorPinFloating[66]) { bus &= 0xBF; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[66] ? 0x40 : 0); } // PPU D6
-            if (!Cart.Emu.ConnectorPinFloating[65]) { bus &= 0x7F; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[65] ? 0x80 : 0); } // PPU D7
-            return bus;
+            if (TiltingCart)
+            {
+                if (!Cart.Emu.ConnectorPinFloating[29]) { bus &= 0xFE; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[29] ? 0x01 : 0); } // PPU D0
+                if (!Cart.Emu.ConnectorPinFloating[30]) { bus &= 0xFD; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[30] ? 0x02 : 0); } // PPU D1
+                if (!Cart.Emu.ConnectorPinFloating[31]) { bus &= 0xFB; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[31] ? 0x04 : 0); } // PPU D2
+                if (!Cart.Emu.ConnectorPinFloating[32]) { bus &= 0xF7; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[32] ? 0x08 : 0); } // PPU D3
+                if (!Cart.Emu.ConnectorPinFloating[68]) { bus &= 0xEF; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[68] ? 0x10 : 0); } // PPU D4
+                if (!Cart.Emu.ConnectorPinFloating[67]) { bus &= 0xDF; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[67] ? 0x20 : 0); } // PPU D5
+                if (!Cart.Emu.ConnectorPinFloating[66]) { bus &= 0xBF; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[66] ? 0x40 : 0); } // PPU D6
+                if (!Cart.Emu.ConnectorPinFloating[65]) { bus &= 0x7F; bus |= (byte)(Cart.Emu.SeventyTwoPinConnector[65] ? 0x80 : 0); } // PPU D7
+                return bus;
+            }
+            else
+            {
+                return PPU_NonTiltData;
+            }
         }
 
         public void Connector_SetUpCPUAddressPins(ushort Address) // the 2A03 bus, not the 6502 bus.
         {
-            if (!Cart.Emu.ConnectorPinFloating[12]) { Cart.Emu.SeventyTwoPinConnector[12] = (Address & 0x01) != 0; } // CPU A0
-            if (!Cart.Emu.ConnectorPinFloating[11]) { Cart.Emu.SeventyTwoPinConnector[11] = (Address & 0x02) != 0; } // CPU A1
-            if (!Cart.Emu.ConnectorPinFloating[10]) { Cart.Emu.SeventyTwoPinConnector[10] = (Address & 0x04) != 0; } // CPU A2
-            if (!Cart.Emu.ConnectorPinFloating[9]) { Cart.Emu.SeventyTwoPinConnector[9] = (Address & 0x08) != 0; } // CPU A3
-            if (!Cart.Emu.ConnectorPinFloating[8]) { Cart.Emu.SeventyTwoPinConnector[8] = (Address & 0x10) != 0; } // CPU A4
-            if (!Cart.Emu.ConnectorPinFloating[7]) { Cart.Emu.SeventyTwoPinConnector[7] = (Address & 0x20) != 0; } // CPU A5
-            if (!Cart.Emu.ConnectorPinFloating[6]) { Cart.Emu.SeventyTwoPinConnector[6] = (Address & 0x40) != 0; } // CPU A6
-            if (!Cart.Emu.ConnectorPinFloating[5]) { Cart.Emu.SeventyTwoPinConnector[5] = (Address & 0x80) != 0; } // CPU A7
-            if (!Cart.Emu.ConnectorPinFloating[4]) { Cart.Emu.SeventyTwoPinConnector[4] = (Address & 0x0100) != 0; } // CPU A8
-            if (!Cart.Emu.ConnectorPinFloating[3]) { Cart.Emu.SeventyTwoPinConnector[3] = (Address & 0x0200) != 0; } // CPU A9
-            if (!Cart.Emu.ConnectorPinFloating[2]) { Cart.Emu.SeventyTwoPinConnector[2] = (Address & 0x0400) != 0; } // CPU A10
-            if (!Cart.Emu.ConnectorPinFloating[1]) { Cart.Emu.SeventyTwoPinConnector[1] = (Address & 0x0800) != 0; } // CPU A11
-            if (!Cart.Emu.ConnectorPinFloating[38]) { Cart.Emu.SeventyTwoPinConnector[38] = (Address & 0x1000) != 0; } // CPU A12
-            if (!Cart.Emu.ConnectorPinFloating[39]) { Cart.Emu.SeventyTwoPinConnector[39] = (Address & 0x2000) != 0; } // CPU A13
-            if (!Cart.Emu.ConnectorPinFloating[40]) { Cart.Emu.SeventyTwoPinConnector[40] = (Address & 0x4000) != 0; } // CPU A14
-            if (!Cart.Emu.ConnectorPinFloating[49]) { Cart.Emu.SeventyTwoPinConnector[49] = (Address & 0x8000) == 0; } // CPU /A15
+            if (TiltingCart)
+            {
+                if (!Cart.Emu.ConnectorPinFloating[12]) { Cart.Emu.SeventyTwoPinConnector[12] = (Address & 0x01) != 0; } // CPU A0
+                if (!Cart.Emu.ConnectorPinFloating[11]) { Cart.Emu.SeventyTwoPinConnector[11] = (Address & 0x02) != 0; } // CPU A1
+                if (!Cart.Emu.ConnectorPinFloating[10]) { Cart.Emu.SeventyTwoPinConnector[10] = (Address & 0x04) != 0; } // CPU A2
+                if (!Cart.Emu.ConnectorPinFloating[9]) { Cart.Emu.SeventyTwoPinConnector[9] = (Address & 0x08) != 0; } // CPU A3
+                if (!Cart.Emu.ConnectorPinFloating[8]) { Cart.Emu.SeventyTwoPinConnector[8] = (Address & 0x10) != 0; } // CPU A4
+                if (!Cart.Emu.ConnectorPinFloating[7]) { Cart.Emu.SeventyTwoPinConnector[7] = (Address & 0x20) != 0; } // CPU A5
+                if (!Cart.Emu.ConnectorPinFloating[6]) { Cart.Emu.SeventyTwoPinConnector[6] = (Address & 0x40) != 0; } // CPU A6
+                if (!Cart.Emu.ConnectorPinFloating[5]) { Cart.Emu.SeventyTwoPinConnector[5] = (Address & 0x80) != 0; } // CPU A7
+                if (!Cart.Emu.ConnectorPinFloating[4]) { Cart.Emu.SeventyTwoPinConnector[4] = (Address & 0x0100) != 0; } // CPU A8
+                if (!Cart.Emu.ConnectorPinFloating[3]) { Cart.Emu.SeventyTwoPinConnector[3] = (Address & 0x0200) != 0; } // CPU A9
+                if (!Cart.Emu.ConnectorPinFloating[2]) { Cart.Emu.SeventyTwoPinConnector[2] = (Address & 0x0400) != 0; } // CPU A10
+                if (!Cart.Emu.ConnectorPinFloating[1]) { Cart.Emu.SeventyTwoPinConnector[1] = (Address & 0x0800) != 0; } // CPU A11
+                if (!Cart.Emu.ConnectorPinFloating[38]) { Cart.Emu.SeventyTwoPinConnector[38] = (Address & 0x1000) != 0; } // CPU A12
+                if (!Cart.Emu.ConnectorPinFloating[39]) { Cart.Emu.SeventyTwoPinConnector[39] = (Address & 0x2000) != 0; } // CPU A13
+                if (!Cart.Emu.ConnectorPinFloating[40]) { Cart.Emu.SeventyTwoPinConnector[40] = (Address & 0x4000) != 0; } // CPU A14
+                if (!Cart.Emu.ConnectorPinFloating[49]) { Cart.Emu.SeventyTwoPinConnector[49] = (Address & 0x8000) == 0; } // CPU /A15
+            }
+            else
+            {
+                // Okay, real talk. If we're not messing with the 72 pin connector, we don't need to do any of that, and we can optimize that down to this...
+                CPU_AddressIn = Address;
+            }
         }
         public void Connector_ReadCPUAddressPins()
         {
             // This can only be done by the cartridge.
-            if (!Cart.Emu.ConnectorPinFloating[49]) { CPU_AddressIn &= 0x7FFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[49] ? 0 : 0x8000); } // CPU /A15
-            if (!Cart.Emu.ConnectorPinFloating[40]) { CPU_AddressIn &= 0xBFFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[40] ? 0x4000 : 0); } // CPU A14
-            if (!Cart.Emu.ConnectorPinFloating[39]) { CPU_AddressIn &= 0xDFFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[39] ? 0x2000 : 0); } // CPU A13
-            if (!Cart.Emu.ConnectorPinFloating[38]) { CPU_AddressIn &= 0xEFFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[38] ? 0x1000 : 0); } // CPU A12
-            if (!Cart.Emu.ConnectorPinFloating[1]) { CPU_AddressIn &= 0xF7FF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[1] ? 0x0800 : 0); } // CPU A11
-            if (!Cart.Emu.ConnectorPinFloating[2]) { CPU_AddressIn &= 0xFBFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[2] ? 0x0400 : 0); } // CPU A10
-            if (!Cart.Emu.ConnectorPinFloating[3]) { CPU_AddressIn &= 0xFDFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[3] ? 0x0200 : 0); } // CPU A9
-            if (!Cart.Emu.ConnectorPinFloating[4]) { CPU_AddressIn &= 0xFEFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[4] ? 0x0100 : 0); } // CPU A8
-            if (!Cart.Emu.ConnectorPinFloating[5]) { CPU_AddressIn &= 0xFF7F; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[5] ? 0x0080 : 0); } // CPU A7
-            if (!Cart.Emu.ConnectorPinFloating[6]) { CPU_AddressIn &= 0xFFBF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[6] ? 0x0040 : 0); } // CPU A6
-            if (!Cart.Emu.ConnectorPinFloating[7]) { CPU_AddressIn &= 0xFFDF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[7] ? 0x0020 : 0); } // CPU A5
-            if (!Cart.Emu.ConnectorPinFloating[8]) { CPU_AddressIn &= 0xFFEF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[8] ? 0x0010 : 0); } // CPU A4
-            if (!Cart.Emu.ConnectorPinFloating[9]) { CPU_AddressIn &= 0xFFF7; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[9] ? 0x0008 : 0); } // CPU A3
-            if (!Cart.Emu.ConnectorPinFloating[10]) { CPU_AddressIn &= 0xFFFB; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[10] ? 0x0004 : 0); } // CPU A2
-            if (!Cart.Emu.ConnectorPinFloating[11]) { CPU_AddressIn &= 0xFFFD; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[11] ? 0x0002 : 0); } // CPU A1
-            if (!Cart.Emu.ConnectorPinFloating[12]) { CPU_AddressIn &= 0xFFFE; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[12] ? 0x0001 : 0); } // CPU A0
+            if (TiltingCart)
+            {
+                if (!Cart.Emu.ConnectorPinFloating[49]) { CPU_AddressIn &= 0x7FFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[49] ? 0 : 0x8000); } // CPU /A15
+                if (!Cart.Emu.ConnectorPinFloating[40]) { CPU_AddressIn &= 0xBFFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[40] ? 0x4000 : 0); } // CPU A14
+                if (!Cart.Emu.ConnectorPinFloating[39]) { CPU_AddressIn &= 0xDFFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[39] ? 0x2000 : 0); } // CPU A13
+                if (!Cart.Emu.ConnectorPinFloating[38]) { CPU_AddressIn &= 0xEFFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[38] ? 0x1000 : 0); } // CPU A12
+                if (!Cart.Emu.ConnectorPinFloating[1]) { CPU_AddressIn &= 0xF7FF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[1] ? 0x0800 : 0); } // CPU A11
+                if (!Cart.Emu.ConnectorPinFloating[2]) { CPU_AddressIn &= 0xFBFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[2] ? 0x0400 : 0); } // CPU A10
+                if (!Cart.Emu.ConnectorPinFloating[3]) { CPU_AddressIn &= 0xFDFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[3] ? 0x0200 : 0); } // CPU A9
+                if (!Cart.Emu.ConnectorPinFloating[4]) { CPU_AddressIn &= 0xFEFF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[4] ? 0x0100 : 0); } // CPU A8
+                if (!Cart.Emu.ConnectorPinFloating[5]) { CPU_AddressIn &= 0xFF7F; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[5] ? 0x0080 : 0); } // CPU A7
+                if (!Cart.Emu.ConnectorPinFloating[6]) { CPU_AddressIn &= 0xFFBF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[6] ? 0x0040 : 0); } // CPU A6
+                if (!Cart.Emu.ConnectorPinFloating[7]) { CPU_AddressIn &= 0xFFDF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[7] ? 0x0020 : 0); } // CPU A5
+                if (!Cart.Emu.ConnectorPinFloating[8]) { CPU_AddressIn &= 0xFFEF; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[8] ? 0x0010 : 0); } // CPU A4
+                if (!Cart.Emu.ConnectorPinFloating[9]) { CPU_AddressIn &= 0xFFF7; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[9] ? 0x0008 : 0); } // CPU A3
+                if (!Cart.Emu.ConnectorPinFloating[10]) { CPU_AddressIn &= 0xFFFB; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[10] ? 0x0004 : 0); } // CPU A2
+                if (!Cart.Emu.ConnectorPinFloating[11]) { CPU_AddressIn &= 0xFFFD; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[11] ? 0x0002 : 0); } // CPU A1
+                if (!Cart.Emu.ConnectorPinFloating[12]) { CPU_AddressIn &= 0xFFFE; CPU_AddressIn |= (ushort)(Cart.Emu.SeventyTwoPinConnector[12] ? 0x0001 : 0); } // CPU A0
+            }
         }
         public void Connector_SetUpCPUDataPins(byte t)
         {
-            if (!Cart.Emu.ConnectorPinFloating[48]) { Cart.Emu.SeventyTwoPinConnector[48] = (t & 0x01) != 0; } // CPU D0
-            if (!Cart.Emu.ConnectorPinFloating[47]) { Cart.Emu.SeventyTwoPinConnector[47] = (t & 0x02) != 0; } // CPU D1
-            if (!Cart.Emu.ConnectorPinFloating[46]) { Cart.Emu.SeventyTwoPinConnector[46] = (t & 0x04) != 0; } // CPU D2
-            if (!Cart.Emu.ConnectorPinFloating[45]) { Cart.Emu.SeventyTwoPinConnector[45] = (t & 0x08) != 0; } // CPU D3
-            if (!Cart.Emu.ConnectorPinFloating[44]) { Cart.Emu.SeventyTwoPinConnector[44] = (t & 0x10) != 0; } // CPU D4
-            if (!Cart.Emu.ConnectorPinFloating[43]) { Cart.Emu.SeventyTwoPinConnector[43] = (t & 0x20) != 0; } // CPU D5
-            if (!Cart.Emu.ConnectorPinFloating[42]) { Cart.Emu.SeventyTwoPinConnector[42] = (t & 0x40) != 0; } // CPU D6
-            if (!Cart.Emu.ConnectorPinFloating[41]) { Cart.Emu.SeventyTwoPinConnector[41] = (t & 0x80) != 0; } // CPU D7
+            if (TiltingCart)
+            {
+                if (!Cart.Emu.ConnectorPinFloating[48]) { Cart.Emu.SeventyTwoPinConnector[48] = (t & 0x01) != 0; } // CPU D0
+                if (!Cart.Emu.ConnectorPinFloating[47]) { Cart.Emu.SeventyTwoPinConnector[47] = (t & 0x02) != 0; } // CPU D1
+                if (!Cart.Emu.ConnectorPinFloating[46]) { Cart.Emu.SeventyTwoPinConnector[46] = (t & 0x04) != 0; } // CPU D2
+                if (!Cart.Emu.ConnectorPinFloating[45]) { Cart.Emu.SeventyTwoPinConnector[45] = (t & 0x08) != 0; } // CPU D3
+                if (!Cart.Emu.ConnectorPinFloating[44]) { Cart.Emu.SeventyTwoPinConnector[44] = (t & 0x10) != 0; } // CPU D4
+                if (!Cart.Emu.ConnectorPinFloating[43]) { Cart.Emu.SeventyTwoPinConnector[43] = (t & 0x20) != 0; } // CPU D5
+                if (!Cart.Emu.ConnectorPinFloating[42]) { Cart.Emu.SeventyTwoPinConnector[42] = (t & 0x40) != 0; } // CPU D6
+                if (!Cart.Emu.ConnectorPinFloating[41]) { Cart.Emu.SeventyTwoPinConnector[41] = (t & 0x80) != 0; } // CPU D7
+            }
+            else
+            {
+                CPU_NonTiltData = t;
+            }
         }
         public byte Connector_ReadCPUDataPins()
         {
-            byte t = 0;
-            if (!Cart.Emu.ConnectorPinFloating[48]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[48] ? 0x01 : 0); } // CPU D0
-            if (!Cart.Emu.ConnectorPinFloating[47]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[47] ? 0x02 : 0); } // CPU D1
-            if (!Cart.Emu.ConnectorPinFloating[46]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[46] ? 0x04 : 0); } // CPU D2
-            if (!Cart.Emu.ConnectorPinFloating[45]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[45] ? 0x08 : 0); } // CPU D3
-            if (!Cart.Emu.ConnectorPinFloating[44]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[44] ? 0x10 : 0); } // CPU D4
-            if (!Cart.Emu.ConnectorPinFloating[43]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[43] ? 0x20 : 0); } // CPU D5
-            if (!Cart.Emu.ConnectorPinFloating[42]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[42] ? 0x40 : 0); } // CPU D6
-            if (!Cart.Emu.ConnectorPinFloating[41]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[41] ? 0x80 : 0); } // CPU D7
-            return t;
+            if (TiltingCart)
+            {
+                byte t = 0;
+                if (!Cart.Emu.ConnectorPinFloating[48]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[48] ? 0x01 : 0); } // CPU D0
+                if (!Cart.Emu.ConnectorPinFloating[47]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[47] ? 0x02 : 0); } // CPU D1
+                if (!Cart.Emu.ConnectorPinFloating[46]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[46] ? 0x04 : 0); } // CPU D2
+                if (!Cart.Emu.ConnectorPinFloating[45]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[45] ? 0x08 : 0); } // CPU D3
+                if (!Cart.Emu.ConnectorPinFloating[44]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[44] ? 0x10 : 0); } // CPU D4
+                if (!Cart.Emu.ConnectorPinFloating[43]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[43] ? 0x20 : 0); } // CPU D5
+                if (!Cart.Emu.ConnectorPinFloating[42]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[42] ? 0x40 : 0); } // CPU D6
+                if (!Cart.Emu.ConnectorPinFloating[41]) { t |= (byte)(Cart.Emu.SeventyTwoPinConnector[41] ? 0x80 : 0); } // CPU D7
+                return t;
+            }
+            else
+            {
+                return CPU_NonTiltData;
+            }
         }
         public virtual void Connector_CheckCIRAM()
         {
-            if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
-            if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.NametableHorizontalMirroring ? Cart.Emu.SeventyTwoPinConnector[61] : Cart.Emu.SeventyTwoPinConnector[62]; }
+            if (TiltingCart)
+            {
+                if (!Cart.Emu.ConnectorPinFloating[56]) { Cart.Emu.SeventyTwoPinConnector[56] = Cart.Emu.SeventyTwoPinConnector[57]; }
+                if (!Cart.Emu.ConnectorPinFloating[21]) { Cart.Emu.SeventyTwoPinConnector[21] = Cart.NametableHorizontalMirroring ? Cart.Emu.SeventyTwoPinConnector[61] : Cart.Emu.SeventyTwoPinConnector[62]; }
+            }
+            else
+            {
+                Cart.Emu.SeventyTwoPinConnector[56] = (Cart.Emu.PPU_AddressBus & 0x2000) == 0;
+                Cart.Emu.SeventyTwoPinConnector[21] = Cart.NametableHorizontalMirroring ? ((Cart.Emu.PPU_AddressBus & 0x800) != 0) : ((Cart.Emu.PPU_AddressBus & 0x400) != 0);
+            }
         }
         public virtual void Connector_IRQPin(bool t)
         {

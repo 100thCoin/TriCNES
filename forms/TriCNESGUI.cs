@@ -139,6 +139,7 @@ namespace TriCNES
             {
                 CartConnector.Update72PinConnector();
             }
+            EMU.Cart.MapperChip.TiltingCart = CartConnector != null;
         }
 
         void RunPostFramePhase()

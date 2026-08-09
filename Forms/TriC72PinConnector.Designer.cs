@@ -1,4 +1,4 @@
-﻿namespace TriCNES.forms
+﻿namespace TriCNES
 {
     partial class TriC72PinConnector
     {
