@@ -830,7 +830,7 @@ namespace TriCNES
 
 
         public byte operationCycle = 0; // This tracks what cycle of a given instruction is being emulated. Cycle 0 fetches the opcode, and all cycles after that have specific logic depending on which cycle needs emulated next.
-
+        public bool CPU_SYNC = false;
         public ushort temporaryAddress; // I use this to temporarily modify the value of the address bus for some if statements. This is mostly for checking if the low byte under/over flows.
 
 
@@ -3616,7 +3616,11 @@ namespace TriCNES
                 }
                 if ((PPU_Mask_ShowSprites || PPU_Mask_ShowBackground))
                 {
-                    PPU_OAMBuffer_In = OAM2[0];
+                    PPU_OAMBuffer_In = OAM2[OAM2Address];
+                }
+                else
+                {
+                    PPU_OAMBuffer_In = OAM[PPUOAMAddress]; // The OAM buffer is updated with Primary OAM when rendering is disabled.
                 }
                 if (PPU_Dot == 339)
                 {
@@ -4576,6 +4580,7 @@ namespace TriCNES
 
         void CompleteOperation()
         {
+            CPU_SYNC = true;
             operationCycle = 0xFF; // this will be incremented to 0.
             addressBus = programCounter;
             CPU_Read = true;
@@ -4709,9 +4714,9 @@ namespace TriCNES
                 }
 
             }
-            else if (operationCycle == 0) // We are not running any DMAs, and this is the first cycle of an instruction.
+            else if (CPU_SYNC) // We are not running any DMAs, and this is the first cycle of an instruction.
             {
-
+                CPU_SYNC = false;
                 // cycle 0. fetch opcode:
                 addressBus = programCounter;
 
@@ -4746,7 +4751,7 @@ namespace TriCNES
                     addressBus = programCounter;
                 }
 
-                operationCycle++; // increment this for use in the following CPU cycle.
+                operationCycle = 1; // set this for use in the following CPU cycle.
 
             }
             else
@@ -10877,6 +10882,7 @@ namespace TriCNES
                 //string TempLine_PPU = LogLine + "\t$2000:" + Observe(0x2000).ToString("X2") + "\t$2001:" + Observe(0x2001).ToString("X2") + "\t$2002:" + Observe(0x2002).ToString("X2") + "\tR/W Addr:" + PPU_v.ToString("X4") + "\tPPUAddrLatch:" + PPUAddrLatch + "\tPPU AddressBus: " + PPU_AddressBus.ToString("X4");
                 //string TempLine_PPU2 = LogLine + "\tVRAMAddress:" + PPU_v.ToString("X4") + "\tPPUReadBuffer:" + PPU_ReadBuffer.ToString("X2");
                 string TempLine_PPU3 = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\todd:" + PPU_OddFrame.ToString() + "\tv: " + PPU_v.ToString("X4")
+                /*
                     + "\tOAM2: [";
 
                 for(int i = 0; i < OAM2.Length; i++)
@@ -10890,7 +10896,8 @@ namespace TriCNES
                     {
                         TempLine_PPU3 += "]\t OAMBuffer:" + PPU_OAMBuffer.ToString("X2");
                     }
-                }
+                }*/
+                + "\tG/P:" + (APU_PutCycle ? "Put" : "Get") + " FC:" + APU_Framecounter.ToString();
 
                 //String TempLine_Mapper = LogLine + Cart.MapperChip.AppendToDebugLog();
 
@@ -11007,6 +11014,7 @@ namespace TriCNES
             State.Add(H);
             State.Add((byte)(IgnoreH ? 1 : 0));
 
+            State.Add((byte)(CPU_SYNC ? 1 : 0));
             State.Add((byte)(CPU_Read ? 1 : 0));
             State.Add((byte)(DoBRK ? 1 : 0));
             State.Add((byte)(DoNMI ? 1 : 0));
@@ -11314,6 +11322,7 @@ namespace TriCNES
             H = State[p++];
             IgnoreH = (State[p++] & 1) == 1;
 
+            CPU_SYNC = (State[p++] & 1) == 1;
             CPU_Read = (State[p++] & 1) == 1;
             DoBRK = (State[p++] & 1) == 1;
             DoNMI = (State[p++] & 1) == 1;
