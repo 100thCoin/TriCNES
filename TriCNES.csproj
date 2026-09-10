@@ -100,6 +100,7 @@
     <Compile Include="mappers\Mapper_MMC2.cs" />
     <Compile Include="mappers\Mapper_FME7.cs" />
     <Compile Include="mappers\Mapper_FDS.cs" />
+    <Compile Include="mappers\Mapper_GxROM.cs" />
     <Compile Include="mappers\Mapper_UxROM.cs" />
     <Compile Include="mappers\Mapper_NROM.cs" />
     <Compile Include="Program.cs" />

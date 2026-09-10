@@ -76,21 +76,8 @@ namespace TriCNES
                             CartridgeArray[i].CHRROM = new byte[64 << CartridgeArray[i].ROM[11]]; // 0x2000 bytes of CHR ROM, multiplied by byte 5 of the iNES header.
                         }                        
                     }
-                    Mapper MapperChip;
-                    // clear all mapper stuff.
-                    switch (CartridgeArray[i].MemoryMapper)
-                    {
-                        default:
-                        case 0: MapperChip = new Mapper_NROM(); break;
-                        case 1: MapperChip = new Mapper_MMC1(); break;
-                        case 71:
-                        case 2: MapperChip = new Mapper_UxROM(); break;
-                        case 3: MapperChip = new Mapper_CNROM(); break;
-                        case 4: MapperChip = new Mapper_MMC3(); break;
-                        case 7: MapperChip = new Mapper_AOROM(); break;
-                        case 9: MapperChip = new Mapper_MMC2(); break;
-                        case 69: MapperChip = new Mapper_FME7(); break;
-                    }
+                    Mapper MapperChip = Cartridge.SetMapper(CartridgeArray[i].MemoryMapper);
+
                     MapperChip.Cart = CartridgeArray[i];
                     CartridgeArray[i].MapperChip = MapperChip;
                     i++;

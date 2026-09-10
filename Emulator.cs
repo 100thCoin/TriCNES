@@ -34,6 +34,23 @@ namespace TriCNES
         public bool AlternativeNametableArrangement; // Header info: Some mapper chips support "alternative nametable arrangements", which are mapper-specific.
         public byte[] PRGVRAM;      // PRG VRAM, for the alternative nametable arrangements.
 
+        public static Mapper SetMapper(int m)
+        {
+            switch (m)
+            {
+                default:
+                case 0: return new Mapper_NROM();
+                case 1: return new Mapper_MMC1();
+                case 71:
+                case 2: return new Mapper_UxROM();
+                case 3: return new Mapper_CNROM();
+                case 4: return new Mapper_MMC3();
+                case 7: return new Mapper_AOROM();
+                case 9: return new Mapper_MMC2();
+                case 66: return new Mapper_GxROM();
+                case 69: return new Mapper_FME7();
+            }
+        }
         public Cartridge(string filepath) // Constructor from file path
         {
             ROM = File.ReadAllBytes(filepath); // Reads the file from the provided file path, and stores every byte into an array.
@@ -90,19 +107,8 @@ namespace TriCNES
 
             Name = filepath; // For debugging, it's nice to see the file name sometimes.
 
-            switch (MemoryMapper)
-            {
-                default:
-                case 0: MapperChip = new Mapper_NROM(); break;
-                case 1: MapperChip = new Mapper_MMC1(); break;
-                case 71:
-                case 2: MapperChip = new Mapper_UxROM(); break;
-                case 3: MapperChip = new Mapper_CNROM(); break;
-                case 4: MapperChip = new Mapper_MMC3(); break;
-                case 7: MapperChip = new Mapper_AOROM(); break;
-                case 9: MapperChip = new Mapper_MMC2(); break;
-                case 69: MapperChip = new Mapper_FME7(); break;
-            }
+            MapperChip = Cartridge.SetMapper(MemoryMapper);
+
             MapperChip.Cart = this;
         }
         public DiskDrive FDS;   // The famicom disk system disk drive.
