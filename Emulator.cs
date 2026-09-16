@@ -1116,6 +1116,7 @@ namespace TriCNES
             DoDMCDMA = false;
             DoOAMDMA = false;
             operationCycle = 0;
+            CPU_SYNC = true;
 
             switch (APUAlignment & 4)
             {
