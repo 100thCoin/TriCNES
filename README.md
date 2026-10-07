@@ -7,17 +7,19 @@ This NES emulator was built from the ground up starting from a blank .net winfor
 # Limitations
 
 This emulator does not produce audio.  
-This emulator only accepts inputs in the form of a TAS file.  
+This emulator only accepts inputs in the form of a TAS file. (This is fixed in the dev build)  
 This emulator can only run NTSC cartridges properly.  
-This emulator only supports the following mapper chips:
-* 0: NROM
-* 1: MMC1
-* 2: UxROM
-* 3: CNROM
-* 4: MMC3 (MMC6 support in the dev build)
-* 7: AOROM
-* 9: MMC2 (dev build)
-* 69: Sunsoft FME-7
+This emulator only supports the following mapper chips:  
+* 0: NROM  
+* 1: MMC1  
+* 2: UxROM  
+* 3: CNROM  
+* 4: MMC3 (MMC6 support in the dev build)  
+* 7: AOROM  
+* 9: MMC2 (dev build)  
+* 66: GxROM (dev build)  
+* 69: Sunsoft FME-7  
+* Famicom Disk System is partially supported (dev build)  
 
 # Supported TAS file types
 
