@@ -1147,6 +1147,8 @@ namespace TriCNES
                     break;
             }
 
+            APU_DMC_LFSR = 0; // Technically it would take a few microseconds of the reset button being held down for this to be shifted to all zeroes.
+
             DoReset = true;
             PPU_RESET = false; // I'm not even 100% certain my console has this behavior. I'll set it to false for now.
             // in theory, the CPU/PPU clock would be given random values. Let's just assume no changes.
@@ -1389,6 +1391,29 @@ namespace TriCNES
         // LookUp Table for how many CPU cycles are between each bit of the DPCM sample being played. (8 bits per byte, so to calculate how many cycles there are between each DMA, multiply these numbers by 8)
         public static readonly ushort[] APU_DMCRateLUT = { 428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54 };
 
+        public static readonly ushort[] APU_DMCRate_LFSR_LUT = {
+        0x173, // 0
+        0x08A, // 1
+        0x143, // 2
+        0x0DB, // 3
+        0x1EE, // 4
+        0x03F, // 5
+        0x07D, // 6
+        0x1D1, // 7
+        0x009, // 8
+        0x0DC, // 9
+        0x0F1, // 10
+        0x0F9, // 11
+        0x08D, // 12
+        0x189, // 13
+        0x18E, // 14
+        0x156  // 15
+        };
+
+        public byte APU_DMC_Rate4 = 15;
+
+        public ushort APU_DMC_LFSR = 0;
+
         // $4011 (and DPCM stuff)
         public byte APU_DMC_Output; // Directly writing here (Address $4011) will set the DMC output. This is how you play PCM audio.
 
@@ -1406,6 +1431,78 @@ namespace TriCNES
         public bool DPCM_Up;    // If the next bit of the DPCM sample is a 1, the output goes up. Otherwise it goes down.
 
         public bool APU_Silent = true;  // If the APU is not making any noise, this is set.
+
+        StringBuilder TEMP_SB = new StringBuilder();
+
+        void APU_DMC_StepLFSR()
+        {
+            bool LFSR_0 = (APU_DMC_LFSR & 1) == 1;
+            bool LFSR_4 = (APU_DMC_LFSR & 16) == 16;
+            bool LFSR_ZeroDetector = APU_DMC_LFSR == 0;
+            bool LFSR_Expired = APU_DMC_LFSR == 0x1;
+
+            bool _A = (LFSR_0 && LFSR_4);
+            bool _N = !(LFSR_0 || LFSR_4 || LFSR_ZeroDetector);
+            bool ShiftIn = !(_A || _N);
+
+            if (LFSR_Expired)
+            {
+                APU_DMC_LFSR = APU_DMCRate_LFSR_LUT[APU_DMC_Rate4];
+                APU_DMC_StepSample();
+            }
+            else
+            {
+                APU_DMC_LFSR >>= 1;
+                APU_DMC_LFSR |= (ushort)(ShiftIn ? 0x100 : 0);
+            }
+        }
+
+        void APU_DMC_StepSample()
+        {
+            DPCM_Up = (APU_DMC_Shifter & 1) == 1;
+            if (DPCM_Up)
+            {
+                if (APU_DMC_Output <= 125) // this is 7 bit, and cannot go above 127
+                {
+                    APU_DMC_Output += 2;
+                }
+            }
+            else
+            {
+                if (APU_DMC_Output >= 2) // this is 7 bit, and cannot go below 0
+                {
+                    APU_DMC_Output -= 2;
+                }
+            }
+            APU_DMC_Shifter >>= 1; // shift the bits in the shift register
+            APU_DMC_ShifterBitsRemaining--; // and decrement the "bits remaining" counter.
+            if (APU_DMC_ShifterBitsRemaining == 0) // If there are no bits left,
+            {
+                APU_DMC_ShifterBitsRemaining = 8; // it's time for a DMC DMA!
+
+                if (APU_DMC_BytesRemaining > 0 || APU_SetImplicitAbortDMC4015)
+                {
+                    if (!DoDMCDMA && CannotRunDMCDMARightNow != 2)
+                    {
+                        // if playing a sample:
+                        DoDMCDMA = true;
+                        DMCDMA_Halt = true;
+                    }
+                    if (APU_SetImplicitAbortDMC4015)
+                    {
+                        APU_ImplicitAbortDMC4015 = true; // check for weird DMA abort behavior
+                        APU_SetImplicitAbortDMC4015 = false;
+                    }
+                    APU_DMC_Shifter = APU_DMC_Buffer; // and set up the shifter with the new values.
+                    APU_Silent = false; // The APU is not silent.
+
+                }
+                else
+                {
+                    APU_Silent = true;
+                }
+            }
+        }
 
         void _EmulateAPU()
         {
@@ -1497,55 +1594,16 @@ namespace TriCNES
                 APU_ChannelTimer_Noise--;
 
 
+
+                APU_DMC_StepLFSR();
+
                 //this happens whether a sample is playing or not
                 APU_ChannelTimer_DMC--;
                 APU_ChannelTimer_DMC--; // the table is in CPU cycles, but the count is in APU cycles
                 if (APU_ChannelTimer_DMC == 0)
                 {
                     APU_ChannelTimer_DMC = APU_DMC_Rate;
-                    DPCM_Up = (APU_DMC_Shifter & 1) == 1;
-                    if (DPCM_Up)
-                    {
-                        if (APU_DMC_Output <= 125) // this is 7 bit, and cannot go above 127
-                        {
-                            APU_DMC_Output += 2;
-                        }
-                    }
-                    else
-                    {
-                        if (APU_DMC_Output >= 2) // this is 7 bit, and cannot go below 0
-                        {
-                            APU_DMC_Output -= 2;
-                        }
-                    }
-                    APU_DMC_Shifter >>= 1; // shift the bits in the shift register
-                    APU_DMC_ShifterBitsRemaining--; // and decrement the "bits remaining" counter.
-                    if (APU_DMC_ShifterBitsRemaining == 0) // If there are no bits left,
-                    {
-                        APU_DMC_ShifterBitsRemaining = 8; // it's time for a DMC DMA!
-
-                        if (APU_DMC_BytesRemaining > 0 || APU_SetImplicitAbortDMC4015)
-                        {
-                            if (!DoDMCDMA && CannotRunDMCDMARightNow != 2)
-                            {
-                                // if playing a sample:
-                                DoDMCDMA = true;
-                                DMCDMA_Halt = true;
-                            }
-                            if (APU_SetImplicitAbortDMC4015)
-                            {
-                                APU_ImplicitAbortDMC4015 = true; // check for weird DMA abort behavior
-                                APU_SetImplicitAbortDMC4015 = false;
-                            }
-                            APU_DMC_Shifter = APU_DMC_Buffer; // and set up the shifter with the new values.
-                            APU_Silent = false; // The APU is not silent.
-
-                        }
-                        else
-                        {
-                            APU_Silent = true;
-                        }
-                    }
+                    //APU_DMC_StepSample();
                 }
                 if (CannotRunDMCDMARightNow > 0)
                 {
@@ -2284,26 +2342,30 @@ namespace TriCNES
         void WriteVideoMemory(byte input)
         {
             Cart.MapperChip.Connector_SetUpPPUAddressPins();
-            Cart.MapperChip.Connector_CheckCIRAM();
-            bool CE = !SeventyTwoPinConnector[56] && !ConnectorPinFloating[56] && !ConnectorPinFloating[57];
+            Cart.MapperChip.Connector_SetUpPPUDataPins(input);
 
-            if ((PPU_AddressBus & 0x3FFF) >= 0x3F00)
+            if (PPU_2007_PaletteRAMEnable)
             {
                 PaletteRAM[PPU_AddressBus & (((PPU_AddressBus & 0x3) == 0) ? 0x0F : 0x1F)] = input;
             }
-            else if (CE)
+            if(PPU_WRITE)
             {
-                // We're writing to on-console VRAM, not the cartridge.
-                // NOTE: In theory you could trigger bus conflicts with this. I'm currently just assuming the bus is free.
-                ushort Address = (ushort)((PPU_AddressBus & 0x300) | PPU_OctalLatch);
-                Address |= (ushort)(SeventyTwoPinConnector[21] ? 0x400 : 0);
-                VRAM[Address] = input;
-            }
-            else
-            {
-                Cart.MapperChip.Connector_SetUpPPUDataPins(input);
-                Cart.MapperChip.Connector_PPU_RW(PPU_READ, PPU_WRITE);
-                Cart.MapperChip.AccessPPU();
+                Cart.MapperChip.Connector_CheckCIRAM();
+                bool CE = !SeventyTwoPinConnector[56] && !ConnectorPinFloating[56] && !ConnectorPinFloating[57];
+
+                if (CE)
+                {
+                    // We're writing to on-console VRAM, not the cartridge.
+                    // NOTE: In theory you could trigger bus conflicts with this. I'm currently just assuming the bus is free.
+                    ushort Address = (ushort)((PPU_AddressBus & 0x300) | PPU_OctalLatch);
+                    Address |= (ushort)(SeventyTwoPinConnector[21] ? 0x400 : 0);
+                    VRAM[Address] = input;
+                }
+                else
+                {
+                    Cart.MapperChip.Connector_PPU_RW(PPU_READ, PPU_WRITE);
+                    Cart.MapperChip.AccessPPU();
+                }
             }
         }
 
@@ -2487,6 +2549,13 @@ namespace TriCNES
             if (PPU_2007_DB_PAR) // Using PAR instead of PPU_WRITE, since I re-use WriteVideoMemory() for writes to palette RAM.
             {
                 WriteVideoMemory(PPU_2007_WriteData);
+                if (PPU_ALE)
+                {
+                    PPU_OctalLatch = (byte)PPU_2007_WriteData;
+                    // Hey look at that, we just wrote to VRAM but uh... the octal latch has changed.
+                    // Run it back!
+                    WriteVideoMemory(PPU_2007_WriteData);
+                }
             }
         }
 
@@ -3277,11 +3346,11 @@ namespace TriCNES
                                     else
                                     {
                                         NineObjectsOnThisScanline = true;
-                                        PPUOAMAddress++;
                                         if (!PPUStatus_SpriteOverflow)// if secondary OAM is full, yet another object is on this scanline
                                         {
                                             PPUStatus_SpriteOverflow = true; // set the sprite overflow flag
                                         }
+                                        PPUOAMAddress++;
                                     }
                                     if (!SpriteEval_ReadOnly_PreRenderLine)
                                     {
@@ -4593,6 +4662,8 @@ namespace TriCNES
             CPU_Read = true;
             IgnoreH = false;
         }
+
+
 
         public void _6502()
         {
@@ -9803,7 +9874,8 @@ namespace TriCNES
                     case 0x4010:
                         APU_DMC_EnableIRQ = (Input & 0x80) != 0;
                         APU_DMC_Loop = (Input & 0x40) != 0;
-                        APU_DMC_Rate = APU_DMCRateLUT[Input & 0xF];
+                        APU_DMC_Rate4 = (byte)(Input & 0xF);
+                        APU_DMC_Rate = APU_DMCRateLUT[Input & 0xF]; // Only keeping this around for debug logging purposes. I'm using an LFSR now isntead of a counter.
                         if (!APU_DMC_EnableIRQ)
                         {
                             APU_Status_DMCInterrupt = false;
@@ -9859,14 +9931,14 @@ namespace TriCNES
                         IRQ_LevelDetector = false;
 
                         // Explicit abort stuff.
-                        if (!APU_Status_DelayedDMC && ((APU_ChannelTimer_DMC == 2 && !APU_PutCycle) || (APU_ChannelTimer_DMC == APU_DMC_Rate && APU_PutCycle))) // this will be the APU cycle that fires a DMC DMA
+                        if (!APU_Status_DelayedDMC && ((APU_DMC_LFSR == 1 && !APU_PutCycle) || (APU_DMC_LFSR == APU_DMCRate_LFSR_LUT[APU_DMC_Rate4] && APU_PutCycle))) // this will be the APU cycle that fires a DMC DMA
                         {
                             APU_DelayedDMC4015 = (byte)(APU_PutCycle ? 5 : 6); // Disable in 2.5 APU cycles, or 3 APU cycles.
                             // basically, if the DMA has already begun, don't abort it for *this* edge case.
                         }
 
                         // Implicit abort stuff.
-                        if (APU_Status_DelayedDMC && ((APU_ChannelTimer_DMC == 10 && !APU_PutCycle) || (APU_ChannelTimer_DMC == 8 && APU_PutCycle)))
+                        if (APU_Status_DelayedDMC && ((APU_DMC_LFSR == 17 && !APU_PutCycle) || (APU_DMC_LFSR == 8 && APU_PutCycle)))
                         {
                             // okay, so the series of events is as follows:
                             // the Load DMA will occur
@@ -10890,13 +10962,13 @@ namespace TriCNES
             bool LogExtra = true;
             if (LogExtra)
             {
-                //string TempLine_APU_Full = LogLine + "\t" + "DMC :: S_Addr: $" + APU_DMC_SampleAddress.ToString("X4") + "\t S_Length:" + APU_DMC_SampleLength.ToString() + "\t AddrCounter: $" + APU_DMC_AddressCounter.ToString("X4") + "\t BytesLeft:" + APU_DMC_BytesRemaining.ToString() + "\t Shifter:" + APU_DMC_Shifter.ToString() + ":" + APU_DMC_ShifterBitsRemaining.ToString() + "\tDMC_Timer:" + (APU_PutCycle ? APU_ChannelTimer_DMC : (APU_ChannelTimer_DMC - 1)).ToString();
+                string TempLine_APU_Full = LogLine + "\t" + "DMC :: S_Addr: $" + APU_DMC_SampleAddress.ToString("X4") + "\t S_Length:" + APU_DMC_SampleLength.ToString() + "\t AddrCounter: $" + APU_DMC_AddressCounter.ToString("X4") + "\t BytesLeft:" + APU_DMC_BytesRemaining.ToString() + "\t Shifter:" + APU_DMC_Shifter.ToString() + ":" + APU_DMC_ShifterBitsRemaining.ToString() + "\tDMC_Timer:" + (APU_PutCycle ? APU_ChannelTimer_DMC : (APU_ChannelTimer_DMC - 1)).ToString() + "\tG/P:" + (APU_PutCycle ? "Put" : "Get") + " FrameCounter:" + APU_Framecounter.ToString();
 
                 //string TempLine_APUFrameCounter_IRQs = LogLine + " \t$4015: " + Observe(0x4015).ToString("X2") + "\t APU_FrameCounter: " + APU_Framecounter.ToString() + " \tEvenCycle = : " + APU_PutCycle + " \tDoIRQ = " + DoIRQ;
 
                 //string TempLine_PPU = LogLine + "\t$2000:" + Observe(0x2000).ToString("X2") + "\t$2001:" + Observe(0x2001).ToString("X2") + "\t$2002:" + Observe(0x2002).ToString("X2") + "\tR/W Addr:" + PPU_v.ToString("X4") + "\tPPUAddrLatch:" + PPUAddrLatch + "\tPPU AddressBus: " + PPU_AddressBus.ToString("X4");
                 //string TempLine_PPU2 = LogLine + "\tVRAMAddress:" + PPU_v.ToString("X4") + "\tPPUReadBuffer:" + PPU_ReadBuffer.ToString("X2");
-                string TempLine_PPU3 = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\todd:" + PPU_OddFrame.ToString() + "\tv: " + PPU_v.ToString("X4")
+                //string TempLine_PPU3 = LogLine + "\tPPU_Coords (" + PPU_Scanline + ", " + PPU_Dot + ")\todd:" + PPU_OddFrame.ToString() + "\tv: " + PPU_v.ToString("X4") + "\tPPUReadBuffer: " + PPU_ReadBuffer.ToString("X2")
                 /*
                     + "\tOAM2: [";
 
@@ -10912,11 +10984,11 @@ namespace TriCNES
                         TempLine_PPU3 += "]\t OAMBuffer:" + PPU_OAMBuffer.ToString("X2");
                     }
                 }*/
-                + "\tG/P:" + (APU_PutCycle ? "Put" : "Get") + " FC:" + APU_Framecounter.ToString();
+                //+ "\tG/P:" + (APU_PutCycle ? "Put" : "Get") + " FrameCounter:" + APU_Framecounter.ToString();
 
                 //String TempLine_Mapper = LogLine + Cart.MapperChip.AppendToDebugLog();
 
-                DebugLog.AppendLine(TempLine_PPU3);
+                DebugLog.AppendLine(TempLine_APU_Full);
             }
             else
             {
@@ -10924,6 +10996,66 @@ namespace TriCNES
             }
 
 
+        }
+
+        void DeepLog()
+        {
+            // Work in progress. Planning to improve my trace logger.
+
+            /*
+            PC   | Addr | DB | DISASSEMBLY  | PURPOSE | G/P | R/W   | TARGET = PV NEW | A          | X          | Y          | Sp          | ProcessorFlag |
+            ________________________________________________________________________________________________________________________________________________
+            8000 | 8000 | 20 | JSR $ABCD    | OPCODE  | GET | READ  | 8000 = 20       | A:00       | X:00       | Y:00       | Sp:00       | P:00 nv--dizc |
+            8001 | 8001 | CD | JSR $ABCD    | OPERAND | PUT | READ  | 8001 = CD       | A:00       | X:00       | Y:00       | Sp:00       | P:00 nv--dizc |
+            8002 | 0100 | AB | JSR $ABCD    | DUMMY   | GET | READ  | 0100 = F0       | A:00       | X:00       | Y:00       | Sp:00       | P:00 nv--dizc |
+            8002 | 0100 | 02 | JSR $ABCD    | PUSH    | PUT | WRITE | 0100 = F0 -> 02 | A:00       | X:00       | Y:00       | Sp:00 -> FF | P:00 nv--dizc |
+            8002 | 01FF | 80 | JSR $ABCD    | PUSH    | GET | WRITE | 01FF = F0 -> 80 | A:00       | X:00       | Y:00       | Sp:FF -> FE | P:00 nv--dizc |
+            8002 | 01FF | 80 | JSR $ABCD    | DMC DMA | PUT | READ  | 01FF = 80       | A:00       | X:00       | Y:00       | Sp:FE       | P:00 nv--dizc |
+            8002 | 01FF | 80 | JSR $ABCD    | DMC DMA | GET | READ  | 01FF = 80       | A:00       | X:00       | Y:00       | Sp:FE       | P:00 nv--dizc |
+            8002 | 01FF | 80 | JSR $ABCD    | DMC DMA | PUT | READ  | 01FF = 80       | A:00       | X:00       | Y:00       | Sp:FE       | P:00 nv--dizc |
+            8002 | E000 | 5A | JSR $ABCD    | DMC DMA | GET | READ  | E000 = 5A       | A:00       | X:00       | Y:00       | Sp:FE       | P:00 nv--dizc |
+            8002 | 8002 | AB | JSR $ABCD    | OPERAND | PUT | READ  | 8002 = AB       | A:00       | X:00       | Y:00       | Sp:FE       | P:00 nv--dizc |
+            ________________________________________________________________________________________________________________________________________________
+
+            or perhaps
+           
+            PC   | Addr | DB | DISASSEMBLY  | PURPOSE | G/P | R/W   | TARGET = PV NEW | A          | X          | Y          | Sp          | ProcessorFlag | Scan, Dot     | v      | Addr,  Data | ALE   | READ   | WRITE   | Rendering Enabled  | Color    | OAM1ADDR    | OAM2ADDR    | OAM Buf   | OAM Access     | OAM Purpose |
+            -----------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+            8000 | 8000 | 20 | JSR $ABCD    | OPCODE  | GET | READ  | 8000 = 20       | A:00       | X:00       | Y:00       | Sp:00       | P:00 nv--dizc | Line 240, 0   | v:2000 | ad:2000, 00 | ALE:1 | READ:0 | WRITE:0 | Enabled:S+B (BLNK) | Color:00 | OAM1ADDR:00 | OAM2ADDR:00 | OAMBuf:FF | OAM2[00] Read  | OAM IDLE    |
+                                                                                                                                                           |
+                                                                                                                                                           |
+            8001 | 8001 | CD | JSR $ABCD    | OPERAND | PUT | READ  | 8001 = CD       | A:00       | X:00       | Y:00       | Sp:00       | P:00 nv--dizc |
+                                                                                                                                                           |
+                                                                                                                                                           |
+            8002 | 0100 | AB | JSR $ABCD    | DUMMY   | GET | READ  | 0100 = F0       | A:00       | X:00       | Y:00       | Sp:00       | P:00 nv--dizc |
+                                                                                                                                                           |
+                                                                                                                                                           |
+            8002 | 0100 | 02 | JSR $ABCD    | PUSH    | PUT | WRITE | 0100 = F0 -> 02 | A:00       | X:00       | Y:00       | Sp:00 -> FF | P:00 nv--dizc |
+                                                                                                                                                           |
+                                                                                                                                                           |
+            8002 | 01FF | 80 | JSR $ABCD    | PUSH    | GET | WRITE | 01FF = F0 -> 80 | A:00       | X:00       | Y:00       | Sp:FF -> FE | P:00 nv--dizc |
+                                                                                                                                                           |
+                                                                                                                                                           |
+            8002 | 8002 | AB | JSR $ABCD    | OPERAND | PUT | READ  | 8002 = AB       | A:00       | X:00       | Y:00       | Sp:FE       | P:00 nv--dizc |
+                                                                                                                                                           |
+                                                                                                                                                           |
+            _______________________________________________________________________________________________________________________________________________|
+
+            */
+
+            ushort DeepLog_PC = programCounter;
+            ushort DeepLog_Addr = addressBus;
+            byte DeepLog_Data = dataBus;
+            string DeepLog_Disassembly = "";
+            string DeepLog_Purpose = "";
+            string DeepLog_GetPut = APU_PutCycle ? "PUT" : "GET";
+            string DeepLog_ReadWrite = CPU_Read ? "READ" : "WRITE";
+            string DeepLog_Target = "";
+            byte DeepLog_A = A;
+            byte DeepLog_X = X;
+            byte DeepLog_Y = Y;
+            byte DeepLog_Sp = stackPointer;
+            string DeepLog_P = "";
         }
 
         void Debug_PPU()
@@ -10944,6 +11076,7 @@ namespace TriCNES
             string enabled = "[" + (PPU_Mask_ShowSprites ? "S" : "-") + (PPU_Mask_ShowBackground ? "B" : "-") + "]\t";
             string ALE = "ALE: " + (PPU_ALE?"1":"0") + "\t";
             string RD = "RD: " + (PPU_READ ? "1" : "0") + "\t";
+            string WR = "WR: " + (PPU_WRITE ? "1" : "0") + "\t";
             string BSR_Lo = "BSRL: " + Convert.ToString(PPU_BackgroundPatternShiftRegisterL, 2).PadLeft(16, '0') + "\t";
             string BSR_Hi = "BSRH: " + Convert.ToString(PPU_BackgroundPatternShiftRegisterH, 2).PadLeft(16, '0') + "\t";
             string OamBuf = "OAM Buffer: " + PPU_OAMBuffer.ToString("X2") + "\t";
@@ -10979,7 +11112,7 @@ namespace TriCNES
                 }
             }
 
-                string LogLine = "(" + PPU_Scanline.ToString() + ", " + PPU_Dot.ToString() + ")  \t" + v + Addr + Octal + EightCycleRead + dotColor + enabled + MMC3 + ALE + RD + BSR_Lo + BSR_Hi + OamBuf;
+                string LogLine = "(" + PPU_Scanline.ToString() + ", " + PPU_Dot.ToString() + ")  \t" + v + Addr + Octal + EightCycleRead + dotColor + enabled + MMC3 + ALE + RD + WR + BSR_Lo + BSR_Hi + OamBuf;
             DebugLog.AppendLine(LogLine);
         }
 
@@ -11271,6 +11404,10 @@ namespace TriCNES
             State.Add((byte)(PPU_WRITE ? 1 : 0));
 
             State.Add(PPU_RenderingCounter);
+
+            State.Add((byte)APU_DMC_LFSR);
+            State.Add((byte)(APU_DMC_LFSR >> 8));
+            State.Add(APU_DMC_Rate4);
 
             State.Add(PPU_Update2001Delay);              // TEMPORARY
             State.Add(PPU_Update2001OAMCorruptionDelay); // TEMPORARY
@@ -11579,6 +11716,10 @@ namespace TriCNES
             PPU_WRITE = (State[p++] & 1) == 1;
 
             PPU_RenderingCounter = State[p++];
+
+            APU_DMC_LFSR = State[p++];
+            APU_DMC_LFSR |= (ushort)(State[p++] << 8);
+            APU_DMC_Rate4 = State[p++];
 
             PPU_Update2001Delay = State[p++];              //TEMPORARY
             PPU_Update2001OAMCorruptionDelay = State[p++]; //TEMPORARY
