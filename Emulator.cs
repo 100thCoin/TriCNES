@@ -1268,8 +1268,17 @@ namespace TriCNES
             {
                 _EmulateHalfPPU();
             }
+            // The CPU is reading from PPU Registers.
+            if (PPUSEL > 0)
+            {
+                UpdatePPUIOBus(); // The CPU's data bus is driven by the PPU here.
+            }
 
-            if(CICClock == 5) // The CIC clock is NOT tied to the master clock. It would actually clock approximately every 5.369318 master clock cycles, but I'm not going to worry about that for now.
+
+
+
+
+            if (CICClock == 5) // The CIC clock is NOT tied to the master clock. It would actually clock approximately every 5.369318 master clock cycles, but I'm not going to worry about that for now.
             {
                 CICClock = 0;
                 if (!Cart.MapperChip.CheckCIC())
@@ -1306,6 +1315,52 @@ namespace TriCNES
                 _EmulatorCore();
             }
         }
+
+        public void UpdatePPUIOBus()
+        {
+            switch (PPU_IO_Address)
+            {
+                case 2:
+                    PPUBus &= 0x1F;
+                    PPUBus |= (byte)((PPUStatus_LatchedVBlank ? 0x80 : 0) | (PPUStatus_SpriteZeroHit_Delayed ? 0x40 : 0) | (PPUStatus_SpriteOverflow_Delayed ? 0x20 : 0));
+                    break;
+
+                case 4:
+                    PPUBus = ReadOAM();
+                    break;
+
+                case 7:
+                    if ((PPU_AddressBus & 0x3FFF) >= 0x3F00)
+                    {
+                        ushort PalRAMAddr = (ushort)(PPU_v & 0x3F1F);
+                        if ((PalRAMAddr & 3) == 0)
+                        {
+                            PalRAMAddr &= 0x3F0F;
+                        }
+                        PPUBus = (byte)(((PaletteRAM[PalRAMAddr & 0x1F] & (PPU_Mask_Greyscale ? 0x30 : 0x3F)) | (PPUBus & 0xC0)));
+                    }
+                    else
+                    {
+                        PPUBus = PPU_ReadBuffer;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            PPUSEL--;
+            if (PPUSEL == 0)
+            {
+                PPU_Read2002 = false;
+                if (PPU_IO_Address == 7)
+                {
+                    PPU_2007_Read_SR = true; // set the SR latch at the end of the CPU read. Here's where the clock alignment differences begin. :)
+                    PPU_2007_Read = true; // Start the $2007 Read state machine.
+                }
+            }
+            dataBus = PPUBus; // The PPU sets the CPU's data bus.
+                              // And yes- this *does* continue to update the data bus for about one master clock cycle after the CPU's read ends. Funny stuff.
+        }
+
 
         // Audio Processing Unit Variables //
 
@@ -1901,8 +1956,8 @@ namespace TriCNES
         void _EmulatePPU()
         {
 
-            // Reading from PPU Registers.
-            if (PPUSEL)
+            // The CPU is reading from PPU Registers.
+            if (PPUSEL > 0)
             {
                 switch (PPU_IO_Address)
                 {
@@ -1914,45 +1969,17 @@ namespace TriCNES
                             PPU_Read2002 = true;
                             PPUAddrLatch = false;
                         }
-                        PPUBus &= 0x1F;
-                        PPUBus |= (byte)((PPUStatus_LatchedVBlank ? 0x80 : 0) | (PPUStatus_SpriteZeroHit_Delayed ? 0x40 : 0) | (PPUStatus_SpriteOverflow_Delayed ? 0x20 : 0));
                         break;
-
-                    case 4:
-                        PPUBus = ReadOAM();
-                        break;
-
                     case 7:
-                        PPU_Read2007 = true;
                         if ((PPU_AddressBus & 0x3FFF) >= 0x3F00)
                         {
                             // read from palette RAM.
                             // Palette RAM only returns bits 0-5, so bits 6 and 7 are PPU open bus.
                             ThisDotReadFromPaletteRAM = true;
-                            ushort PalRAMAddr = (ushort)(PPU_v & 0x3F1F);
-                            if ((PalRAMAddr & 3) == 0)
-                            {
-                                PalRAMAddr &= 0x3F0F;
-                            }
-                            PPUBus = (byte)(((PaletteRAM[PalRAMAddr & 0x1F] & (PPU_Mask_Greyscale ? 0x30 : 0x3F)) | (PPUBus & 0xC0)));
-                        }
-                        else
-                        {
-                            PPUBus = PPU_ReadBuffer;
                         }
                         break;
                     default:
                         break;
-                }
-            }
-            else
-            {
-                PPU_Read2002 = false;
-                if (PPU_Read2007)
-                {
-                    PPU_Read2007 = false;
-                    PPU_2007_Read_SR = true; // set the SR latch at the end of the CPU read. Here's where the clock alignment differences begin. :)
-                    PPU_2007_Read = true; // Start the $2007 Read state machine.
                 }
             }
 
@@ -9550,7 +9577,7 @@ namespace TriCNES
         +++----------------- fine Y scroll
         */
 
-        bool PPUSEL;
+        byte PPUSEL = 0;
         byte PPU_IO_Address;
 
         byte PPU_Update2006Delay;   // The number of PPU cycles to wait between writing to $2006 and the ppu from updating
@@ -9679,12 +9706,10 @@ namespace TriCNES
             else if (Address >= 0x2000 && Address < 0x4000)
             {
                 // PPU registers. most of these aren't meant to be read.
-                PPUSEL = true;
+                PPUSEL = 8; // PPUSEL will be high for about 8 master clock cycles.
                 PPU_IO_Address = (byte)(Address & 7);
-                EmulateUntilEndOfRead(); // In the meantime, run the PPU and then see what happened to the PPU IO Bus afterwards.
-                dataBus = PPUBus;
+                EmulateUntilEndOfRead(); // In the meantime, run the PPU. The PPU will update the data bus for us.
                 dataPinsAreNotFloating = true;
-                PPUSEL = false;
             }
             else
             {
@@ -11390,9 +11415,8 @@ namespace TriCNES
             State.Add((byte)(APU_DMC_LFSR >> 8));
             State.Add(APU_DMC_Rate4);
 
-            State.Add((byte)(PPU_Read2007 ? 1 : 0));
             State.Add(PPU_IO_Address);
-            State.Add((byte)(PPUSEL ? 1 : 0));
+            State.Add(PPUSEL);
             State.Add((byte)(PPUStatus_LatchedVBlank ? 1 : 0));
 
             State.Add(PPU_Update2001Delay);              // TEMPORARY
@@ -11707,9 +11731,8 @@ namespace TriCNES
             APU_DMC_LFSR |= (ushort)(State[p++] << 8);
             APU_DMC_Rate4 = State[p++];
 
-            PPU_Read2007 = (State[p++] & 1) == 1;
             PPU_IO_Address = State[p++];
-            PPUSEL = (State[p++] & 1) == 1;
+            PPUSEL = State[p++];
             PPUStatus_LatchedVBlank = (State[p++] & 1) == 1;
 
             PPU_Update2001Delay = State[p++];              //TEMPORARY
